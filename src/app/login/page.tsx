@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -9,6 +9,33 @@ import { auth } from "@/lib/firebase";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 
 export default function LoginPage() {
+  // ✅ Required: wrap anything using useSearchParams in Suspense
+  return (
+    <Suspense fallback={<LoginFallback />}>
+      <LoginInner />
+    </Suspense>
+  );
+}
+
+function LoginFallback() {
+  // Keep it simple so it never crashes build
+  return (
+    <main
+      style={{
+        minHeight: "100vh",
+        display: "grid",
+        placeItems: "center",
+        background: "#0b0f19",
+        color: "white",
+        padding: 24,
+      }}
+    >
+      <div style={{ opacity: 0.85, fontWeight: 900 }}>Loading…</div>
+    </main>
+  );
+}
+
+function LoginInner() {
   const router = useRouter();
   const sp = useSearchParams();
 
