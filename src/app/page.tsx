@@ -16,7 +16,7 @@ export default function Home() {
               src="/rvnb-logo-icon.png"
               alt="RVNB"
               className={styles.brandIcon}
-              style={{ width: 64, height: 64 }}
+              style={{ width: 95, height: 95 }}
             />
           </Link>
 
