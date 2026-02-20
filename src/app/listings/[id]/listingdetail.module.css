@@ -1,0 +1,304 @@
+.page {
+  min-height: 100vh;
+  background:
+    radial-gradient(1000px 600px at 50% -100px, rgba(90, 120, 255, 0.18), transparent),
+    radial-gradient(900px 500px at 30% 0px, rgba(40, 200, 255, 0.10), transparent),
+    #05070b;
+  color: white;
+}
+
+.container {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 40px 16px 80px;
+}
+
+.backLink {
+  display: inline-block;
+  color: rgba(255,255,255,0.75);
+  text-decoration: none;
+  margin-bottom: 16px;
+}
+.backLink:hover {
+  color: rgba(255,255,255,0.92);
+}
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.h1 {
+  margin: 0;
+  font-size: 36px;
+  letter-spacing: 0.2px;
+}
+
+.location {
+  margin-top: 6px;
+  opacity: 0.8;
+}
+
+.priceBox {
+  text-align: right;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.priceValue {
+  font-size: 22px;
+  font-weight: 900;
+}
+.priceLabel {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.photoArea {
+  margin-top: 16px;
+  height: 220px;
+  border-radius: 18px;
+  background:
+    radial-gradient(600px 260px at 25% 15%, rgba(255,255,255,0.10), transparent),
+    linear-gradient(120deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 14px;
+}
+
+.photoBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.10);
+  font-weight: 800;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.layout {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1.35fr 0.65fr;
+  gap: 14px;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  border-radius: 18px;
+  padding: 18px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+
+.cardTitle {
+  font-weight: 900;
+  font-size: 14px;
+  margin-bottom: 12px;
+  opacity: 0.95;
+}
+
+.pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.pill {
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.features {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.featureRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(0,0,0,0.20);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.featureKey {
+  opacity: 0.75;
+  font-size: 13px;
+}
+.featureVal {
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.note {
+  margin-top: 12px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.paragraph {
+  margin: 0;
+  line-height: 1.6;
+  opacity: 0.85;
+}
+
+/* Booking card */
+.bookingCard {
+  border-radius: 18px;
+  padding: 18px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  position: sticky;
+  top: 18px;
+}
+
+.bookingTop {
+  margin-bottom: 14px;
+}
+
+.bookingTitle {
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.bookingSub {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.dateRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 900px) {
+  .bookingCard {
+    position: relative;
+    top: auto;
+  }
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.label {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.input {
+  height: 42px;
+  border-radius: 12px;
+  padding: 0 12px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.10);
+  color: white;
+  outline: none;
+}
+
+.sectionTitle {
+  margin-top: 12px;
+  font-size: 12px;
+  font-weight: 900;
+  opacity: 0.85;
+}
+
+.segmentRow {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.segmentBtn {
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(0,0,0,0.20);
+  color: rgba(255,255,255,0.88);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.segmentActive {
+  border-color: rgba(255,255,255,0.22);
+  background: rgba(255,255,255,0.10);
+  color: white;
+}
+
+.summary {
+  margin-top: 12px;
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(0,0,0,0.18);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.summaryRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 6px 0;
+}
+
+.summaryHint {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.65;
+}
+
+.message {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.primaryAction {
+  margin-top: 12px;
+  width: 100%;
+  height: 46px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.12);
+  color: white;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.primaryAction:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

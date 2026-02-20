@@ -1,0 +1,239 @@
+.page {
+  min-height: 100vh;
+  background:
+    radial-gradient(1000px 600px at 50% -100px, rgba(90, 120, 255, 0.18), transparent),
+    radial-gradient(900px 500px at 30% 0px, rgba(40, 200, 255, 0.10), transparent),
+    #05070b;
+  color: white;
+}
+
+.container {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 48px 16px 80px;
+}
+
+.heroCard {
+  border-radius: 18px;
+  padding: 28px 22px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  font-size: 12px;
+  letter-spacing: 0.3px;
+  opacity: 0.95;
+}
+
+.badgeDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.h1 {
+  margin: 14px 0 6px;
+  font-size: 38px;
+  line-height: 1.1;
+}
+
+.sub {
+  margin: 0;
+  opacity: 0.85;
+  font-size: 16px;
+  max-width: 760px;
+}
+
+.countLine {
+  margin-top: 18px;
+  opacity: 0.75;
+  font-size: 14px;
+}
+
+.primaryBtn {
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+}
+
+.primaryBtn:hover {
+  transform: translateY(-1px);
+  transition: transform 140ms ease;
+}
+
+/* GRID */
+.grid {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 760px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* CARD */
+.card {
+  border-radius: 18px;
+  padding: 18px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  text-decoration: none;
+  color: white;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 200ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+}
+
+/* PHOTO AREA (future-ready) */
+.photoArea {
+  height: 120px;
+  border-radius: 14px;
+  background:
+    radial-gradient(280px 140px at 30% 20%, rgba(255,255,255,0.10), transparent),
+    linear-gradient(120deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+  border: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 10px;
+}
+
+.photoBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  color: rgba(255,255,255,0.90);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+/* Card top row */
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cardTitle {
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0.2px;
+}
+
+/* Price */
+.price {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.priceValue {
+  font-weight: 900;
+  font-size: 20px;
+  letter-spacing: 0.3px;
+}
+
+.per {
+  font-weight: 600;
+  font-size: 12px;
+  opacity: 0.65;
+}
+
+/* Meta pills */
+.cardMeta {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  opacity: 0.95;
+}
+
+.pill {
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+/* CTA */
+.cardCta {
+  margin-top: 14px;
+  font-weight: 800;
+  font-size: 13px;
+  opacity: 0.9;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.arrow {
+  transition: transform 160ms ease;
+}
+
+.card:hover .arrow {
+  transform: translateX(4px);
+}
+
+/* Empty state */
+.emptyCard {
+  margin-top: 16px;
+  border-radius: 18px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.emptyTitle {
+  font-weight: 900;
+  font-size: 16px;
+}
+
+.emptySub {
+  margin-top: 6px;
+  opacity: 0.75;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
