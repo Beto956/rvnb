@@ -11,10 +11,21 @@ export default function Home() {
       <header className={styles.header}>
         <div className={styles.headerInner}>
           <Link href="/" className={styles.brand} aria-label="RVNB Home">
-            <span className={styles.brandMark}>RVNB</span>
-            <span className={styles.brandSub}>
-              Recreational Vehicle Nationwide Booking
-            </span>
+            {/* ✅ LOGO ICON */}
+            <img
+              src="/rvnb-logo-icon.png"
+              alt="RVNB"
+              className={styles.brandIcon}
+             style={{ width: 140, height: 140, border: "6px solid red" }}
+           />
+
+            {/* ✅ TEXT STACK */}
+            <div className={styles.brandText}>
+              <span className={styles.brandMark}>RVNB</span>
+              <span className={styles.brandSub}>
+                Recreational Vehicle Nationwide Booking
+              </span>
+            </div>
           </Link>
 
           <nav className={styles.nav} aria-label="Primary">
@@ -39,7 +50,7 @@ export default function Home() {
       >
         <div className={styles.heroBg} aria-hidden="true" />
         <div className={styles.heroOverlay} aria-hidden="true" />
-        {/* Optional grain overlay if you want it */}
+        {/* Optional grain */}
         {/* <div className={styles.heroGrain} aria-hidden="true" /> */}
 
         <div className={styles.heroInner}>
@@ -74,12 +85,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 2–5) SUNLIGHT BAND (single background, no stacking) */}
-      <div
-        className={styles.sunWrap}
-        role="region"
-        aria-label="Sunlight band"
-      >
+      {/* 2–5) SUNLIGHT BAND */}
+      <div className={styles.sunWrap} role="region" aria-label="Sunlight band">
         {/* 2) QUICK SEARCH BAR */}
         <section className={styles.quickSearchWrap} aria-label="Quick search">
           <div className={styles.container}>
@@ -174,8 +181,8 @@ export default function Home() {
                     <span className={styles.badge}>Coming Soon</span>
                   </div>
                   <p className={styles.cardBody}>
-                    Spot reviews, safety tips, region threads, and
-                    host-to-traveler support — built into the platform.
+                    Spot reviews, safety tips, region threads, and host-to-traveler
+                    support — built into the platform.
                   </p>
                   <span className={styles.cardMuted}>
                     Future: moderation, profiles, reputation
@@ -263,7 +270,9 @@ export default function Home() {
               <div className={styles.footerBrandSub}>
                 Recreational Vehicle Nationwide Booking
               </div>
-              <div className={styles.footerMeta}>Built with Next.js + Firebase</div>
+              <div className={styles.footerMeta}>
+                Built with Next.js + Firebase
+              </div>
             </div>
           </div>
 

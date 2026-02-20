@@ -15,6 +15,9 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
+// ✅ ADD (auth) — minimal + additive, does NOT reconfigure Firebase
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+
 type Hookups = "Full" | "Partial" | "None";
 type PricingType = "Night" | "Weekly" | "Monthly";
 
@@ -22,6 +25,9 @@ type ListingDoc = {
   title?: string;
   city?: string;
   state?: string;
+
+  // ✅ ADD (owner field, additive)
+  hostId?: string;
 
   price?: number;
   pricePerNight?: number; // ✅ legacy fallback
@@ -61,6 +67,10 @@ type ListingUI = {
   title: string;
   city: string;
   state: string;
+
+  // ✅ ADD (owner field, additive)
+  hostId: string;
+
   price: number;
   pricingType: PricingType;
   maxLengthFt: number;
@@ -163,6 +173,9 @@ function toUI(id: string, d: ListingDoc): ListingUI {
     city: (d.city ?? "(City not set)").toString(),
     state: (d.state ?? "(State)").toString(),
 
+    // ✅ ADD: hostId (safe fallback for older listings)
+    hostId: (d.hostId ?? "").toString(),
+
     // ✅ fallback for older listings created before `price` existed
     price:
       typeof d.price === "number"
@@ -200,6 +213,9 @@ function toUI(id: string, d: ListingDoc): ListingUI {
 }
 
 export default function HostPage() {
+  // ✅ ADD: auth uid (minimal, additive)
+  const [userUid, setUserUid] = useState<string>("");
+
   // form fields
   const [title, setTitle] = useState("");
   const [city, setCity] = useState("");
@@ -368,6 +384,15 @@ export default function HostPage() {
     }
   }
 
+  // ✅ ADD: capture current user uid (minimal, additive)
+  useEffect(() => {
+    const auth = getAuth();
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUserUid(u?.uid ? u.uid : "");
+    });
+    return () => unsub();
+  }, []);
+
   useEffect(() => {
     loadListingsAndBookings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -490,11 +515,20 @@ export default function HostPage() {
       return;
     }
 
+    // ✅ ADD: require login for ownership field
+    if (!userUid) {
+      setStatus("⚠️ You must be logged in to create a listing.");
+      return;
+    }
+
     const s = stateCode.trim().toUpperCase();
 
     setSaving(true);
     try {
       await addDoc(collection(db, "listings"), {
+        // ✅ ADD (owner field)
+        hostId: userUid,
+
         title: title.trim(),
         city: city.trim(),
         state: s,
@@ -1052,7 +1086,11 @@ export default function HostPage() {
 
                       <div style={pillPrice}>
                         ${l.price} /{" "}
-                        {l.pricingType === "Night" ? "night" : l.pricingType === "Weekly" ? "week" : "month"}
+                        {l.pricingType === "Night"
+                          ? "night"
+                          : l.pricingType === "Weekly"
+                          ? "week"
+                          : "month"}
                       </div>
                     </div>
 

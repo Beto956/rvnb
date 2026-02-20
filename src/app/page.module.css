@@ -20,6 +20,7 @@
   z-index: 10;
   background: rgba(15, 23, 42, 0.85);
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -33,24 +34,43 @@
   gap: 16px;
 }
 
+/* Brand */
 .brand {
   text-decoration: none;
   color: inherit;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 12px; /* ✅ important since you removed brandRow */
   line-height: 1.1;
 }
 
+.brandIcon {
+  width: 80px;
+  height: 32px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.35));
+}
+
+/* ✅ NEW: stack text */
+.brandText {
+  display: flex;
+  flex-direction: column;
+}
+
 .brandMark {
-  font-weight: 800;
-  letter-spacing: 0.5px;
+  font-weight: 900;
+  letter-spacing: 1px;
   font-size: 1.05rem;
+  display: block;
 }
 
 .brandSub {
-  font-size: 0.85rem;
-  opacity: 0.75;
+  font-size: 0.82rem;
+  opacity: 0.7;
   margin-top: 2px;
+  letter-spacing: 0.3px;
+  display: block;
 }
 
 .nav {
@@ -81,13 +101,6 @@
   border-color: rgba(255, 255, 255, 0.10);
 }
 
-.navDivider {
-  width: 1px;
-  height: 24px;
-  background: rgba(255, 255, 255, 0.16);
-  margin: 0 2px;
-}
-
 .navCta {
   text-decoration: none;
   color: #0f172a;
@@ -116,7 +129,7 @@
   padding: 74px 0 44px;
 }
 
-/* premium cinematic overlays (z-index safe; heroInner stays above) */
+/* cinematic overlays */
 .hero::before {
   content: "";
   position: absolute;
@@ -144,33 +157,24 @@
   opacity: 1;
 }
 
-/* Background layer: wires hero image var + preserves existing glow gradients */
 .heroBg {
   position: absolute;
   inset: 0;
-  /* Supports dynamic background from page.tsx:
-     style={{ ["--hero-bg-url" as any]: "url('/rvnb-home-bg.png')" }}
-     Then uses: background-image: var(--hero-bg-url);
-  */
   background-image: var(--hero-bg-url);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-
-  /* Existing glow system preserved & enhanced subtly for premium feel */
   background-color: transparent;
   filter: saturate(1.02) contrast(1.03);
   transform: scale(1.01);
   opacity: 1;
 }
 
-/* Keep the existing gradient glows on top of the image */
 .heroOverlay {
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-
   background:
     radial-gradient(900px 500px at 20% 15%, rgba(56, 189, 248, 0.12), transparent 60%),
     radial-gradient(800px 520px at 80% 30%, rgba(168, 85, 247, 0.14), transparent 62%),
@@ -181,11 +185,10 @@
       rgba(15, 23, 42, 0.60),
       rgba(15, 23, 42, 0.90)
     );
-
   opacity: 1;
 }
 
-/* Subtle grain texture (no external asset required) */
+/* Optional grain texture */
 .heroGrain {
   position: absolute;
   inset: 0;
@@ -210,7 +213,6 @@
   mix-blend-mode: overlay;
 }
 
-/* Ensure heroInner stays above overlays */
 .heroInner {
   position: relative;
   z-index: 1;
@@ -326,90 +328,6 @@
 /* Quick Search Wrap */
 .quickSearchWrap {
   padding: 0 0 24px;
-}
-
-.qsCard {
-  margin-top: 16px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  padding: 16px;
-  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.22);
-}
-
-.qsHeader {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-bottom: 12px;
-}
-
-.qsTitle {
-  margin: 0;
-  font-size: 1.05rem;
-}
-
-.qsSub {
-  margin: 0;
-  opacity: 0.78;
-  font-size: 0.92rem;
-}
-
-.qsGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr auto;
-  gap: 10px;
-  align-items: end;
-}
-
-.qsField {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.qsLabel {
-  font-size: 0.85rem;
-  opacity: 0.8;
-}
-
-.qsControl {
-  border-radius: 12px;
-  padding: 12px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(15, 23, 42, 0.55);
-  color: white;
-  outline: none;
-}
-
-.qsControl:focus {
-  border-color: rgba(56, 189, 248, 0.45);
-  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
-}
-
-.qsButton {
-  border-radius: 12px;
-  padding: 12px 16px;
-  border: none;
-  cursor: pointer;
-  background: white;
-  color: #0f172a;
-  font-weight: 800;
-  transition: transform 160ms ease, box-shadow 180ms ease, filter 180ms ease;
-  height: 44px;
-  will-change: transform;
-}
-
-.qsButton:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.26);
-  filter: brightness(1.02);
-}
-
-.qsHint {
-  margin-top: 10px;
-  opacity: 0.72;
-  font-size: 0.88rem;
 }
 
 /* Sections */
@@ -788,38 +706,6 @@
   font-size: 0.92rem;
 }
 
-.footerCols {
-  display: flex;
-  gap: 26px;
-  flex-wrap: wrap;
-}
-
-.footerCol {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 140px;
-}
-
-.footerColTitle {
-  font-weight: 900;
-  opacity: 0.92;
-  margin-bottom: 2px;
-}
-
-.footerLink {
-  text-decoration: none;
-  color: rgba(255, 255, 255, 0.86);
-  transition: transform 160ms ease, color 160ms ease, text-shadow 180ms ease;
-  will-change: transform;
-}
-
-.footerLink:hover {
-  color: white;
-  transform: translateY(-1px);
-  text-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
-}
-
 .footerBottom {
   display: flex;
   justify-content: space-between;
@@ -843,10 +729,6 @@
     grid-template-columns: 1fr;
   }
 
-  .qsGrid {
-    grid-template-columns: 1fr;
-  }
-
   .stripInner {
     flex-direction: column;
     align-items: flex-start;
@@ -860,28 +742,24 @@
 
 /* ==========================================
    SUNLIGHT BAND (ONE IMAGE spanning sections 2–5)
-   No stacking because it renders only once
    ========================================== */
 
 .sunWrap {
   position: relative;
   overflow: hidden;
   isolation: isolate;
-
   background-image: url("/rvnb-mid-sunlight.png");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
 }
 
-/* Light “daylift” glow so the sunlight feels alive */
 .sunWrap::before {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-
   background:
     radial-gradient(1000px 600px at 55% 12%, rgba(255, 255, 255, 0.16), transparent 60%),
     radial-gradient(900px 700px at 20% 40%, rgba(255, 255, 255, 0.10), transparent 62%),
@@ -891,19 +769,16 @@
       rgba(15, 23, 42, 0.22),
       rgba(15, 23, 42, 0.62)
     );
-
   mix-blend-mode: screen;
   opacity: 1;
 }
 
-/* Readability fade so text/cards always stay crisp */
 .sunWrap::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
-
   background: linear-gradient(
     to bottom,
     rgba(15, 23, 42, 0.86),
@@ -912,18 +787,16 @@
   );
 }
 
-/* Ensure all children are above overlays */
 .sunWrap > * {
   position: relative;
   z-index: 2;
 }
 
-/* Optional: slightly boost “glass” feel over the image */
 .sunWrap .card,
 .sunWrap .step,
-.sunWrap .qsCard,
 .sunWrap .previewCard {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
