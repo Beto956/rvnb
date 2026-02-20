@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -185,7 +187,9 @@ function toRequestUI(id: string, d: SpotRequestDoc): SpotRequestUI {
 /** ---------------- Page Wrapper (Suspense-safe) ---------------- */
 export default function SearchPage() {
   return (
-    <Suspense fallback={<div style={{ minHeight: "100vh", background: "#0b0f19" }} />}>
+    <Suspense
+      fallback={<div style={{ minHeight: "100vh", background: "#0b0f19" }} />}
+    >
       <SearchPageClient />
     </Suspense>
   );
@@ -196,7 +200,7 @@ function SearchPageClient() {
   const router = useRouter();
   const sp = useSearchParams();
 
-  /** URL params (basic compatibility with homepage quick search) */
+  /** URL params */
   const paramState = normalizeState(sp.get("state") ?? "");
   const paramMaxPrice = sp.get("maxPrice") ? Number(sp.get("maxPrice")) : NaN;
   const paramHookups = (sp.get("hookups") ?? "").toString();
@@ -216,7 +220,7 @@ function SearchPageClient() {
       : "Any") as Hookups | "Any"
   );
 
-  /** Advanced filters (NEW) */
+  /** Advanced filters */
   const [showAdvanced, setShowAdvanced] = useState(true);
 
   const [minLengthFt, setMinLengthFt] = useState<number>(0);
@@ -280,9 +284,7 @@ function SearchPageClient() {
     try {
       const q = query(collection(db, "listings"), orderBy("createdAt", "desc"));
       const snap = await getDocs(q);
-      const rows = snap.docs.map((d) =>
-        toListingUI(d.id, d.data() as ListingDoc)
-      );
+      const rows = snap.docs.map((d) => toListingUI(d.id, d.data() as ListingDoc));
       setListings(rows);
     } catch (e) {
       console.error(e);
@@ -295,14 +297,9 @@ function SearchPageClient() {
   async function loadRecentRequests() {
     setRequestsLoading(true);
     try {
-      const q = query(
-        collection(db, "spotRequests"),
-        orderBy("createdAt", "desc")
-      );
+      const q = query(collection(db, "spotRequests"), orderBy("createdAt", "desc"));
       const snap = await getDocs(q);
-      const rows = snap.docs.map((d) =>
-        toRequestUI(d.id, d.data() as SpotRequestDoc)
-      );
+      const rows = snap.docs.map((d) => toRequestUI(d.id, d.data() as SpotRequestDoc));
       setRecentRequests(rows.slice(0, 50));
     } catch (e) {
       console.error(e);
@@ -321,7 +318,6 @@ function SearchPageClient() {
     if (stateCode && stateCode.length === 2) setReqState(stateCode);
   }, [stateCode]);
 
-  /** Active filters count (so it feels “advanced”) */
   const activeFiltersCount = useMemo(() => {
     let n = 0;
     if (qText.trim()) n++;
@@ -376,7 +372,6 @@ function SearchPageClient() {
     amenPicnic,
   ]);
 
-  /** Filtering (in-memory, safe) */
   const filtered = useMemo(() => {
     const q = qText.trim().toLowerCase();
     const s = normalizeState(stateCode);
@@ -390,11 +385,8 @@ function SearchPageClient() {
         const hay =
           `${l.title} ${l.city} ${l.state} ${l.description} ${l.nearbyAttractions}`.toLowerCase();
         if (q && !hay.includes(q)) return false;
-
         if (s && normalizeState(l.state) !== s) return false;
-
         if (mp > 0 && l.price > mp) return false;
-
         if (hookups !== "Any" && l.hookups !== hookups) return false;
 
         if (pricingType !== "Any" && l.pricingType !== pricingType) return false;
@@ -444,7 +436,7 @@ function SearchPageClient() {
       .sort((a, b) => {
         if (sortMode === "PriceLow") return (a.price || 0) - (b.price || 0);
         if (sortMode === "PriceHigh") return (b.price || 0) - (a.price || 0);
-        return 0;
+        return 0; // keep Firestore order for "Newest"
       });
   }, [
     listings,
@@ -473,14 +465,12 @@ function SearchPageClient() {
     sortMode,
   ]);
 
-  const hasResults = filtered.length > 0;
-
   useEffect(() => {
-    if (!loading && !hasResults && activeFiltersCount > 0) {
+    if (!loading && filtered.length === 0 && activeFiltersCount > 0) {
       setShowRequestForm(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, hasResults]);
+  }, [loading, filtered.length]);
 
   function pushParams() {
     const params = new URLSearchParams();
@@ -609,7 +599,6 @@ function SearchPageClient() {
 
   return (
     <main style={wrap}>
-      {/* HERO */}
       <div style={hero}>
         <div>
           <h1 style={heroTitle}>Find RV Spots</h1>
@@ -629,46 +618,23 @@ function SearchPageClient() {
         </div>
       </div>
 
-      {/* SEARCH CARD */}
       <section style={card}>
         <div style={sectionHeader}>
           <div>
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <h2 style={sectionTitle}>Search</h2>
               <span style={badge}>{activeFiltersCount} filters</span>
             </div>
             <p style={sectionSub}>
-              Use the basics up top. Expand advanced filters to find the exact
-              spot.
+              Use the basics up top. Expand advanced filters to find the exact spot.
             </p>
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              flexWrap: "wrap",
-              justifyContent: "flex-end",
-            }}
-          >
-            <button
-              style={smallBtn}
-              onClick={pushParams}
-              title="Update URL params (basic filters)"
-            >
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <button style={smallBtn} onClick={pushParams} title="Update URL params (basic filters)">
               Apply
             </button>
-            <button
-              style={smallBtn}
-              onClick={() => setShowAdvanced((v) => !v)}
-            >
+            <button style={smallBtn} onClick={() => setShowAdvanced((v) => !v)}>
               {showAdvanced ? "Hide Advanced" : "Show Advanced"}
             </button>
             <button style={clearBtn} onClick={resetAll}>
@@ -677,7 +643,6 @@ function SearchPageClient() {
           </div>
         </div>
 
-        {/* BASIC FILTERS */}
         <div style={toolbar}>
           <div>
             <label style={label}>City / keyword</label>
@@ -719,63 +684,33 @@ function SearchPageClient() {
               value={hookups}
               onChange={(e) => setHookups(e.target.value as Hookups | "Any")}
             >
-              <option style={optionStyle} value="Any">
-                Any
-              </option>
-              <option style={optionStyle} value="Full">
-                Full
-              </option>
-              <option style={optionStyle} value="Partial">
-                Partial
-              </option>
-              <option style={optionStyle} value="None">
-                None
-              </option>
+              <option style={optionStyle} value="Any">Any</option>
+              <option style={optionStyle} value="Full">Full</option>
+              <option style={optionStyle} value="Partial">Partial</option>
+              <option style={optionStyle} value="None">None</option>
             </select>
           </div>
 
           <div style={dateRow}>
             <div>
               <label style={label}>Check-in (optional)</label>
-              <input
-                style={input}
-                type="date"
-                value={checkIn}
-                onChange={(e) => setCheckIn(e.target.value)}
-              />
+              <input style={input} type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} />
             </div>
             <div>
               <label style={label}>Check-out (optional)</label>
-              <input
-                style={input}
-                type="date"
-                value={checkOut}
-                onChange={(e) => setCheckOut(e.target.value)}
-              />
+              <input style={input} type="date" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
             </div>
           </div>
         </div>
 
-        {/* ADVANCED FILTERS */}
         {showAdvanced && (
           <div style={{ marginTop: 16 }}>
             <div style={divider} />
 
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 12,
-                flexWrap: "wrap",
-              }}
-            >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
               <div>
-                <div style={{ fontWeight: 950, fontSize: 16 }}>
-                  Advanced filters
-                </div>
-                <div style={tinyHelp}>
-                  These make this page feel different than the homepage search.
-                </div>
+                <div style={{ fontWeight: 950, fontSize: 16 }}>Advanced filters</div>
+                <div style={tinyHelp}>These make this page feel different than the homepage search.</div>
               </div>
 
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -786,22 +721,15 @@ function SearchPageClient() {
                     value={sortMode}
                     onChange={(e) => setSortMode(e.target.value as SortMode)}
                   >
-                    <option style={optionStyle} value="Newest">
-                      Newest
-                    </option>
-                    <option style={optionStyle} value="PriceLow">
-                      Price: low → high
-                    </option>
-                    <option style={optionStyle} value="PriceHigh">
-                      Price: high → low
-                    </option>
+                    <option style={optionStyle} value="Newest">Newest</option>
+                    <option style={optionStyle} value="PriceLow">Price: low → high</option>
+                    <option style={optionStyle} value="PriceHigh">Price: high → low</option>
                   </select>
                 </div>
               </div>
             </div>
 
             <div style={advancedGrid}>
-              {/* RV SIZE */}
               <div style={miniCard}>
                 <div style={miniTitle}>RV Size</div>
                 <div style={miniRow2}>
@@ -812,9 +740,7 @@ function SearchPageClient() {
                       type="number"
                       min={0}
                       value={minLengthFt}
-                      onChange={(e) =>
-                        setMinLengthFt(Math.max(0, Number(e.target.value)))
-                      }
+                      onChange={(e) => setMinLengthFt(Math.max(0, Number(e.target.value)))}
                       placeholder="0"
                     />
                   </div>
@@ -825,19 +751,14 @@ function SearchPageClient() {
                       type="number"
                       min={0}
                       value={maxLengthFt}
-                      onChange={(e) =>
-                        setMaxLengthFt(Math.max(0, Number(e.target.value)))
-                      }
+                      onChange={(e) => setMaxLengthFt(Math.max(0, Number(e.target.value)))}
                       placeholder="0"
                     />
                   </div>
                 </div>
-                <div style={tinyHelp}>
-                  Uses the host’s “Max RV length allowed”.
-                </div>
+                <div style={tinyHelp}>Uses the host’s “Max RV length allowed”.</div>
               </div>
 
-              {/* PRICING TYPE */}
               <div style={miniCard}>
                 <div style={miniTitle}>Pricing</div>
                 <div style={{ marginTop: 10 }}>
@@ -845,42 +766,23 @@ function SearchPageClient() {
                   <select
                     style={{ ...selectFull, marginTop: 6 }}
                     value={pricingType}
-                    onChange={(e) =>
-                      setPricingType(e.target.value as PricingType | "Any")
-                    }
+                    onChange={(e) => setPricingType(e.target.value as PricingType | "Any")}
                   >
-                    <option style={optionStyle} value="Any">
-                      Any
-                    </option>
-                    <option style={optionStyle} value="Night">
-                      Night
-                    </option>
-                    <option style={optionStyle} value="Weekly">
-                      Weekly
-                    </option>
-                    <option style={optionStyle} value="Monthly">
-                      Monthly
-                    </option>
+                    <option style={optionStyle} value="Any">Any</option>
+                    <option style={optionStyle} value="Night">Night</option>
+                    <option style={optionStyle} value="Weekly">Weekly</option>
+                    <option style={optionStyle} value="Monthly">Monthly</option>
                   </select>
                 </div>
                 <div style={tinyHelp}>Example: show only weekly / monthly spots.</div>
               </div>
 
-              {/* UTILITIES */}
               <div style={miniCard}>
                 <div style={miniTitle}>Utilities</div>
 
                 <div style={checkGrid}>
-                  <Check
-                    label="💧 Water required"
-                    checked={requireWater}
-                    onChange={setRequireWater}
-                  />
-                  <Check
-                    label="🚽 Sewer required"
-                    checked={requireSewer}
-                    onChange={setRequireSewer}
-                  />
+                  <Check label="💧 Water required" checked={requireWater} onChange={setRequireWater} />
+                  <Check label="🚽 Sewer required" checked={requireSewer} onChange={setRequireSewer} />
                   <Check
                     label="♻️ Accept dump station"
                     checked={acceptDumpStation}
@@ -896,15 +798,9 @@ function SearchPageClient() {
                     value={powerNeed}
                     onChange={(e) => setPowerNeed(e.target.value as any)}
                   >
-                    <option style={optionStyle} value="Any">
-                      Any
-                    </option>
-                    <option style={optionStyle} value="30A">
-                      30A
-                    </option>
-                    <option style={optionStyle} value="50A">
-                      50A
-                    </option>
+                    <option style={optionStyle} value="Any">Any</option>
+                    <option style={optionStyle} value="30A">30A</option>
+                    <option style={optionStyle} value="50A">50A</option>
                   </select>
                 </div>
 
@@ -915,23 +811,14 @@ function SearchPageClient() {
                     value={laundryNeed}
                     onChange={(e) => setLaundryNeed(e.target.value as any)}
                   >
-                    <option style={optionStyle} value="Any">
-                      Any
-                    </option>
-                    <option style={optionStyle} value="Washer/Dryer">
-                      Washer/Dryer
-                    </option>
-                    <option style={optionStyle} value="Wash & Fold">
-                      Wash & Fold
-                    </option>
-                    <option style={optionStyle} value="Both">
-                      Both
-                    </option>
+                    <option style={optionStyle} value="Any">Any</option>
+                    <option style={optionStyle} value="Washer/Dryer">Washer/Dryer</option>
+                    <option style={optionStyle} value="Wash & Fold">Wash & Fold</option>
+                    <option style={optionStyle} value="Both">Both</option>
                   </select>
                 </div>
               </div>
 
-              {/* AMENITIES */}
               <div style={miniCard}>
                 <div style={miniTitle}>Amenities</div>
                 <div style={checkGrid}>
@@ -950,24 +837,19 @@ function SearchPageClient() {
             </div>
 
             <div style={{ marginTop: 10, opacity: 0.7, fontSize: 12 }}>
-              Note: Date availability checks will come later when we fully integrate
-              booking overlap logic into search.
+              Note: Date availability checks will come later when we fully integrate booking overlap logic into search.
             </div>
           </div>
         )}
       </section>
 
-      {/* RESULTS + REQUESTS GRID */}
       <div style={grid}>
-        {/* RESULTS */}
         <section style={card}>
           <div style={sectionHeader}>
             <div>
               <h2 style={sectionTitle}>Results</h2>
               <p style={sectionSub}>
-                {loading
-                  ? "Loading…"
-                  : `${filtered.length} match${filtered.length === 1 ? "" : "es"}`}
+                {loading ? "Loading…" : `${filtered.length} match${filtered.length === 1 ? "" : "es"}`}
               </p>
             </div>
 
@@ -987,10 +869,7 @@ function SearchPageClient() {
                 Try adjusting filters — or post a request to build supply in that area.
               </div>
 
-              <button
-                style={{ ...smallBtn, marginTop: 12 }}
-                onClick={() => setShowRequestForm(true)}
-              >
+              <button style={{ ...smallBtn, marginTop: 12 }} onClick={() => setShowRequestForm(true)}>
                 Post a request
               </button>
             </div>
@@ -1065,7 +944,6 @@ function SearchPageClient() {
           )}
         </section>
 
-        {/* REQUEST A SPOT */}
         <section style={card}>
           <div style={sectionHeader}>
             <div>
@@ -1123,21 +1001,11 @@ function SearchPageClient() {
               <div style={row2}>
                 <div style={fieldBlock}>
                   <label style={label}>Start date (optional)</label>
-                  <input
-                    style={input}
-                    type="date"
-                    value={reqStart}
-                    onChange={(e) => setReqStart(e.target.value)}
-                  />
+                  <input style={input} type="date" value={reqStart} onChange={(e) => setReqStart(e.target.value)} />
                 </div>
                 <div style={fieldBlock}>
                   <label style={label}>End date (optional)</label>
-                  <input
-                    style={input}
-                    type="date"
-                    value={reqEnd}
-                    onChange={(e) => setReqEnd(e.target.value)}
-                  />
+                  <input style={input} type="date" value={reqEnd} onChange={(e) => setReqEnd(e.target.value)} />
                 </div>
               </div>
 

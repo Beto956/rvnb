@@ -1,15 +1,15 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import React, { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-// ✅ use your existing firebase auth export (already tied to initialized app)
 import { auth } from "@/lib/firebase";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 
 export default function LoginPage() {
-  // ✅ Required: wrap anything using useSearchParams in Suspense
   return (
     <Suspense fallback={<LoginFallback />}>
       <LoginInner />
@@ -18,7 +18,6 @@ export default function LoginPage() {
 }
 
 function LoginFallback() {
-  // Keep it simple so it never crashes build
   return (
     <main
       style={{
@@ -39,7 +38,6 @@ function LoginInner() {
   const router = useRouter();
   const sp = useSearchParams();
 
-  // ✅ Background image (file is in /public)
   const BG_URL = "/rvnb-login-bg.png";
 
   const [email, setEmail] = useState("");
@@ -53,7 +51,6 @@ function LoginInner() {
 
   const [mounted, setMounted] = useState(false);
 
-  // Optional: allow redirect back to where user came from (?next=/host)
   const nextPath = (() => {
     const n = sp?.get("next");
     if (!n) return "/listings";
@@ -139,7 +136,6 @@ function LoginInner() {
         color: "white",
       }}
     >
-      {/* Background image */}
       <div
         aria-hidden="true"
         style={{
@@ -154,7 +150,6 @@ function LoginInner() {
         }}
       />
 
-      {/* Atmospheric overlays */}
       <div
         aria-hidden="true"
         style={{
@@ -165,7 +160,6 @@ function LoginInner() {
         }}
       />
 
-      {/* Single centered card container */}
       <div
         style={{
           position: "relative",
@@ -187,7 +181,6 @@ function LoginInner() {
             transition: "opacity 420ms ease, transform 420ms ease",
           }}
         >
-          {/* Header row */}
           <div style={topRow}>
             <div style={brandRow}>
               <div style={brandBadge}>RVNB</div>
@@ -287,8 +280,6 @@ function LoginInner() {
     </main>
   );
 }
-
-/** ---------------- Styles ---------------- */
 
 const card: React.CSSProperties = {
   borderRadius: 22,
