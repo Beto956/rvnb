@@ -11,21 +11,13 @@ export default function Home() {
       <header className={styles.header}>
         <div className={styles.headerInner}>
           <Link href="/" className={styles.brand} aria-label="RVNB Home">
-            {/* ✅ LOGO ICON */}
+            {/* ✅ LOGO ICON (bigger + stands alone) */}
             <img
               src="/rvnb-logo-icon.png"
               alt="RVNB"
               className={styles.brandIcon}
-             style={{ width: 140, height: 140, border: "6px solid red" }}
-           />
-
-            {/* ✅ TEXT STACK */}
-            <div className={styles.brandText}>
-              <span className={styles.brandMark}>RVNB</span>
-              <span className={styles.brandSub}>
-                Recreational Vehicle Nationwide Booking
-              </span>
-            </div>
+              style={{ width: 64, height: 64 }}
+            />
           </Link>
 
           <nav className={styles.nav} aria-label="Primary">
