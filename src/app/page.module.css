@@ -45,8 +45,8 @@
 }
 
 .brandIcon {
-  width: 80px;
-  height: 32px;
+  width: 100px;
+  height: 50px;
   object-fit: contain;
   display: block;
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.35));
