@@ -6,6 +6,7 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../../lib/firebase";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
+import styles from "./signup.module.css";
 
 type Role = "host" | "guest";
 
@@ -41,95 +42,142 @@ export default function SignupPage() {
   };
 
   return (
-    <main style={wrap}>
-      <h1 style={{ fontSize: 28, fontWeight: 900 }}>Create account</h1>
+    <main className={styles.page}>
+      {/* Background */}
+      <div className={styles.bg} />
+      <div className={styles.bgOverlay} />
 
-      <div style={card}>
-        <label style={label}>Email</label>
-        <input
-          style={input}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+      {/* Header */}
+      <header className={styles.header}>
+        <div className={styles.headerInner}>
+          <Link href="/" className={styles.brand}>
+            <img
+              src="/rvnb-logo-icon.png"
+              alt="RVNB"
+              className={styles.brandIcon}
+            />
+          </Link>
 
-        <label style={label}>Password</label>
-        <input
-          style={input}
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+          <nav className={styles.nav}>
+            <Link href="/login" className={styles.navLink}>
+              Login
+            </Link>
+            <Link href="/signup" className={styles.navCta}>
+              Sign Up
+            </Link>
+          </nav>
+        </div>
+      </header>
 
-        <div style={{ marginTop: 10, fontWeight: 900 }}>I am a:</div>
-        <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
-          <button onClick={() => setRole("guest")} style={pill(role === "guest")}>
-            🙋 Guest
-          </button>
-          <button onClick={() => setRole("host")} style={pill(role === "host")}>
-            🏕️ Host
-          </button>
+      {/* Two Column Shell */}
+      <div className={styles.shell}>
+        {/* LEFT PANEL — REFINED HYBRID COPY */}
+        <div className={styles.left}>
+          <div className={styles.kicker}>
+            Nationwide RV stays • Built for real RV life
+          </div>
+
+          <h1 className={styles.title}>Create your RVNB account</h1>
+
+          <p className={styles.sub}>
+            Start booking trusted RV spots — or turn your land into income.
+          </p>
+
+          <div className={styles.points}>
+            <div className={styles.point}>
+              <span className={styles.pointDot} />
+              Fast, secure setup in under a minute
+            </div>
+
+            <div className={styles.point}>
+              <span className={styles.pointDot} />
+              Choose Guest or Host — expand anytime
+            </div>
+
+            <div className={styles.point}>
+              <span className={styles.pointDot} />
+              Built for real RV life, not generic rentals
+            </div>
+          </div>
         </div>
 
-        <button onClick={handleSignup} disabled={saving} style={btn}>
-          {saving ? "Creating..." : "Sign up"}
-        </button>
+        {/* RIGHT PANEL — SIGNUP CARD */}
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <h2 className={styles.cardTitle}>Create account</h2>
+            <p className={styles.cardSub}>
+              Choose your role — you can expand later.
+            </p>
+          </div>
 
-        {msg && <div style={{ marginTop: 10, fontWeight: 800 }}>{msg}</div>}
+          <div className={styles.form}>
+            <div className={styles.field}>
+              <label className={styles.label}>Email</label>
+              <input
+                className={styles.input}
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
 
-        <div style={{ marginTop: 14, opacity: 0.85 }}>
-          Already have an account? <Link href="/login">Log in</Link>
+            <div className={styles.field}>
+              <label className={styles.label}>Password</label>
+              <input
+                className={styles.input}
+                type="password"
+                placeholder="Minimum 6 characters"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+
+            <div className={styles.roleWrap}>
+              <div className={styles.roleLabel}>I am a:</div>
+              <div className={styles.roleRow}>
+                <button
+                  type="button"
+                  onClick={() => setRole("guest")}
+                  className={`${styles.roleBtn} ${
+                    role === "guest" ? styles.roleBtnActive : ""
+                  }`}
+                >
+                  🙋 Guest
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRole("host")}
+                  className={`${styles.roleBtn} ${
+                    role === "host" ? styles.roleBtnActive : ""
+                  }`}
+                >
+                  🏕️ Host
+                </button>
+              </div>
+            </div>
+
+            <button
+              onClick={handleSignup}
+              disabled={saving}
+              className={styles.submit}
+            >
+              {saving ? "Creating..." : "Sign up"}
+            </button>
+
+            {msg && <div className={styles.msg}>{msg}</div>}
+
+            <div className={styles.footerRow}>
+              <div className={styles.footerText}>
+                Already have an account?
+              </div>
+              <Link href="/login" className={styles.footerLink}>
+                Log in
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </main>
   );
 }
-
-const wrap: React.CSSProperties = {
-  minHeight: "100vh",
-  padding: 24,
-  background: "#0b0f19",
-  color: "white",
-};
-
-const card: React.CSSProperties = {
-  marginTop: 14,
-  maxWidth: 520,
-  padding: 16,
-  borderRadius: 14,
-  border: "1px solid rgba(255,255,255,0.12)",
-  background: "rgba(255,255,255,0.06)",
-};
-
-const label: React.CSSProperties = { fontWeight: 800, marginTop: 10 };
-
-const input: React.CSSProperties = {
-  width: "100%",
-  padding: 12,
-  marginTop: 6,
-  borderRadius: 10,
-  border: "1px solid rgba(255,255,255,0.15)",
-  background: "rgba(255,255,255,0.06)",
-  color: "white",
-};
-
-const btn: React.CSSProperties = {
-  marginTop: 14,
-  width: "100%",
-  padding: 14,
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,0.15)",
-  background: "rgba(255,255,255,0.12)",
-  color: "white",
-  fontWeight: 900,
-  cursor: "pointer",
-};
-
-const pill = (active: boolean): React.CSSProperties => ({
-  padding: "10px 14px",
-  borderRadius: 999,
-  border: active ? "1px solid rgba(255,255,255,0.35)" : "1px solid rgba(255,255,255,0.15)",
-  background: active ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.08)",
-  color: "white",
-  fontWeight: 900,
-  cursor: "pointer",
-});

@@ -11,12 +11,13 @@ export default function Home() {
       <header className={styles.header}>
         <div className={styles.headerInner}>
           <Link href="/" className={styles.brand} aria-label="RVNB Home">
-            {/* ✅ LOGO ICON (bigger + stands alone) */}
+            {/* ✅ LOGO ICON (image scales, container stays stable) */}
             <img
               src="/rvnb-logo-icon.png"
               alt="RVNB"
               className={styles.brandIcon}
-              style={{ width: 95, height: 95 }}
+              width={180}
+              height={72}
             />
           </Link>
 
