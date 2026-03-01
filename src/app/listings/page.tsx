@@ -33,7 +33,7 @@ type ListingUI = {
   maxLengthFt: number;
 
   displayPriceValue: number;
-  displayPriceLabel: string; // "night" | "week" | "month"
+  displayPriceLabel: string;
 };
 
 function normalizePricingLabel(pricingType: PricingType): string {
@@ -85,59 +85,105 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
   };
 }
 
-function CameraIcon() {
-  // Inline SVG so we don’t add any dependencies
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M9 7l1.2-2.2c.3-.5.8-.8 1.4-.8h2.8c.6 0 1.1.3 1.4.8L17 7"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M7 7h10c2 0 3 1 3 3v8c0 2-1 3-3 3H7c-2 0-3-1-3-3v-8c0-2 1-3 3-3z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M12 17a4 4 0 100-8 4 4 0 000 8z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+type ListingsSearchParams = {
+  state?: string;
+  hookups?: string;
+  maxPrice?: string;
+  sort?: string;
+};
+
+function normalizeHookups(v: string | undefined): Hookups | "Any" {
+  if (!v) return "Any";
+  const val = v.toString().trim();
+  if (val === "Full" || val === "Partial" || val === "None") return val;
+  return "Any";
 }
 
-export default async function ListingsPage() {
+function normalizeSort(
+  v: string | undefined
+): "recommended" | "price_asc" | "price_desc" | "title_asc" {
+  if (!v) return "recommended";
+  const val = v.toString().trim();
+  if (val === "price_asc") return "price_asc";
+  if (val === "price_desc") return "price_desc";
+  if (val === "title_asc") return "title_asc";
+  return "recommended";
+}
+
+function safeMaxPrice(v: string | undefined): number | null {
+  if (!v) return null;
+  const raw = v.toString().trim();
+  if (!raw) return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return null;
+  if (n <= 0) return null;
+  return n;
+}
+
+function safeState(v: string | undefined): string {
+  if (!v) return "";
+  return v.toString().trim();
+}
+
+/**
+ * ✅ Next.js 16:
+ * searchParams is now a Promise.
+ * We MUST unwrap it before accessing properties.
+ */
+export default async function ListingsPage({
+  searchParams,
+}: {
+  searchParams?: ListingsSearchParams | Promise<ListingsSearchParams>;
+}) {
+  const params = (await searchParams) ?? {};
+
+  const selectedState = safeState(params.state);
+  const selectedHookups = normalizeHookups(params.hookups);
+  const selectedMaxPrice = safeMaxPrice(params.maxPrice);
+  const selectedSort = normalizeSort(params.sort);
+
   const snap = await getDocs(collection(db, "listings"));
 
-  const listings: ListingUI[] = snap.docs.map((docSnap) => {
+  const allListings: ListingUI[] = snap.docs.map((docSnap) => {
     const data = docSnap.data() as ListingDoc;
     return buildListingUI(docSnap.id, data);
   });
 
+  let listings = allListings.slice();
+
+  if (selectedState) {
+    const st = selectedState.toLowerCase();
+    listings = listings.filter((l) => l.state.toLowerCase() === st);
+  }
+
+  if (selectedHookups !== "Any") {
+    listings = listings.filter((l) => l.hookups === selectedHookups);
+  }
+
+  if (selectedMaxPrice !== null) {
+    listings = listings.filter((l) => l.displayPriceValue <= selectedMaxPrice);
+  }
+
+  if (selectedSort === "price_asc") {
+    listings.sort((a, b) => a.displayPriceValue - b.displayPriceValue);
+  } else if (selectedSort === "price_desc") {
+    listings.sort((a, b) => b.displayPriceValue - a.displayPriceValue);
+  } else if (selectedSort === "title_asc") {
+    listings.sort((a, b) => a.title.localeCompare(b.title));
+  }
+
   return (
     <div className={styles.page}>
       <div className={styles.container}>
-        {/* Hero */}
-        <div className={styles.heroCard}>
-          <div className={styles.badge}>
-            <span className={styles.badgeDot} />
-            Explore
-          </div>
+        <div className={styles.breadcrumb}>
+          <Link href="/" className={styles.breadcrumbLink}>
+            Home
+          </Link>
+          <span className={styles.breadcrumbSep}>/</span>
+          <span className={styles.breadcrumbHere}>Listings</span>
+        </div>
 
+        <div className={styles.heroCard}>
           <h1 className={styles.h1}>RVNB Listings</h1>
           <p className={styles.sub}>
             Discover RV spots across the country — clean, host-backed, and built
@@ -145,63 +191,106 @@ export default async function ListingsPage() {
           </p>
 
           <div className={styles.countLine}>
-            Showing <strong>{listings.length}</strong> available spots
+            Showing <strong>{listings.length}</strong> spot
+            {listings.length === 1 ? "" : "s"}
           </div>
         </div>
 
-        {listings.length === 0 ? (
-          <div className={styles.emptyCard}>
-            <div className={styles.emptyTitle}>No listings yet.</div>
-            <div className={styles.emptySub}>
-              Be the first to list your RV spot.
+        <div className={styles.sectionDivider} />
+
+        <form className={styles.filtersCard} method="get" action="/listings">
+          <div className={styles.filtersGrid}>
+            <div className={styles.filtersField}>
+              <label className={styles.filtersLabel}>State</label>
+              <input
+                name="state"
+                className={styles.filtersControl}
+                defaultValue={selectedState}
+              />
             </div>
 
-            <Link href="/host" className={styles.primaryBtn}>
-              List Your Spot
-            </Link>
-          </div>
-        ) : (
-          <div className={styles.grid}>
-            {listings.map((l) => (
-              <Link
-                key={l.id}
-                href={`/listings/${l.id}`}
-                className={styles.card}
+            <div className={styles.filtersField}>
+              <label className={styles.filtersLabel}>Max Price</label>
+              <input
+                name="maxPrice"
+                className={styles.filtersControl}
+                defaultValue={selectedMaxPrice ?? ""}
+              />
+            </div>
+
+            <div className={styles.filtersField}>
+              <label className={styles.filtersLabel}>Hookups</label>
+              <select
+                name="hookups"
+                className={styles.filtersControl}
+                defaultValue={
+                  selectedHookups === "Any" ? "" : selectedHookups
+                }
               >
-                {/* Photo area (future-ready) */}
-                <div className={styles.photoArea}>
-                  <div className={styles.photoBadge}>
-                    <CameraIcon />
-                    <span>Photos coming soon</span>
-                  </div>
-                </div>
+                <option value="">Any</option>
+                <option value="Full">Full</option>
+                <option value="Partial">Partial</option>
+                <option value="None">None</option>
+              </select>
+            </div>
 
-                <div className={styles.cardTop}>
-                  <div className={styles.cardTitle}>{l.title}</div>
+            <div className={styles.filtersField}>
+              <label className={styles.filtersLabel}>Sort</label>
+              <select
+                name="sort"
+                className={styles.filtersControl}
+                defaultValue={selectedSort}
+              >
+                <option value="recommended">Recommended</option>
+                <option value="price_asc">Price: Low → High</option>
+                <option value="price_desc">Price: High → Low</option>
+                <option value="title_asc">Title: A → Z</option>
+              </select>
+            </div>
 
-                  <div className={styles.price}>
-                    <span className={styles.priceValue}>
-                      ${l.displayPriceValue}
-                    </span>
-                    <span className={styles.per}>/ {l.displayPriceLabel}</span>
-                  </div>
-                </div>
-
-                <div className={styles.cardMeta}>
-                  <span className={styles.pill}>
-                    {l.city}, {l.state}
-                  </span>
-                  <span className={styles.pill}>{l.hookups} hookups</span>
-                  <span className={styles.pill}>Max {l.maxLengthFt} ft</span>
-                </div>
-
-                <div className={styles.cardCta}>
-                  View spot <span className={styles.arrow}>→</span>
-                </div>
-              </Link>
-            ))}
+            <div className={styles.filtersBtns}>
+              <button className={styles.applyBtn} type="submit">
+                Apply
+              </button>
+            </div>
           </div>
-        )}
+        </form>
+
+        <div className={styles.grid}>
+          {listings.map((l) => (
+            <Link
+              key={l.id}
+              href={`/listings/${l.id}`}
+              className={styles.card}
+            >
+              <div className={styles.cardTop}>
+                <div className={styles.cardTitle}>{l.title}</div>
+                <div className={styles.price}>
+                  <span className={styles.priceValue}>
+                    ${l.displayPriceValue}
+                  </span>
+                  <span className={styles.per}>
+                    / {l.displayPriceLabel}
+                  </span>
+                </div>
+              </div>
+
+              <div className={styles.cardMeta}>
+                <span className={styles.pill}>
+                  {l.city}, {l.state}
+                </span>
+                <span className={styles.pill}>{l.hookups} hookups</span>
+                <span className={styles.pill}>
+                  Max {l.maxLengthFt} ft
+                </span>
+              </div>
+
+              <div className={styles.cardCta}>
+                View spot →
+              </div>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );

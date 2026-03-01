@@ -28,14 +28,14 @@
    ✅ Locks header height so it never stretches
 */
 .headerInner {
-  max-width: 1400px;     /* was 1100px */
+  max-width: 1400px; /* was 1100px */
   margin: 0 auto;
-  padding: 8px 18px;     /* was 8px 4px */
+  padding: 8px 18px; /* was 8px 4px */
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 64px;      /* ✅ prevents stretch */
+  min-height: 64px; /* ✅ prevents stretch */
 }
 
 /* Brand */
@@ -44,43 +44,20 @@
   color: inherit;
   display: flex;
   align-items: center;
-  gap: 12px; /* ✅ important since you removed brandRow */
+  gap: 12px;
   line-height: 1.1;
 
-  /* ✅ stable clickable container (image scales inside) */
   height: 48px;
   width: 138px;
 }
 
-/* ✅ UPDATED: only image scales; content biased left inside box */
 .brandIcon {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  object-position: left center; /* ✅ pulls logo closer left (PNG whitespace fix) */
+  object-position: left center;
   display: block;
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.35));
-}
-
-/* ✅ NEW: stack text */
-.brandText {
-  display: flex;
-  flex-direction: column;
-}
-
-.brandMark {
-  font-weight: 900;
-  letter-spacing: 1px;
-  font-size: 1.05rem;
-  display: block;
-}
-
-.brandSub {
-  font-size: 0.82rem;
-  opacity: 0.7;
-  margin-top: 2px;
-  letter-spacing: 0.3px;
-  display: block;
 }
 
 .nav {
@@ -132,11 +109,14 @@
   border-color: rgba(255, 255, 255, 0.22);
 }
 
-/* HERO */
+/* HERO (✅ shortened height so Block 1 isn't too long) */
 .hero {
   position: relative;
   overflow: hidden;
-  padding: 74px 0 44px;
+
+  /* ✅ shorter hero */
+  padding: 56px 0 26px;
+  min-height: 420px;
 }
 
 /* cinematic overlays */
@@ -146,11 +126,26 @@
   inset: -1px;
   z-index: 0;
   pointer-events: none;
-  background:
-    radial-gradient(900px 520px at 18% 10%, rgba(255, 255, 255, 0.10), transparent 60%),
-    radial-gradient(760px 520px at 82% 22%, rgba(56, 189, 248, 0.10), transparent 62%),
-    radial-gradient(980px 720px at 50% 92%, rgba(34, 197, 94, 0.07), transparent 64%),
-    radial-gradient(1200px 900px at 50% 40%, rgba(168, 85, 247, 0.08), transparent 64%);
+  background: radial-gradient(
+      900px 520px at 18% 10%,
+      rgba(255, 255, 255, 0.10),
+      transparent 60%
+    ),
+    radial-gradient(
+      760px 520px at 82% 22%,
+      rgba(56, 189, 248, 0.10),
+      transparent 62%
+    ),
+    radial-gradient(
+      980px 720px at 50% 92%,
+      rgba(34, 197, 94, 0.07),
+      transparent 64%
+    ),
+    radial-gradient(
+      1200px 900px at 50% 40%,
+      rgba(168, 85, 247, 0.08),
+      transparent 64%
+    );
   mix-blend-mode: screen;
   opacity: 0.85;
 }
@@ -161,8 +156,11 @@
   inset: -1px;
   z-index: 0;
   pointer-events: none;
-  background:
-    radial-gradient(130% 90% at 50% 40%, rgba(0, 0, 0, 0.00), rgba(0, 0, 0, 0.40)),
+  background: radial-gradient(
+      130% 90% at 50% 40%,
+      rgba(0, 0, 0, 0.00),
+      rgba(0, 0, 0, 0.40)
+    ),
     linear-gradient(to bottom, rgba(15, 23, 42, 0.22), rgba(15, 23, 42, 0.88));
   opacity: 1;
 }
@@ -176,7 +174,7 @@
   background-repeat: no-repeat;
   background-color: transparent;
   filter: saturate(1.02) contrast(1.03);
-  transform: scale(1.01);
+  transform: scale(1.12);
   opacity: 1;
 }
 
@@ -185,10 +183,21 @@
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background:
-    radial-gradient(900px 500px at 20% 15%, rgba(56, 189, 248, 0.12), transparent 60%),
-    radial-gradient(800px 520px at 80% 30%, rgba(168, 85, 247, 0.14), transparent 62%),
-    radial-gradient(900px 680px at 50% 85%, rgba(34, 197, 94, 0.09), transparent 62%),
+  background: radial-gradient(
+      900px 500px at 20% 15%,
+      rgba(56, 189, 248, 0.12),
+      transparent 60%
+    ),
+    radial-gradient(
+      800px 520px at 80% 30%,
+      rgba(168, 85, 247, 0.14),
+      transparent 62%
+    ),
+    radial-gradient(
+      900px 680px at 50% 85%,
+      rgba(34, 197, 94, 0.09),
+      transparent 62%
+    ),
     linear-gradient(
       to bottom,
       rgba(15, 23, 42, 0.18),
@@ -205,8 +214,7 @@
   z-index: 0;
   pointer-events: none;
   opacity: 0.10;
-  background-image:
-    repeating-linear-gradient(
+  background-image: repeating-linear-gradient(
       0deg,
       rgba(255, 255, 255, 0.035),
       rgba(255, 255, 255, 0.035) 1px,
@@ -335,9 +343,225 @@
   text-shadow: 0 6px 16px rgba(0, 0, 0, 0.26);
 }
 
-/* Quick Search Wrap */
-.quickSearchWrap {
-  padding: 0 0 24px;
+/* ✅ QUICK SEARCH (now starts cleanly after hero; no overlap) */
+.quickSearchSection {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-top: 0;
+  padding: 22px 24px 0;
+  position: relative;
+  z-index: 6;
+}
+
+/* ✅ REQUIRED: page.tsx uses styles.quickSearchBubble
+   ✅ UPDATED: bubble is the premium glass container (always visible)
+   ✅ FIXED: stronger contrast so the box doesn't disappear into sunlight band
+*/
+.quickSearchBubble {
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  border-radius: 18px;
+  padding: 18px;
+
+  /* ✅ stronger background */
+  background: linear-gradient(
+    to bottom,
+    rgba(15, 23, 42, 0.82),
+    rgba(15, 23, 42, 0.64)
+  );
+
+  border: 1px solid rgba(255, 255, 255, 0.18);
+
+  /* ✅ deeper shadow + subtle inner highlight */
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
+
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* premium divider line */
+.quickSearchBubble::before {
+  content: "";
+  display: block;
+  height: 1px;
+  margin: 0 0 14px;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0.18),
+    rgba(255, 255, 255, 0.05),
+    rgba(255, 255, 255, 0.00)
+  );
+}
+
+/* If HomeQuickSearchBar renders a qsCard, we keep it clean (no double card look) */
+.quickSearchBubble .qsCard {
+  background: transparent;
+  border: none;
+  padding: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  max-width: 100%;
+}
+
+/* FAILSAFE: even plain HTML inside gets premium input/button styling */
+.quickSearchBubble input,
+.quickSearchBubble select {
+  width: 100%;
+  min-width: 0;
+  padding: 12px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: white;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+.quickSearchBubble input::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.quickSearchBubble input:focus,
+.quickSearchBubble select:focus {
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.quickSearchBubble button {
+  border: none;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-weight: 900;
+  cursor: pointer;
+  background: white;
+  color: #0f172a;
+  transition: transform 160ms ease, box-shadow 180ms ease, filter 180ms ease;
+  white-space: nowrap;
+}
+
+.quickSearchBubble button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.32);
+  filter: brightness(1.02);
+}
+
+/* =========================================================
+   ✅ HomeQuickSearchBar styles (qs* classes)
+   (kept for your component’s structure)
+   ========================================================= */
+
+.qsHeader {
+  margin-bottom: 12px;
+}
+
+.qsTitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: 0.2px;
+}
+
+.qsSub {
+  margin: 4px 0 0;
+  font-size: 0.82rem;
+  opacity: 0.78;
+}
+
+.qsGrid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 0.9fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.qsField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.qsLabel {
+  font-size: 0.86rem;
+  opacity: 0.86;
+  letter-spacing: 0.2px;
+}
+
+.qsControl {
+  width: 100%;
+  min-width: 0;
+  padding: 12px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: white;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+.qsControl::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.qsControl:focus {
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.qsButton {
+  border: none;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-weight: 900;
+  cursor: pointer;
+  background: white;
+  color: #0f172a;
+  transition: transform 160ms ease, box-shadow 180ms ease, filter 180ms ease;
+  white-space: nowrap;
+  height: 44px;
+  align-self: end;
+}
+
+.qsButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.32);
+  filter: brightness(1.02);
+}
+
+.qsHint {
+  margin-top: 10px;
+  font-size: 0.82rem;
+  opacity: 0.78;
+}
+
+@media (max-width: 980px) {
+  .qsGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .qsButton {
+    width: 100%;
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 700px) {
+  .qsGrid {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .qsButton {
+    width: 100%;
+  }
 }
 
 /* Sections */
@@ -750,7 +974,7 @@
   }
 }
 
-/* ✅ Added: mobile header tuning so it stays premium + not oversized */
+/* ✅ Mobile header tuning */
 @media (max-width: 520px) {
   .headerInner {
     max-width: 1100px;
@@ -761,6 +985,16 @@
   .brand {
     height: 44px;
     width: 124px;
+  }
+
+  /* ✅ quick search no overlap on mobile too */
+  .quickSearchSection {
+    margin-top: 0;
+    padding: 16px 14px 0;
+  }
+
+  .qsCard {
+    max-width: 100%;
   }
 }
 
@@ -784,9 +1018,16 @@
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background:
-    radial-gradient(1000px 600px at 55% 12%, rgba(255, 255, 255, 0.16), transparent 60%),
-    radial-gradient(900px 700px at 20% 40%, rgba(255, 255, 255, 0.10), transparent 62%),
+  background: radial-gradient(
+      1000px 600px at 55% 12%,
+      rgba(255, 255, 255, 0.16),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 700px at 20% 40%,
+      rgba(255, 255, 255, 0.10),
+      transparent 62%
+    ),
     linear-gradient(
       to bottom,
       rgba(15, 23, 42, 0.62),

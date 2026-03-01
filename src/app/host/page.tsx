@@ -18,6 +18,9 @@ import { db } from "@/lib/firebase";
 // ✅ ADD (auth) — minimal + additive, does NOT reconfigure Firebase
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 
+// ✅ ADD: Host route protection (role gate)
+import HostGuard from "../components/HostGuard";
+
 type Hookups = "Full" | "Partial" | "None";
 type PricingType = "Night" | "Weekly" | "Monthly";
 
@@ -60,6 +63,8 @@ type ListingDoc = {
 
   // ✅ New (safe/additive): nearby attractions / theme parks
   nearbyAttractions?: string;
+
+  createdAt?: any;
 };
 
 type ListingUI = {
@@ -96,6 +101,8 @@ type ListingUI = {
   showers: boolean;
 
   nearbyAttractions: string;
+
+  createdAt?: any;
 };
 
 type ListingFilter =
@@ -166,6 +173,14 @@ function safeTimestampLabel(ts: any) {
   return "";
 }
 
+function sortByCreatedAtDesc(rows: ListingUI[]) {
+  return [...rows].sort((a, b) => {
+    const ta = typeof a.createdAt?.toDate === "function" ? a.createdAt.toDate().getTime() : 0;
+    const tb = typeof b.createdAt?.toDate === "function" ? b.createdAt.toDate().getTime() : 0;
+    return tb - ta;
+  });
+}
+
 function toUI(id: string, d: ListingDoc): ListingUI {
   return {
     id,
@@ -209,6 +224,8 @@ function toUI(id: string, d: ListingDoc): ListingUI {
     showers: Boolean(d.showers),
 
     nearbyAttractions: (d.nearbyAttractions ?? "").toString(),
+
+    createdAt: d.createdAt,
   };
 }
 
@@ -298,17 +315,51 @@ export default function HostPage() {
   async function loadListingsAndBookings() {
     setLoading(true);
     setBookingStatus("");
+    setStatus("");
+
+    // ✅ Ownership filter needs a logged-in user
+    if (!userUid) {
+      setListings([]);
+      setBookings([]);
+      setLoading(false);
+      return;
+    }
+
     try {
-      const q = query(collection(db, "listings"), orderBy("createdAt", "desc"));
-      const snap = await getDocs(q);
+      // ✅ Prefer server-side ownership filter
+      // NOTE: Firestore may require an index for (hostId == uid + orderBy createdAt).
+      const q1 = query(
+        collection(db, "listings"),
+        where("hostId", "==", userUid),
+        orderBy("createdAt", "desc")
+      );
+
+      const snap = await getDocs(q1);
       const rows = snap.docs.map((d) => toUI(d.id, d.data() as ListingDoc));
       setListings(rows);
 
       // ✅ Load bookings that belong to these listings
       await loadBookingsForListings(rows);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      setStatus("❌ Could not load listings.");
+
+      // ✅ Fallback if index isn’t ready yet: query by hostId only, then sort client-side
+      try {
+        const q2 = query(collection(db, "listings"), where("hostId", "==", userUid));
+        const snap2 = await getDocs(q2);
+        const rows2Raw = snap2.docs.map((d) => toUI(d.id, d.data() as ListingDoc));
+        const rows2 = sortByCreatedAtDesc(rows2Raw);
+
+        setListings(rows2);
+        await loadBookingsForListings(rows2);
+
+        setStatus("⚠️ Listings loaded (ownership filtered). If you saw an index warning in console, create it later.");
+      } catch (e2) {
+        console.error(e2);
+        setStatus("❌ Could not load your listings.");
+        setListings([]);
+        setBookings([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -393,10 +444,11 @@ export default function HostPage() {
     return () => unsub();
   }, []);
 
+  // ✅ IMPORTANT: reload whenever the signed-in user changes (ownership filter)
   useEffect(() => {
     loadListingsAndBookings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [userUid]);
 
   // ✅ derived: filtered listings for the right panel
   const filteredListings = useMemo(() => {
@@ -479,8 +531,7 @@ export default function HostPage() {
     if (!c) return "Please enter a city.";
     if (s.length !== 2) return "State must be 2 letters (example: TX).";
     if (!Number.isFinite(price) || price < 0) return "Price must be 0 or more.";
-    if (!Number.isFinite(maxLengthFt) || maxLengthFt < 0)
-      return "Max length must be 0 or more.";
+    if (!Number.isFinite(maxLengthFt) || maxLengthFt < 0) return "Max length must be 0 or more.";
     return null;
   }
 
@@ -607,538 +658,541 @@ export default function HostPage() {
     }
   }
 
+  // ✅ ADD: Wrap existing Host UI in role + auth gate (no refactor)
   return (
-    <main style={wrap}>
-      <div style={hero}>
-        <div>
-          <h1 style={heroTitle}>Host Dashboard</h1>
-          <p style={heroSub}>
-            Create listings and manage your spots. This is now connected to Firestore (real data).
-          </p>
+    <HostGuard>
+      <main style={wrap}>
+        <div style={hero}>
+          <div>
+            <h1 style={heroTitle}>Host Dashboard</h1>
+            <p style={heroSub}>
+              Create listings and manage your spots. This is now connected to Firestore (real data).
+            </p>
+          </div>
+
+          <Link href="/listings" style={ghostBtn}>
+            View public listings →
+          </Link>
         </div>
 
-        <Link href="/listings" style={ghostBtn}>
-          View public listings →
-        </Link>
-      </div>
-
-      <div style={grid}>
-        {/* LEFT: CREATE */}
-        <section style={card}>
-          <div style={sectionHeader}>
-            <div>
-              <h2 style={sectionTitle}>Create Listing</h2>
-              <p style={sectionSub}>These fields match what your listing pages read.</p>
+        <div style={grid}>
+          {/* LEFT: CREATE */}
+          <section style={card}>
+            <div style={sectionHeader}>
+              <div>
+                <h2 style={sectionTitle}>Create Listing</h2>
+                <p style={sectionSub}>These fields match what your listing pages read.</p>
+              </div>
             </div>
-          </div>
 
-          {status && <div style={statusBox}>{status}</div>}
+            {status && <div style={statusBox}>{status}</div>}
 
-          <div style={fieldBlock}>
-            <label style={label}>Listing title</label>
-            <input
-              style={input}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Example: Bet RV Park"
-            />
-          </div>
-
-          <div style={row2}>
             <div style={fieldBlock}>
-              <label style={label}>City</label>
+              <label style={label}>Listing title</label>
               <input
                 style={input}
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                placeholder="Mission"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Example: Bet RV Park"
               />
             </div>
 
-            <div style={fieldBlock}>
-              <label style={label}>State</label>
-              <input
-                style={input}
-                value={stateCode}
-                onChange={(e) => setStateCode(e.target.value.toUpperCase().trim())}
-                placeholder="TX"
-                maxLength={2}
-              />
-            </div>
-          </div>
-
-          {/* PRICE */}
-          <div style={fieldBlock}>
-            <label style={label}>Price</label>
-            <div style={priceRow}>
-              <div style={priceInputWrapper}>
-                {showDollar && <span style={priceSymbol}>$</span>}
+            <div style={row2}>
+              <div style={fieldBlock}>
+                <label style={label}>City</label>
                 <input
-                  style={{
-                    ...priceInput,
-                    paddingLeft: showDollar ? 22 : 12,
-                  }}
-                  type="number"
-                  min={0}
-                  value={price}
-                  onChange={(e) => setPrice(Math.max(0, Number(e.target.value)))}
-                  onFocus={() => setIsPriceFocused(true)}
-                  onBlur={() => setIsPriceFocused(false)}
-                  placeholder="0"
+                  style={input}
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="Mission"
                 />
               </div>
 
+              <div style={fieldBlock}>
+                <label style={label}>State</label>
+                <input
+                  style={input}
+                  value={stateCode}
+                  onChange={(e) => setStateCode(e.target.value.toUpperCase().trim())}
+                  placeholder="TX"
+                  maxLength={2}
+                />
+              </div>
+            </div>
+
+            {/* PRICE */}
+            <div style={fieldBlock}>
+              <label style={label}>Price</label>
+              <div style={priceRow}>
+                <div style={priceInputWrapper}>
+                  {showDollar && <span style={priceSymbol}>$</span>}
+                  <input
+                    style={{
+                      ...priceInput,
+                      paddingLeft: showDollar ? 22 : 12,
+                    }}
+                    type="number"
+                    min={0}
+                    value={price}
+                    onChange={(e) => setPrice(Math.max(0, Number(e.target.value)))}
+                    onFocus={() => setIsPriceFocused(true)}
+                    onBlur={() => setIsPriceFocused(false)}
+                    placeholder="0"
+                  />
+                </div>
+
+                <select
+                  style={select}
+                  value={pricingType}
+                  onChange={(e) => setPricingType(e.target.value as PricingType)}
+                >
+                  <option style={optionStyle} value="Night">
+                    Night
+                  </option>
+                  <option style={optionStyle} value="Weekly">
+                    Weekly
+                  </option>
+                  <option style={optionStyle} value="Monthly">
+                    Monthly
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            {/* MAX LENGTH */}
+            <div style={fieldBlock}>
+              <label style={label}>Max RV length allowed</label>
+              <div style={unitRow}>
+                <input
+                  style={unitInput}
+                  type="number"
+                  min={0}
+                  max={50}
+                  value={maxLengthFt}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    if (Number.isNaN(val)) return;
+                    setMaxLengthFt(Math.min(50, Math.max(0, val)));
+                  }}
+                />
+                <span style={unitSuffix}>ft</span>
+              </div>
+              <small style={tinyHelp}>Enter the longest RV that can fit (max 50 ft).</small>
+            </div>
+
+            {/* HOOKUPS */}
+            <div style={fieldBlock}>
+              <label style={label}>Hookups</label>
               <select
-                style={select}
-                value={pricingType}
-                onChange={(e) => setPricingType(e.target.value as PricingType)}
+                style={selectFull}
+                value={hookups}
+                onChange={(e) => setHookups(e.target.value as Hookups)}
               >
-                <option style={optionStyle} value="Night">
-                  Night
+                <option style={optionStyle} value="Full">
+                  Full Hookups
                 </option>
-                <option style={optionStyle} value="Weekly">
-                  Weekly
+                <option style={optionStyle} value="Partial">
+                  Partial Hookups
                 </option>
-                <option style={optionStyle} value="Monthly">
-                  Monthly
+                <option style={optionStyle} value="None">
+                  No Hookups
                 </option>
               </select>
             </div>
-          </div>
 
-          {/* MAX LENGTH */}
-          <div style={fieldBlock}>
-            <label style={label}>Max RV length allowed</label>
-            <div style={unitRow}>
-              <input
-                style={unitInput}
-                type="number"
-                min={0}
-                max={50}
-                value={maxLengthFt}
-                onChange={(e) => {
-                  const val = Number(e.target.value);
-                  if (Number.isNaN(val)) return;
-                  setMaxLengthFt(Math.min(50, Math.max(0, val)));
-                }}
+            {/* DESCRIPTION */}
+            <div style={fieldBlock}>
+              <label style={label}>Spot description (optional)</label>
+              <textarea
+                style={textarea}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Example: Level gravel pad, quiet at night, easy pull-through, close to highway..."
+                maxLength={800}
               />
-              <span style={unitSuffix}>ft</span>
+              <div style={counterRow}>
+                <span style={tinyHelp}>Shows on the listing page later.</span>
+                <span style={tinyHelp}>{description.length}/800</span>
+              </div>
             </div>
-            <small style={tinyHelp}>Enter the longest RV that can fit (max 50 ft).</small>
-          </div>
 
-          {/* HOOKUPS */}
-          <div style={fieldBlock}>
-            <label style={label}>Hookups</label>
-            <select
-              style={selectFull}
-              value={hookups}
-              onChange={(e) => setHookups(e.target.value as Hookups)}
+            {/* NEARBY ATTRACTIONS */}
+            <div style={fieldBlock}>
+              <label style={label}>Nearby attractions / theme parks (optional)</label>
+              <textarea
+                style={textarea}
+                value={nearbyAttractions}
+                onChange={(e) => setNearbyAttractions(e.target.value)}
+                placeholder="Example: Six Flags (15 min), Water park (10 min), State park trails (5 min)..."
+                maxLength={500}
+              />
+              <div style={counterRow}>
+                <span style={tinyHelp}>Helps guests see what’s around your location.</span>
+                <span style={tinyHelp}>{nearbyAttractions.length}/500</span>
+              </div>
+            </div>
+
+            {/* AMENITIES */}
+            <div style={divider} />
+
+            <div style={amenityWrap}>
+              <AmenitySection title="RV Infrastructure">
+                <Checkbox label="🔌 30 Amp Power" checked={power30} onChange={setPower30} />
+                <Checkbox label="🔌 50 Amp Power" checked={power50} onChange={setPower50} />
+                <Checkbox label="💧 Water Hookup" checked={water} onChange={setWater} />
+                <Checkbox label="🚽 Full Sewer Hookup" checked={sewer} onChange={setSewer} />
+                <Checkbox label="♻️ Dump Station Onsite" checked={dump} onChange={setDump} />
+              </AmenitySection>
+
+              <AmenitySection title="Laundry">
+                <Checkbox label="🧺 Washer/Dryer Onsite" checked={laundry} onChange={setLaundry} />
+                <Checkbox label="🧼 Wash & Fold Service" checked={washFold} onChange={setWashFold} />
+              </AmenitySection>
+
+              <AmenitySection title="Facilities">
+                <Checkbox label="🏋️ Gym Onsite" checked={gym} onChange={setGym} />
+                <Checkbox label="🚻 Bathrooms Onsite" checked={bathrooms} onChange={setBathrooms} />
+                <Checkbox label="🚿 Showers Onsite" checked={showers} onChange={setShowers} />
+              </AmenitySection>
+
+              <AmenitySection title="Convenience">
+                <Checkbox label="📶 Wi-Fi" checked={wifi} onChange={setWifi} />
+                <Checkbox label="🗑️ Trash Pickup" checked={trashPickup} onChange={setTrashPickup} />
+                <Checkbox
+                  label="📹 Security Cameras"
+                  checked={securityCameras}
+                  onChange={setSecurityCameras}
+                />
+              </AmenitySection>
+
+              <AmenitySection title="Recreation / Site Features">
+                <Checkbox label="🐶 Pets Allowed" checked={petsAllowed} onChange={setPetsAllowed} />
+                <Checkbox label="🔥 Fire Pit" checked={firePit} onChange={setFirePit} />
+                <Checkbox label="🧺 Picnic Table" checked={picnicTable} onChange={setPicnicTable} />
+                <Checkbox label="🚚 Pull-Through Site" checked={pullThrough} onChange={setPullThrough} />
+              </AmenitySection>
+            </div>
+
+            <button
+              style={{ ...btn, opacity: saving ? 0.7 : 1 }}
+              onClick={handleCreate}
+              disabled={saving}
             >
-              <option style={optionStyle} value="Full">
-                Full Hookups
-              </option>
-              <option style={optionStyle} value="Partial">
-                Partial Hookups
-              </option>
-              <option style={optionStyle} value="None">
-                No Hookups
-              </option>
-            </select>
-          </div>
+              {saving ? "Creating..." : "Create Listing"}
+            </button>
 
-          {/* DESCRIPTION */}
-          <div style={fieldBlock}>
-            <label style={label}>Spot description (optional)</label>
-            <textarea
-              style={textarea}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Example: Level gravel pad, quiet at night, easy pull-through, close to highway..."
-              maxLength={800}
-            />
-            <div style={counterRow}>
-              <span style={tinyHelp}>Shows on the listing page later.</span>
-              <span style={tinyHelp}>{description.length}/800</span>
+            <div style={tinyHelp}>
+              Saved legacy-compatible fields: <b>power</b>, <b>water</b>, <b>sewer</b>, <b>laundry</b>. New
+              amenities are additive & safe.
             </div>
-          </div>
+          </section>
 
-          {/* NEARBY ATTRACTIONS */}
-          <div style={fieldBlock}>
-            <label style={label}>Nearby attractions / theme parks (optional)</label>
-            <textarea
-              style={textarea}
-              value={nearbyAttractions}
-              onChange={(e) => setNearbyAttractions(e.target.value)}
-              placeholder="Example: Six Flags (15 min), Water park (10 min), State park trails (5 min)..."
-              maxLength={500}
-            />
-            <div style={counterRow}>
-              <span style={tinyHelp}>Helps guests see what’s around your location.</span>
-              <span style={tinyHelp}>{nearbyAttractions.length}/500</span>
-            </div>
-          </div>
+          {/* RIGHT COLUMN: BOOKINGS + LISTINGS */}
+          <div style={{ display: "grid", gap: 18 }}>
+            {/* BOOKINGS */}
+            <section style={card}>
+              <div style={sectionHeader}>
+                <div style={{ flex: 1 }}>
+                  <h2 style={sectionTitle}>Booking Requests</h2>
+                  <p style={sectionSub}>
+                    Requested: <b>{bookingCounts.requested}</b> • Confirmed: <b>{bookingCounts.confirmed}</b> •
+                    Cancelled: <b>{bookingCounts.cancelled}</b>
+                  </p>
 
-          {/* AMENITIES */}
-          <div style={divider} />
+                  <div style={toolbar}>
+                    <select
+                      style={filterSelect}
+                      value={bookingFilter}
+                      onChange={(e) => setBookingFilter(e.target.value as BookingFilter)}
+                    >
+                      <option style={optionStyle} value="All">
+                        All
+                      </option>
+                      <option style={optionStyle} value="Requested">
+                        Requested
+                      </option>
+                      <option style={optionStyle} value="Confirmed">
+                        Confirmed
+                      </option>
+                      <option style={optionStyle} value="Cancelled">
+                        Cancelled
+                      </option>
+                    </select>
 
-          <div style={amenityWrap}>
-            <AmenitySection title="RV Infrastructure">
-              <Checkbox label="🔌 30 Amp Power" checked={power30} onChange={setPower30} />
-              <Checkbox label="🔌 50 Amp Power" checked={power50} onChange={setPower50} />
-              <Checkbox label="💧 Water Hookup" checked={water} onChange={setWater} />
-              <Checkbox label="🚽 Full Sewer Hookup" checked={sewer} onChange={setSewer} />
-              <Checkbox label="♻️ Dump Station Onsite" checked={dump} onChange={setDump} />
-            </AmenitySection>
+                    <button
+                      style={smallBtn}
+                      onClick={() => loadBookingsForListings(listings)}
+                      disabled={bookingsLoading || listings.length === 0}
+                    >
+                      {bookingsLoading ? "Refreshing..." : "Refresh bookings"}
+                    </button>
+                  </div>
 
-            <AmenitySection title="Laundry">
-              <Checkbox label="🧺 Washer/Dryer Onsite" checked={laundry} onChange={setLaundry} />
-              <Checkbox label="🧼 Wash & Fold Service" checked={washFold} onChange={setWashFold} />
-            </AmenitySection>
-
-            <AmenitySection title="Facilities">
-              <Checkbox label="🏋️ Gym Onsite" checked={gym} onChange={setGym} />
-              <Checkbox label="🚻 Bathrooms Onsite" checked={bathrooms} onChange={setBathrooms} />
-              <Checkbox label="🚿 Showers Onsite" checked={showers} onChange={setShowers} />
-            </AmenitySection>
-
-            <AmenitySection title="Convenience">
-              <Checkbox label="📶 Wi-Fi" checked={wifi} onChange={setWifi} />
-              <Checkbox label="🗑️ Trash Pickup" checked={trashPickup} onChange={setTrashPickup} />
-              <Checkbox
-                label="📹 Security Cameras"
-                checked={securityCameras}
-                onChange={setSecurityCameras}
-              />
-            </AmenitySection>
-
-            <AmenitySection title="Recreation / Site Features">
-              <Checkbox label="🐶 Pets Allowed" checked={petsAllowed} onChange={setPetsAllowed} />
-              <Checkbox label="🔥 Fire Pit" checked={firePit} onChange={setFirePit} />
-              <Checkbox label="🧺 Picnic Table" checked={picnicTable} onChange={setPicnicTable} />
-              <Checkbox label="🚚 Pull-Through Site" checked={pullThrough} onChange={setPullThrough} />
-            </AmenitySection>
-          </div>
-
-          <button
-            style={{ ...btn, opacity: saving ? 0.7 : 1 }}
-            onClick={handleCreate}
-            disabled={saving}
-          >
-            {saving ? "Creating..." : "Create Listing"}
-          </button>
-
-          <div style={tinyHelp}>
-            Saved legacy-compatible fields: <b>power</b>, <b>water</b>, <b>sewer</b>, <b>laundry</b>. New amenities
-            are additive & safe.
-          </div>
-        </section>
-
-        {/* RIGHT COLUMN: BOOKINGS + LISTINGS */}
-        <div style={{ display: "grid", gap: 18 }}>
-          {/* BOOKINGS */}
-          <section style={card}>
-            <div style={sectionHeader}>
-              <div style={{ flex: 1 }}>
-                <h2 style={sectionTitle}>Booking Requests</h2>
-                <p style={sectionSub}>
-                  Requested: <b>{bookingCounts.requested}</b> • Confirmed: <b>{bookingCounts.confirmed}</b> • Cancelled:{" "}
-                  <b>{bookingCounts.cancelled}</b>
-                </p>
-
-                <div style={toolbar}>
-                  <select
-                    style={filterSelect}
-                    value={bookingFilter}
-                    onChange={(e) => setBookingFilter(e.target.value as BookingFilter)}
-                  >
-                    <option style={optionStyle} value="All">
-                      All
-                    </option>
-                    <option style={optionStyle} value="Requested">
-                      Requested
-                    </option>
-                    <option style={optionStyle} value="Confirmed">
-                      Confirmed
-                    </option>
-                    <option style={optionStyle} value="Cancelled">
-                      Cancelled
-                    </option>
-                  </select>
-
-                  <button
-                    style={smallBtn}
-                    onClick={() => loadBookingsForListings(listings)}
-                    disabled={bookingsLoading || listings.length === 0}
-                  >
-                    {bookingsLoading ? "Refreshing..." : "Refresh bookings"}
-                  </button>
-                </div>
-
-                {bookingStatus && <div style={mutedBox}>{bookingStatus}</div>}
-              </div>
-            </div>
-
-            {bookingsLoading ? (
-              <div style={mutedBox}>Loading bookings…</div>
-            ) : filteredBookings.length === 0 ? (
-              <div style={mutedBox}>
-                <div style={{ fontWeight: 900, marginBottom: 6 }}>No bookings yet</div>
-                <div style={{ opacity: 0.85, lineHeight: 1.4 }}>
-                  When guests request bookings, they will appear here for approval.
+                  {bookingStatus && <div style={mutedBox}>{bookingStatus}</div>}
                 </div>
               </div>
-            ) : (
-              <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-                {filteredBookings.map((b) => (
-                  <div key={b.id} style={bookingCard}>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                      <div>
-                        <div style={{ fontWeight: 950, fontSize: 16 }}>{b.listingTitle}</div>
-                        <div style={{ opacity: 0.8, marginTop: 4 }}>
-                          {safeDateLabel(b.checkIn)} → {safeDateLabel(b.checkOut)} • {b.nights} night
-                          {b.nights === 1 ? "" : "s"} • <b>${b.estimatedTotal}</b>
+
+              {bookingsLoading ? (
+                <div style={mutedBox}>Loading bookings…</div>
+              ) : filteredBookings.length === 0 ? (
+                <div style={mutedBox}>
+                  <div style={{ fontWeight: 900, marginBottom: 6 }}>No bookings yet</div>
+                  <div style={{ opacity: 0.85, lineHeight: 1.4 }}>
+                    When guests request bookings, they will appear here for approval.
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+                  {filteredBookings.map((b) => (
+                    <div key={b.id} style={bookingCard}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                        <div>
+                          <div style={{ fontWeight: 950, fontSize: 16 }}>{b.listingTitle}</div>
+                          <div style={{ opacity: 0.8, marginTop: 4 }}>
+                            {safeDateLabel(b.checkIn)} → {safeDateLabel(b.checkOut)} • {b.nights} night
+                            {b.nights === 1 ? "" : "s"} • <b>${b.estimatedTotal}</b>
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span
+                            style={{
+                              ...statusPill,
+                              background:
+                                b.status === "requested"
+                                  ? "rgba(255,255,255,0.10)"
+                                  : b.status === "confirmed"
+                                  ? "rgba(0,255,160,0.12)"
+                                  : b.status === "cancelled"
+                                  ? "rgba(255,80,80,0.12)"
+                                  : "rgba(255,255,255,0.08)",
+                              borderColor:
+                                b.status === "confirmed"
+                                  ? "rgba(0,255,160,0.22)"
+                                  : b.status === "cancelled"
+                                  ? "rgba(255,80,80,0.22)"
+                                  : "rgba(255,255,255,0.14)",
+                            }}
+                          >
+                            {b.status}
+                          </span>
                         </div>
                       </div>
 
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span
-                          style={{
-                            ...statusPill,
-                            background:
-                              b.status === "requested"
-                                ? "rgba(255,255,255,0.10)"
-                                : b.status === "confirmed"
-                                ? "rgba(0,255,160,0.12)"
-                                : b.status === "cancelled"
-                                ? "rgba(255,80,80,0.12)"
-                                : "rgba(255,255,255,0.08)",
-                            borderColor:
-                              b.status === "confirmed"
-                                ? "rgba(0,255,160,0.22)"
-                                : b.status === "cancelled"
-                                ? "rgba(255,80,80,0.22)"
-                                : "rgba(255,255,255,0.14)",
-                          }}
-                        >
-                          {b.status}
-                        </span>
+                      <div style={bookingMetaRow}>
+                        <span style={pill}>Type: {b.bookingType}</span>
+                        {b.createdAtLabel && <span style={pill}>Created: {b.createdAtLabel}</span>}
+                        <span style={pill}>Booking ID: {b.id}</span>
                       </div>
-                    </div>
 
-                    <div style={bookingMetaRow}>
-                      <span style={pill}>Type: {b.bookingType}</span>
-                      {b.createdAtLabel && <span style={pill}>Created: {b.createdAtLabel}</span>}
-                      <span style={pill}>Booking ID: {b.id}</span>
-                    </div>
-
-                    {b.note?.trim() && (
-                      <div style={descBox}>
-                        <div style={{ fontWeight: 800, marginBottom: 6 }}>Guest note</div>
-                        <div style={{ opacity: 0.9, lineHeight: 1.4 }}>{b.note}</div>
-                      </div>
-                    )}
-
-                    {/* Actions */}
-                    <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-                      {b.status === "requested" ? (
-                        <>
-                          <button
-                            style={{
-                              ...actionBtn,
-                              background: "rgba(0,255,160,0.16)",
-                              borderColor: "rgba(0,255,160,0.24)",
-                            }}
-                            onClick={() => setBookingStatusValue(b.id, "confirmed")}
-                            disabled={updatingBookingId === b.id}
-                          >
-                            {updatingBookingId === b.id ? "Updating..." : "✅ Approve"}
-                          </button>
-
-                          <button
-                            style={{
-                              ...actionBtn,
-                              background: "rgba(255,80,80,0.14)",
-                              borderColor: "rgba(255,80,80,0.22)",
-                            }}
-                            onClick={() => setBookingStatusValue(b.id, "cancelled")}
-                            disabled={updatingBookingId === b.id}
-                          >
-                            {updatingBookingId === b.id ? "Updating..." : "❌ Reject"}
-                          </button>
-                        </>
-                      ) : (
-                        <div style={{ opacity: 0.75, fontSize: 12 }}>
-                          This booking is {b.status}. (No further action needed.)
+                      {b.note?.trim() && (
+                        <div style={descBox}>
+                          <div style={{ fontWeight: 800, marginBottom: 6 }}>Guest note</div>
+                          <div style={{ opacity: 0.9, lineHeight: 1.4 }}>{b.note}</div>
                         </div>
                       )}
+
+                      {/* Actions */}
+                      <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+                        {b.status === "requested" ? (
+                          <>
+                            <button
+                              style={{
+                                ...actionBtn,
+                                background: "rgba(0,255,160,0.16)",
+                                borderColor: "rgba(0,255,160,0.24)",
+                              }}
+                              onClick={() => setBookingStatusValue(b.id, "confirmed")}
+                              disabled={updatingBookingId === b.id}
+                            >
+                              {updatingBookingId === b.id ? "Updating..." : "✅ Approve"}
+                            </button>
+
+                            <button
+                              style={{
+                                ...actionBtn,
+                                background: "rgba(255,80,80,0.14)",
+                                borderColor: "rgba(255,80,80,0.22)",
+                              }}
+                              onClick={() => setBookingStatusValue(b.id, "cancelled")}
+                              disabled={updatingBookingId === b.id}
+                            >
+                              {updatingBookingId === b.id ? "Updating..." : "❌ Reject"}
+                            </button>
+                          </>
+                        ) : (
+                          <div style={{ opacity: 0.75, fontSize: 12 }}>
+                            This booking is {b.status}. (No further action needed.)
+                          </div>
+                        )}
+                      </div>
                     </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* YOUR LISTINGS */}
+            <section style={card}>
+              <div style={sectionHeader}>
+                <div style={{ flex: 1 }}>
+                  <h2 style={sectionTitle}>Your Listings</h2>
+                  <div style={rightMetaRow}>
+                    <p style={sectionSub} title={filteredCountLabel}>
+                      {filteredCountLabel}
+                    </p>
+                    <span style={dot}>•</span>
+                    <p style={sectionSub}>What’s currently in Firestore.</p>
                   </div>
-                ))}
-              </div>
-            )}
-          </section>
 
-          {/* YOUR LISTINGS */}
-          <section style={card}>
-            <div style={sectionHeader}>
-              <div style={{ flex: 1 }}>
-                <h2 style={sectionTitle}>Your Listings</h2>
-                <div style={rightMetaRow}>
-                  <p style={sectionSub} title={filteredCountLabel}>
-                    {filteredCountLabel}
-                  </p>
-                  <span style={dot}>•</span>
-                  <p style={sectionSub}>What’s currently in Firestore.</p>
+                  {/* Toolbar */}
+                  <div style={toolbar}>
+                    <input
+                      style={searchInput}
+                      value={searchText}
+                      onChange={(e) => setSearchText(e.target.value)}
+                      placeholder="Search title, city, state…"
+                    />
+
+                    <select
+                      style={filterSelect}
+                      value={listingFilter}
+                      onChange={(e) => setListingFilter(e.target.value as ListingFilter)}
+                    >
+                      <option style={optionStyle} value="All">
+                        All
+                      </option>
+                      <option style={optionStyle} value="Full hookups">
+                        Full hookups
+                      </option>
+                      <option style={optionStyle} value="Has showers">
+                        Has showers
+                      </option>
+                      <option style={optionStyle} value="Has bathrooms">
+                        Has bathrooms
+                      </option>
+                      <option style={optionStyle} value="Has gym">
+                        Has gym
+                      </option>
+                      <option style={optionStyle} value="Has wifi">
+                        Has Wi-Fi
+                      </option>
+                      <option style={optionStyle} value="Pets allowed">
+                        Pets allowed
+                      </option>
+                      <option style={optionStyle} value="Under $50">
+                        Under $50
+                      </option>
+                      <option style={optionStyle} value="Power 50A">
+                        Power 50A
+                      </option>
+                      <option style={optionStyle} value="Full sewer">
+                        Full sewer
+                      </option>
+                      <option style={optionStyle} value="Laundry available">
+                        Laundry available
+                      </option>
+                      <option style={optionStyle} value="Has nearby attractions">
+                        Has nearby attractions
+                      </option>
+                    </select>
+
+                    <button
+                      style={clearBtn}
+                      onClick={clearSearchAndFilter}
+                      disabled={!searchText && listingFilter === "All"}
+                      title="Clear search and filter"
+                    >
+                      Clear
+                    </button>
+                  </div>
                 </div>
 
-                {/* Toolbar */}
-                <div style={toolbar}>
-                  <input
-                    style={searchInput}
-                    value={searchText}
-                    onChange={(e) => setSearchText(e.target.value)}
-                    placeholder="Search title, city, state…"
-                  />
-
-                  <select
-                    style={filterSelect}
-                    value={listingFilter}
-                    onChange={(e) => setListingFilter(e.target.value as ListingFilter)}
-                  >
-                    <option style={optionStyle} value="All">
-                      All
-                    </option>
-                    <option style={optionStyle} value="Full hookups">
-                      Full hookups
-                    </option>
-                    <option style={optionStyle} value="Has showers">
-                      Has showers
-                    </option>
-                    <option style={optionStyle} value="Has bathrooms">
-                      Has bathrooms
-                    </option>
-                    <option style={optionStyle} value="Has gym">
-                      Has gym
-                    </option>
-                    <option style={optionStyle} value="Has wifi">
-                      Has Wi-Fi
-                    </option>
-                    <option style={optionStyle} value="Pets allowed">
-                      Pets allowed
-                    </option>
-                    <option style={optionStyle} value="Under $50">
-                      Under $50
-                    </option>
-                    <option style={optionStyle} value="Power 50A">
-                      Power 50A
-                    </option>
-                    <option style={optionStyle} value="Full sewer">
-                      Full sewer
-                    </option>
-                    <option style={optionStyle} value="Laundry available">
-                      Laundry available
-                    </option>
-                    <option style={optionStyle} value="Has nearby attractions">
-                      Has nearby attractions
-                    </option>
-                  </select>
-
-                  <button
-                    style={clearBtn}
-                    onClick={clearSearchAndFilter}
-                    disabled={!searchText && listingFilter === "All"}
-                    title="Clear search and filter"
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
-
-              <button style={smallBtn} onClick={loadListingsAndBookings} disabled={loading}>
-                {loading ? "Refreshing..." : "Refresh"}
-              </button>
-            </div>
-
-            {loading ? (
-              <div style={mutedBox}>Loading listings…</div>
-            ) : filteredListings.length === 0 ? (
-              <div style={mutedBox}>
-                <div style={{ fontWeight: 900, marginBottom: 6 }}>No results</div>
-                <div style={{ opacity: 0.85, lineHeight: 1.4 }}>
-                  Try clearing your search/filter, or create a new listing on the left.
-                </div>
-                <button style={{ ...smallBtn, marginTop: 12 }} onClick={clearSearchAndFilter}>
-                  Clear filters
+                <button style={smallBtn} onClick={loadListingsAndBookings} disabled={loading}>
+                  {loading ? "Refreshing..." : "Refresh"}
                 </button>
               </div>
-            ) : (
-              <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-                {filteredListings.map((l) => (
-                  <div key={l.id} style={listingCard}>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                      <div>
-                        <div style={{ fontWeight: 900, fontSize: 18 }}>{l.title}</div>
-                        <div style={{ opacity: 0.8 }}>
-                          {l.city}, {l.state}
+
+              {loading ? (
+                <div style={mutedBox}>Loading listings…</div>
+              ) : filteredListings.length === 0 ? (
+                <div style={mutedBox}>
+                  <div style={{ fontWeight: 900, marginBottom: 6 }}>No results</div>
+                  <div style={{ opacity: 0.85, lineHeight: 1.4 }}>
+                    Try clearing your search/filter, or create a new listing on the left.
+                  </div>
+                  <button style={{ ...smallBtn, marginTop: 12 }} onClick={clearSearchAndFilter}>
+                    Clear filters
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+                  {filteredListings.map((l) => (
+                    <div key={l.id} style={listingCard}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                        <div>
+                          <div style={{ fontWeight: 900, fontSize: 18 }}>{l.title}</div>
+                          <div style={{ opacity: 0.8 }}>
+                            {l.city}, {l.state}
+                          </div>
+                        </div>
+
+                        <div style={pillPrice}>
+                          ${l.price} /{" "}
+                          {l.pricingType === "Night"
+                            ? "night"
+                            : l.pricingType === "Weekly"
+                            ? "week"
+                            : "month"}
                         </div>
                       </div>
 
-                      <div style={pillPrice}>
-                        ${l.price} /{" "}
-                        {l.pricingType === "Night"
-                          ? "night"
-                          : l.pricingType === "Weekly"
-                          ? "week"
-                          : "month"}
+                      <div style={pillRow}>
+                        <span style={pill}>Hookups: {l.hookups}</span>
+                        <span style={pill}>Max: {l.maxLengthFt} ft</span>
+                        <span style={pill}>Power: {l.power}</span>
+                        <span style={pill}>Water: {l.water}</span>
+                        <span style={pill}>Sewer: {l.sewer}</span>
+                        <span style={pill}>Laundry: {l.laundry}</span>
+
+                        {l.gym && <span style={pill}>Gym</span>}
+                        {l.bathrooms && <span style={pill}>Bathrooms</span>}
+                        {l.showers && <span style={pill}>Showers</span>}
+                        {l.wifi && <span style={pill}>Wi-Fi</span>}
+                        {l.petsAllowed && <span style={pill}>Pets</span>}
+                        {l.firePit && <span style={pill}>Fire Pit</span>}
+                        {l.pullThrough && <span style={pill}>Pull-Through</span>}
+                      </div>
+
+                      {l.description && (
+                        <div style={descBox}>
+                          <div style={{ fontWeight: 800, marginBottom: 6 }}>Description</div>
+                          <div style={{ opacity: 0.9, lineHeight: 1.4 }}>{l.description}</div>
+                        </div>
+                      )}
+
+                      {l.nearbyAttractions && (
+                        <div style={descBox}>
+                          <div style={{ fontWeight: 800, marginBottom: 6 }}>Nearby Attractions</div>
+                          <div style={{ opacity: 0.9, lineHeight: 1.4 }}>{l.nearbyAttractions}</div>
+                        </div>
+                      )}
+
+                      <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+                        <Link href={`/listings/${l.id}`} style={primaryLinkBtn}>
+                          View listing →
+                        </Link>
+                        <span style={tinyHelp}>ID: {l.id}</span>
                       </div>
                     </div>
-
-                    <div style={pillRow}>
-                      <span style={pill}>Hookups: {l.hookups}</span>
-                      <span style={pill}>Max: {l.maxLengthFt} ft</span>
-                      <span style={pill}>Power: {l.power}</span>
-                      <span style={pill}>Water: {l.water}</span>
-                      <span style={pill}>Sewer: {l.sewer}</span>
-                      <span style={pill}>Laundry: {l.laundry}</span>
-
-                      {l.gym && <span style={pill}>Gym</span>}
-                      {l.bathrooms && <span style={pill}>Bathrooms</span>}
-                      {l.showers && <span style={pill}>Showers</span>}
-                      {l.wifi && <span style={pill}>Wi-Fi</span>}
-                      {l.petsAllowed && <span style={pill}>Pets</span>}
-                      {l.firePit && <span style={pill}>Fire Pit</span>}
-                      {l.pullThrough && <span style={pill}>Pull-Through</span>}
-                    </div>
-
-                    {l.description && (
-                      <div style={descBox}>
-                        <div style={{ fontWeight: 800, marginBottom: 6 }}>Description</div>
-                        <div style={{ opacity: 0.9, lineHeight: 1.4 }}>{l.description}</div>
-                      </div>
-                    )}
-
-                    {l.nearbyAttractions && (
-                      <div style={descBox}>
-                        <div style={{ fontWeight: 800, marginBottom: 6 }}>Nearby Attractions</div>
-                        <div style={{ opacity: 0.9, lineHeight: 1.4 }}>{l.nearbyAttractions}</div>
-                      </div>
-                    )}
-
-                    <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-                      <Link href={`/listings/${l.id}`} style={primaryLinkBtn}>
-                        View listing →
-                      </Link>
-                      <span style={tinyHelp}>ID: {l.id}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </HostGuard>
   );
 }
 
@@ -1312,7 +1366,11 @@ const textarea: React.CSSProperties = {
   resize: "vertical",
 };
 
-const counterRow: React.CSSProperties = { display: "flex", justifyContent: "space-between", marginTop: 8 };
+const counterRow: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  marginTop: 8,
+};
 
 const label: React.CSSProperties = { fontWeight: 800 };
 const tinyHelp: React.CSSProperties = { opacity: 0.7, fontSize: 12 };
@@ -1378,7 +1436,11 @@ const unitInput: React.CSSProperties = {
   color: "white",
 };
 
-const divider: React.CSSProperties = { height: 1, background: "rgba(255,255,255,0.10)", marginTop: 18 };
+const divider: React.CSSProperties = {
+  height: 1,
+  background: "rgba(255,255,255,0.10)",
+  marginTop: 18,
+};
 
 const btn: React.CSSProperties = {
   marginTop: 18,
@@ -1392,7 +1454,12 @@ const btn: React.CSSProperties = {
   cursor: "pointer",
 };
 
-const checkRow: React.CSSProperties = { display: "flex", gap: 10, marginTop: 10, alignItems: "center" };
+const checkRow: React.CSSProperties = {
+  display: "flex",
+  gap: 10,
+  marginTop: 10,
+  alignItems: "center",
+};
 
 const listingCard: React.CSSProperties = {
   padding: 16,
@@ -1408,7 +1475,12 @@ const bookingCard: React.CSSProperties = {
   background: "rgba(0,0,0,0.22)",
 };
 
-const bookingMetaRow: React.CSSProperties = { display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 };
+const bookingMetaRow: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 8,
+  marginTop: 12,
+};
 
 const statusPill: React.CSSProperties = {
   padding: "6px 10px",

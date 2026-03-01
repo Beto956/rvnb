@@ -13,6 +13,47 @@
   padding: 48px 16px 80px;
 }
 
+/* Breadcrumb */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  opacity: 0.9; /* ✅ slightly more visible */
+  font-size: 13px;
+}
+
+.breadcrumbLink {
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+}
+
+.breadcrumbLink:hover {
+  text-decoration: underline;
+}
+
+.breadcrumbSep {
+  opacity: 0.5;
+}
+
+.breadcrumbHere {
+  opacity: 0.85; /* ✅ slightly more visible */
+  font-weight: 700; /* ✅ better hierarchy */
+}
+
+/* Divider to separate hero + filters */
+.sectionDivider {
+  height: 1px;
+  margin: 18px 0 18px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.10),
+    transparent
+  );
+  opacity: 0.9;
+}
+
 .heroCard {
   border-radius: 18px;
   padding: 28px 22px;
@@ -79,9 +120,272 @@
   transition: transform 140ms ease;
 }
 
+/* --- FILTERS (upgrade to match homepage glass) --- */
+.filtersCard {
+  margin-top: 14px;
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+}
+
+.filtersTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.filtersTitle {
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: 0.2px;
+}
+
+.filtersHint {
+  margin-top: 4px;
+  opacity: 0.75;
+  font-size: 12px;
+}
+
+.clearAll {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.90);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: transform 140ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.clearAll:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.20);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.clearAllDisabled {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 12px;
+  opacity: 0.45;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.04);
+  display: inline-flex;
+  align-items: center;
+}
+
+.filtersGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+@media (max-width: 900px) {
+  .filtersGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .filtersGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.filtersField {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filtersLabel {
+  font-size: 12px;
+  opacity: 0.85;
+  font-weight: 700;
+}
+
+.filtersControl {
+  height: 42px;
+  border-radius: 12px;
+  padding: 0 12px;
+  color: white;
+
+  /* ✅ slightly less flat + more glass depth */
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.filtersControl:focus {
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 0 0 3px rgba(120, 160, 255, 0.18);
+  background: rgba(0, 0, 0, 0.45);
+}
+
+/* ✅ UPDATED: centered row so the card doesn't look stretched */
+.filtersBtns {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center; /* center button */
+  align-items: center;
+  margin-top: 8px; /* tighter spacing */
+}
+
+/* ✅ UPDATED: slimmer + more elegant */
+.applyBtn {
+  height: 38px; /* slimmer */
+  padding: 0 18px;
+  border-radius: 10px;
+  font-weight: 800;
+
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.10);
+  color: white;
+  cursor: pointer;
+
+  transition:
+    transform 140ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.applyBtn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.resetBtn {
+  height: 42px; /* ✅ match input height */
+  padding: 0 14px;
+  border-radius: 12px;
+  font-weight: 900;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.92);
+  transition: transform 140ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.resetBtn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.20);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Active filter chips row */
+.chipsRow {
+  margin-top: 12px;
+  padding-top: 10px; /* ✅ gives it structure */
+  border-top: 1px solid rgba(255, 255, 255, 0.06); /* ✅ intentional separation */
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: transform 140ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.chip:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.20);
+}
+
+.chipX {
+  opacity: 0.8;
+  font-weight: 900;
+}
+
+/* Results summary bar */
+.resultsBar {
+  margin-top: 14px;
+  padding: 10px 12px; /* ✅ slightly tighter */
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.resultsLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.resultsCount {
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.resultsDot {
+  opacity: 0.4;
+}
+
+.resultsMeta {
+  opacity: 0.75;
+  font-size: 13px;
+}
+
+.resultsRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mapPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-weight: 900;
+  font-size: 12px;
+  opacity: 0.8;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+}
+
 /* GRID */
 .grid {
-  margin-top: 28px;
+  margin-top: 16px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;

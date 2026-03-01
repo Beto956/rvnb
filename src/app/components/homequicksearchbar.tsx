@@ -1,22 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../page.module.css";
 
-type Hookups = "Full" | "Partial" | "None" | "";
-
-type StateOption = {
-  code: string;
-  name: string;
-};
+type Hookups = "Any" | "Full" | "Partial" | "None";
 
 export default function HomeQuickSearchBar() {
   const router = useRouter();
 
-  const states: StateOption[] = useMemo(
+  const [stateCode, setStateCode] = useState<string>("Any");
+  const [maxPrice, setMaxPrice] = useState<string>("");
+  const [hookups, setHookups] = useState<Hookups>("Any");
+
+  const usStates = useMemo(
     () => [
-      { code: "", name: "Any State" },
+      { code: "Any", name: "Any State" },
       { code: "AL", name: "Alabama" },
       { code: "AK", name: "Alaska" },
       { code: "AZ", name: "Arizona" },
@@ -71,82 +70,97 @@ export default function HomeQuickSearchBar() {
     []
   );
 
-  const [stateCode, setStateCode] = useState<string>("");
-  const [maxPrice, setMaxPrice] = useState<string>("");
-  const [hookups, setHookups] = useState<Hookups>("");
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
 
-  const onSearch = () => {
     const params = new URLSearchParams();
 
-    // We only add params if user chooses values.
-    if (stateCode) params.set("state", stateCode);
-    if (maxPrice) params.set("maxPrice", maxPrice);
-    if (hookups) params.set("hookups", hookups);
+    // Only set params if user chose values (keeps URLs clean)
+    if (stateCode && stateCode !== "Any") params.set("state", stateCode);
+
+    // keep maxPrice numeric-ish
+    const cleaned = maxPrice.trim();
+    if (cleaned) params.set("maxPrice", cleaned);
+
+    if (hookups && hookups !== "Any") params.set("hookups", hookups);
 
     const qs = params.toString();
     router.push(qs ? `/search?${qs}` : "/search");
-  };
+  }
 
   return (
-    <div className={styles.qsCard}>
+    <form className={styles.qsCard} onSubmit={onSubmit}>
       <div className={styles.qsHeader}>
         <h3 className={styles.qsTitle}>Quick Search</h3>
         <p className={styles.qsSub}>Start fast — refine more on the search page.</p>
       </div>
 
       <div className={styles.qsGrid}>
-        <label className={styles.qsField}>
-          <span className={styles.qsLabel}>State</span>
+        {/* State */}
+        <div className={styles.qsField}>
+          <label className={styles.qsLabel} htmlFor="qs-state">
+            State
+          </label>
           <select
+            id="qs-state"
             className={styles.qsControl}
             value={stateCode}
             onChange={(e) => setStateCode(e.target.value)}
           >
-            {states.map((s) => (
-              <option key={s.code || "any"} value={s.code}>
-                {s.code ? `${s.code} — ${s.name}` : s.name}
+            {usStates.map((s) => (
+              <option key={s.code} value={s.code}>
+                {s.code === "Any" ? s.name : `${s.name} (${s.code})`}
               </option>
             ))}
           </select>
-        </label>
+        </div>
 
-        <label className={styles.qsField}>
-          <span className={styles.qsLabel}>Max Price (optional)</span>
+        {/* Max price */}
+        <div className={styles.qsField}>
+          <label className={styles.qsLabel} htmlFor="qs-maxprice">
+            Max Price (optional)
+          </label>
           <input
+            id="qs-maxprice"
             className={styles.qsControl}
             inputMode="numeric"
             placeholder="e.g. 60"
             value={maxPrice}
             onChange={(e) => {
-              // keep only digits
-              const cleaned = e.target.value.replace(/[^\d]/g, "");
-              setMaxPrice(cleaned);
+              // allow only digits
+              const next = e.target.value.replace(/[^\d]/g, "");
+              setMaxPrice(next);
             }}
           />
-        </label>
+        </div>
 
-        <label className={styles.qsField}>
-          <span className={styles.qsLabel}>Hookups</span>
+        {/* Hookups */}
+        <div className={styles.qsField}>
+          <label className={styles.qsLabel} htmlFor="qs-hookups">
+            Hookups
+          </label>
           <select
+            id="qs-hookups"
             className={styles.qsControl}
             value={hookups}
             onChange={(e) => setHookups(e.target.value as Hookups)}
           >
-            <option value="">Any</option>
+            <option value="Any">Any</option>
             <option value="Full">Full</option>
             <option value="Partial">Partial</option>
             <option value="None">None</option>
           </select>
-        </label>
+        </div>
 
-        <button className={styles.qsButton} onClick={onSearch} type="button">
+        {/* Button */}
+        <button className={styles.qsButton} type="submit">
           Search
         </button>
       </div>
 
       <div className={styles.qsHint}>
-        This only builds query params — your existing <strong>/search</strong> page stays in control.
+        This only builds query params — your existing /search page stays in control.
       </div>
-    </div>
+    </form>
   );
 }

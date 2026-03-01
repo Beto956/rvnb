@@ -54,8 +54,8 @@ export default function Home() {
           <h1 className={styles.title}>RVNB</h1>
 
           <p className={styles.subtitle}>
-            Freedom doesn’t need a hotel key. Find safe, host-backed RV spots
-            across the country — and build the community that powers the road.
+            Freedom doesn’t need a hotel key. Find safe, host-backed RV spots across
+            the country — and build the community that powers the road.
           </p>
 
           <div className={styles.ctaRow}>
@@ -78,11 +78,11 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 2–5) SUNLIGHT BAND */}
+      {/* 2–5) SUNLIGHT BAND (now includes Quick Search at the very top of block 2) */}
       <div className={styles.sunWrap} role="region" aria-label="Sunlight band">
-        {/* 2) QUICK SEARCH BAR */}
-        <section className={styles.quickSearchWrap} aria-label="Quick search">
-          <div className={styles.container}>
+        {/* ✅ QUICK SEARCH (Block 2 top, bubble wrapper added) */}
+        <section className={styles.quickSearchSection} aria-label="Quick search">
+          <div className={styles.quickSearchBubble}>
             <HomeQuickSearchBar />
           </div>
         </section>
@@ -112,12 +112,9 @@ export default function Home() {
           <div className={styles.container}>
             <div className={styles.sectionHeader}>
               <div>
-                <h2 className={styles.sectionTitle}>
-                  Built to Become an Ecosystem
-                </h2>
+                <h2 className={styles.sectionTitle}>Built to Become an Ecosystem</h2>
                 <p className={styles.sectionSub}>
-                  RVNB is positioned to support the entire RV lifestyle — not
-                  just parking.
+                  RVNB is positioned to support the entire RV lifestyle — not just parking.
                 </p>
               </div>
             </div>
@@ -134,8 +131,8 @@ export default function Home() {
                     <span className={styles.badge}>Coming Soon</span>
                   </div>
                   <p className={styles.cardBody}>
-                    Hotshot driver listings + booking lanes for moving rigs,
-                    trailers, and RVs safely between locations.
+                    Hotshot driver listings + booking lanes for moving rigs, trailers, and RVs
+                    safely between locations.
                   </p>
                   <span className={styles.cardMuted}>
                     Future: driver accounts, dispatch, tracking
@@ -154,8 +151,8 @@ export default function Home() {
                     <span className={styles.badge}>Coming Soon</span>
                   </div>
                   <p className={styles.cardBody}>
-                    Compare RV insurance options, specialized coverage, and
-                    trusted providers built for RV life.
+                    Compare RV insurance options, specialized coverage, and trusted providers
+                    built for RV life.
                   </p>
                   <span className={styles.cardMuted}>
                     Future: affiliate lanes, verified partners
@@ -174,8 +171,8 @@ export default function Home() {
                     <span className={styles.badge}>Coming Soon</span>
                   </div>
                   <p className={styles.cardBody}>
-                    Spot reviews, safety tips, region threads, and host-to-traveler
-                    support — built into the platform.
+                    Spot reviews, safety tips, region threads, and host-to-traveler support —
+                    built into the platform.
                   </p>
                   <span className={styles.cardMuted}>
                     Future: moderation, profiles, reputation
@@ -211,8 +208,7 @@ export default function Home() {
                 <div className={styles.stepNum}>2</div>
                 <h3 className={styles.stepTitle}>Book Securely</h3>
                 <p className={styles.stepBody}>
-                  Book with confidence through a clean flow designed for hosts
-                  and travelers.
+                  Book with confidence through a clean flow designed for hosts and travelers.
                 </p>
               </div>
 
@@ -237,8 +233,8 @@ export default function Home() {
                 Built for Hosts. Built for Travelers. Built for Growth.
               </h2>
               <p className={styles.stripBody}>
-                RVNB is designed to expand into transport, insurance, community,
-                reviews, and maps — without rebuilding the foundation.
+                RVNB is designed to expand into transport, insurance, community, reviews, and
+                maps — without rebuilding the foundation.
               </p>
             </div>
 
@@ -246,6 +242,7 @@ export default function Home() {
               <Link href="/host" className={styles.stripBtnPrimary}>
                 Become a Host
               </Link>
+
               <Link href="/search" className={styles.stripBtnSecondary}>
                 Start Searching
               </Link>
@@ -263,9 +260,7 @@ export default function Home() {
               <div className={styles.footerBrandSub}>
                 Recreational Vehicle Nationwide Booking
               </div>
-              <div className={styles.footerMeta}>
-                Built with Next.js + Firebase
-              </div>
+              <div className={styles.footerMeta}>Built with Next.js + Firebase</div>
             </div>
           </div>
 
