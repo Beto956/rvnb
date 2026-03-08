@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import styles from "./listingdetail.module.css";
 
 import { db } from "@/lib/firebase";
@@ -20,7 +20,7 @@ type ListingDoc = {
   hookups?: Hookups;
   maxLengthFt?: number;
 
-  // Optional amenities (if you have them already)
+  // Optional amenities
   power?: string; // "None" | "15A" | "30A" | "50A" etc
   water?: string;
   sewer?: string;
@@ -32,6 +32,14 @@ type ListingDoc = {
   // NEW
   price?: number;
   pricingType?: PricingType;
+
+  // ✅ ADDITIVE: exact location (host geocode OR manual pin)
+  lat?: number;
+  lng?: number;
+
+  // ✅ ADDITIVE: optional address metadata from geocoding
+  geocodeAddress?: string;
+  placeId?: string;
 };
 
 type ListingUI = {
@@ -50,12 +58,28 @@ type ListingUI = {
   water: string;
   sewer: string;
   laundry: string;
+
+  // ✅ ADDITIVE: exact location fields
+  lat?: number;
+  lng?: number;
+  geocodeAddress?: string;
+  placeId?: string;
 };
 
 function normalizePricingLabel(pricingType: PricingType): string {
   if (pricingType === "Night") return "night";
   if (pricingType === "Weekly") return "week";
   return "month";
+}
+
+function buildGoogleMapsUrl(lat: number, lng: number, placeId?: string) {
+  // PlaceId gives cleaner results if available, but coords always work.
+  if (placeId && placeId.trim()) {
+    return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}&query_place_id=${encodeURIComponent(
+      placeId
+    )}`;
+  }
+  return `https://www.google.com/maps?q=${lat},${lng}`;
 }
 
 function buildListingUI(id: string, data: ListingDoc): ListingUI {
@@ -70,6 +94,11 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
   const water = (data.water ?? "None").toString();
   const sewer = (data.sewer ?? "None").toString();
   const laundry = (data.laundry ?? "None").toString();
+
+  const lat = typeof data.lat === "number" ? data.lat : undefined;
+  const lng = typeof data.lng === "number" ? data.lng : undefined;
+  const geocodeAddress = (data.geocodeAddress ?? "").toString().trim() || undefined;
+  const placeId = (data.placeId ?? "").toString().trim() || undefined;
 
   const hasNewPrice = typeof data.price === "number";
   const hasNewPricingType =
@@ -91,6 +120,10 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
       water,
       sewer,
       laundry,
+      lat,
+      lng,
+      geocodeAddress,
+      placeId,
     };
   }
 
@@ -109,6 +142,10 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
     water,
     sewer,
     laundry,
+    lat,
+    lng,
+    geocodeAddress,
+    placeId,
   };
 }
 
@@ -179,6 +216,16 @@ export default function ListingDetailPage() {
     run();
   }, [listingId]);
 
+  const hasCoords = useMemo(() => {
+    return !!listing && typeof listing.lat === "number" && typeof listing.lng === "number";
+  }, [listing]);
+
+  const mapsUrl = useMemo(() => {
+    if (!listing) return "";
+    if (typeof listing.lat !== "number" || typeof listing.lng !== "number") return "";
+    return buildGoogleMapsUrl(listing.lat, listing.lng, listing.placeId);
+  }, [listing]);
+
   // Missing ID (or navigated weirdly)
   if (!listingId) {
     return (
@@ -223,9 +270,7 @@ export default function ListingDetailPage() {
           </Link>
           <div className={styles.heroCard}>
             <h1 className={styles.h1}>Listing not found</h1>
-            <p className={styles.sub}>
-              This listing may have been removed or the link is incorrect.
-            </p>
+            <p className={styles.sub}>This listing may have been removed or the link is incorrect.</p>
           </div>
         </div>
       </div>
@@ -243,9 +288,33 @@ export default function ListingDetailPage() {
         <div className={styles.header}>
           <div>
             <h1 className={styles.h1}>{listing.title}</h1>
+
             <div className={styles.location}>
               {listing.city}, {listing.state}
+              {hasCoords ? (
+                <span
+                  style={{
+                    marginLeft: 10,
+                    fontSize: 12,
+                    opacity: 0.85,
+                    padding: "4px 10px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    background: "rgba(255,255,255,0.06)",
+                    display: "inline-block",
+                  }}
+                >
+                  📍 Exact pin saved
+                </span>
+              ) : null}
             </div>
+
+            {/* ✅ Subtle enhancement: show address line (if available) */}
+            {listing.geocodeAddress ? (
+              <div style={{ marginTop: 6, opacity: 0.82, fontSize: 13, lineHeight: 1.35 }}>
+                {listing.geocodeAddress}
+              </div>
+            ) : null}
           </div>
 
           <div className={styles.priceBox}>
@@ -298,11 +367,69 @@ export default function ListingDetailPage() {
               </div>
             </div>
 
+            {/* ✅ NEW: Location card (inserted exactly between Spot details and What to expect) */}
+            <div className={styles.card}>
+              <div className={styles.cardTitle}>Location</div>
+
+              {listing.geocodeAddress ? (
+                <p className={styles.paragraph} style={{ marginTop: 10 }}>
+                  <b>Saved address:</b> {listing.geocodeAddress}
+                </p>
+              ) : (
+                <p className={styles.paragraph} style={{ marginTop: 10 }}>
+                  <b>Address:</b> Not provided.
+                </p>
+              )}
+
+              {hasCoords ? (
+                <>
+                  <div className={styles.features} style={{ marginTop: 10 }}>
+                    <div className={styles.featureRow}>
+                      <span className={styles.featureKey}>Latitude</span>
+                      <span className={styles.featureVal}>{listing.lat}</span>
+                    </div>
+                    <div className={styles.featureRow}>
+                      <span className={styles.featureKey}>Longitude</span>
+                      <span className={styles.featureVal}>{listing.lng}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+                    <a
+                      href={mapsUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: "inline-block",
+                        padding: "10px 12px",
+                        borderRadius: 12,
+                        border: "1px solid rgba(255,255,255,0.15)",
+                        background: "rgba(255,255,255,0.10)",
+                        color: "white",
+                        fontWeight: 900,
+                        textDecoration: "none",
+                      }}
+                    >
+                      Open in Google Maps →
+                    </a>
+
+                    <span style={{ opacity: 0.75, fontSize: 12, alignSelf: "center" }}>
+                      Tip: If you’re rural, hosts can drop the pin at the entrance/driveway.
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className={styles.note} style={{ marginTop: 10 }}>
+                  No exact pin saved for this listing yet. (Hosts can add a manual pin when creating the listing.)
+                </div>
+              )}
+            </div>
+
             <div className={styles.card}>
               <div className={styles.cardTitle}>What to expect</div>
               <p className={styles.paragraph}>
-                RVNB spots are designed to be simple, host-backed places to park and reset.
-                This listing page will expand later with rules, check-in instructions, and verified details.
+                RVNB spots are designed to be simple, host-backed places to park and reset. This listing page will
+                expand later with rules, check-in instructions, and verified details.
               </p>
             </div>
           </div>

@@ -19,7 +19,7 @@
   align-items: center;
   gap: 10px;
   margin-bottom: 14px;
-  opacity: 0.9; /* ✅ slightly more visible */
+  opacity: 0.9;
   font-size: 13px;
 }
 
@@ -37,8 +37,8 @@
 }
 
 .breadcrumbHere {
-  opacity: 0.85; /* ✅ slightly more visible */
-  font-weight: 700; /* ✅ better hierarchy */
+  opacity: 0.85;
+  font-weight: 700;
 }
 
 /* Divider to separate hero + filters */
@@ -223,7 +223,6 @@
   padding: 0 12px;
   color: white;
 
-  /* ✅ slightly less flat + more glass depth */
   background: rgba(0, 0, 0, 0.32);
   border: 1px solid rgba(255, 255, 255, 0.10);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
@@ -240,41 +239,38 @@
   background: rgba(0, 0, 0, 0.45);
 }
 
-/* ✅ UPDATED: centered row so the card doesn't look stretched */
+/* ✅ Apply row: centered + doesn't force the card to feel taller */
 .filtersBtns {
   grid-column: 1 / -1;
   display: flex;
-  justify-content: center; /* center button */
+  justify-content: center;   /* ✅ center the Apply row */
   align-items: center;
-  margin-top: 8px; /* tighter spacing */
+  margin-top: 10px;          /* slightly tighter */
+  padding-top: 2px;
 }
 
-/* ✅ UPDATED: slimmer + more elegant */
+/* ✅ Slimmer Apply button (still premium, just less bulky) */
 .applyBtn {
-  height: 38px; /* slimmer */
-  padding: 0 18px;
+  height: 38px;              /* ✅ slimmer than 42 */
+  padding: 0 18px;           /* ✅ slimmer look */
   border-radius: 10px;
-  font-weight: 800;
-
+  font-weight: 900;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.10);
   color: white;
   cursor: pointer;
-
-  transition:
-    transform 140ms ease,
-    border-color 160ms ease,
-    background 160ms ease;
+  transition: transform 140ms ease, border-color 160ms ease, background 160ms ease;
 }
 
 .applyBtn:hover {
   transform: translateY(-1px);
-  border-color: rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.20);
+  background: rgba(255, 255, 255, 0.12);
 }
 
+/* Reset button stays available if you want it shown later */
 .resetBtn {
-  height: 42px; /* ✅ match input height */
+  height: 42px;
   padding: 0 14px;
   border-radius: 12px;
   font-weight: 900;
@@ -296,8 +292,8 @@
 /* Active filter chips row */
 .chipsRow {
   margin-top: 12px;
-  padding-top: 10px; /* ✅ gives it structure */
-  border-top: 1px solid rgba(255, 255, 255, 0.06); /* ✅ intentional separation */
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
@@ -332,7 +328,7 @@
 /* Results summary bar */
 .resultsBar {
   margin-top: 14px;
-  padding: 10px 12px; /* ✅ slightly tighter */
+  padding: 10px 12px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   addDoc,
@@ -21,6 +21,20 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 // ✅ ADD: Host route protection (role gate)
 import HostGuard from "../components/HostGuard";
 
+// ✅ ADD: Manual pin picker (rural-friendly)
+import HostLocationPicker from "../components/HostLocationPicker";
+
+// ✅ ADD: Host analytics components
+import HostDashboardKpis from "../components/HostDashboardKpis";
+import HostBookingCalendar from "../components/HostBookingCalendar";
+import HostOccupancyStats from "../components/HostOccupancyStats";
+import HostRevenueSummary from "../components/HostRevenueSummary";
+
+import type {
+  HostAnalyticsBooking,
+  HostAnalyticsListing,
+} from "../components/hostDashboardUtils";
+
 type Hookups = "Full" | "Partial" | "None";
 type PricingType = "Night" | "Weekly" | "Monthly";
 
@@ -31,6 +45,14 @@ type ListingDoc = {
 
   // ✅ ADD (owner field, additive)
   hostId?: string;
+
+  // ✅ ADD (coords for map — additive)
+  lat?: number;
+  lng?: number;
+
+  // ✅ ADD (optional geocode metadata — additive)
+  geocodeAddress?: string;
+  placeId?: string;
 
   price?: number;
   pricePerNight?: number; // ✅ legacy fallback
@@ -75,6 +97,14 @@ type ListingUI = {
 
   // ✅ ADD (owner field, additive)
   hostId: string;
+
+  // ✅ ADD (coords for map — additive)
+  lat?: number;
+  lng?: number;
+
+  // ✅ ADD (optional geocode metadata — additive)
+  geocodeAddress?: string;
+  placeId?: string;
 
   price: number;
   pricingType: PricingType;
@@ -151,7 +181,6 @@ type BookingUI = {
 type BookingFilter = "All" | "Requested" | "Confirmed" | "Cancelled";
 
 function safeDateLabel(yyyyMmDd: string) {
-  // yyyy-mm-dd -> nicer label
   if (!yyyyMmDd) return "";
   const parts = yyyyMmDd.split("-");
   if (parts.length !== 3) return yyyyMmDd;
@@ -160,23 +189,22 @@ function safeDateLabel(yyyyMmDd: string) {
 }
 
 function safeTimestampLabel(ts: any) {
-  // handles Firestore Timestamp (toDate) or missing
   try {
     if (!ts) return "";
     if (typeof ts.toDate === "function") {
       const d = ts.toDate() as Date;
       return d.toLocaleString();
     }
-  } catch {
-    // ignore
-  }
+  } catch {}
   return "";
 }
 
 function sortByCreatedAtDesc(rows: ListingUI[]) {
   return [...rows].sort((a, b) => {
-    const ta = typeof a.createdAt?.toDate === "function" ? a.createdAt.toDate().getTime() : 0;
-    const tb = typeof b.createdAt?.toDate === "function" ? b.createdAt.toDate().getTime() : 0;
+    const ta =
+      typeof a.createdAt?.toDate === "function" ? a.createdAt.toDate().getTime() : 0;
+    const tb =
+      typeof b.createdAt?.toDate === "function" ? b.createdAt.toDate().getTime() : 0;
     return tb - ta;
   });
 }
@@ -188,10 +216,14 @@ function toUI(id: string, d: ListingDoc): ListingUI {
     city: (d.city ?? "(City not set)").toString(),
     state: (d.state ?? "(State)").toString(),
 
-    // ✅ ADD: hostId (safe fallback for older listings)
     hostId: (d.hostId ?? "").toString(),
 
-    // ✅ fallback for older listings created before `price` existed
+    lat: typeof d.lat === "number" ? d.lat : undefined,
+    lng: typeof d.lng === "number" ? d.lng : undefined,
+
+    geocodeAddress: (d.geocodeAddress ?? "").toString() || undefined,
+    placeId: (d.placeId ?? "").toString() || undefined,
+
     price:
       typeof d.price === "number"
         ? d.price
@@ -229,8 +261,65 @@ function toUI(id: string, d: ListingDoc): ListingUI {
   };
 }
 
+// ✅ ADD: type for geocode response (additive)
+type GeocodeResult =
+  | {
+      ok: true;
+      address?: string;
+      formattedAddress?: string;
+      lat: number;
+      lng: number;
+      placeId?: string;
+    }
+  | {
+      ok: false;
+      status?: string;
+      error_message?: string;
+      address?: string;
+    };
+
+// ✅ ADD: call server route to geocode (no key exposed, additive)
+async function geocodeCityState(
+  city: string,
+  state: string
+): Promise<GeocodeResult | null> {
+  try {
+    const res = await fetch("/api/geocode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ city, state }),
+    });
+
+    const data = (await res.json()) as any;
+    if (!data) return null;
+
+    if (data.ok === true && typeof data.lat === "number" && typeof data.lng === "number") {
+      return {
+        ok: true,
+        address: data.address,
+        formattedAddress: data.formattedAddress,
+        lat: data.lat,
+        lng: data.lng,
+        placeId: data.placeId,
+      };
+    }
+
+    if (data.ok === false) {
+      return {
+        ok: false,
+        status: data.status,
+        error_message: data.error_message,
+        address: data.address,
+      };
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export default function HostPage() {
-  // ✅ ADD: auth uid (minimal, additive)
   const [userUid, setUserUid] = useState<string>("");
 
   // form fields
@@ -271,17 +360,22 @@ export default function HostPage() {
   const [bathrooms, setBathrooms] = useState(false);
   const [showers, setShowers] = useState(false);
 
+  // ✅ ADD: manual pin override (rural-friendly)
+  const [manualLocationEnabled, setManualLocationEnabled] = useState(false);
+  const [manualLat, setManualLat] = useState<number | null>(null);
+  const [manualLng, setManualLng] = useState<number | null>(null);
+
   // firestore listings
   const [listings, setListings] = useState<ListingUI[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string>("");
 
-  // ✅ search + filter UI state
+  // search + filter UI state
   const [searchText, setSearchText] = useState("");
   const [listingFilter, setListingFilter] = useState<ListingFilter>("All");
 
-  // ✅ bookings state
+  // bookings state
   const [bookings, setBookings] = useState<BookingUI[]>([]);
   const [bookingsLoading, setBookingsLoading] = useState(false);
   const [bookingFilter, setBookingFilter] = useState<BookingFilter>("All");
@@ -317,7 +411,6 @@ export default function HostPage() {
     setBookingStatus("");
     setStatus("");
 
-    // ✅ Ownership filter needs a logged-in user
     if (!userUid) {
       setListings([]);
       setBookings([]);
@@ -326,8 +419,6 @@ export default function HostPage() {
     }
 
     try {
-      // ✅ Prefer server-side ownership filter
-      // NOTE: Firestore may require an index for (hostId == uid + orderBy createdAt).
       const q1 = query(
         collection(db, "listings"),
         where("hostId", "==", userUid),
@@ -338,12 +429,10 @@ export default function HostPage() {
       const rows = snap.docs.map((d) => toUI(d.id, d.data() as ListingDoc));
       setListings(rows);
 
-      // ✅ Load bookings that belong to these listings
       await loadBookingsForListings(rows);
     } catch (e: any) {
       console.error(e);
 
-      // ✅ Fallback if index isn’t ready yet: query by hostId only, then sort client-side
       try {
         const q2 = query(collection(db, "listings"), where("hostId", "==", userUid));
         const snap2 = await getDocs(q2);
@@ -353,7 +442,9 @@ export default function HostPage() {
         setListings(rows2);
         await loadBookingsForListings(rows2);
 
-        setStatus("⚠️ Listings loaded (ownership filtered). If you saw an index warning in console, create it later.");
+        setStatus(
+          "⚠️ Listings loaded (ownership filtered). If you saw an index warning in console, create it later."
+        );
       } catch (e2) {
         console.error(e2);
         setStatus("❌ Could not load your listings.");
@@ -374,7 +465,6 @@ export default function HostPage() {
         return;
       }
 
-      // Firestore "in" query max is 10 values, so chunk
       const chunks: string[][] = [];
       for (let i = 0; i < ids.length; i += 10) chunks.push(ids.slice(i, i + 10));
 
@@ -427,7 +517,6 @@ export default function HostPage() {
       setBookings(all);
     } catch (e: any) {
       console.error(e);
-      // If user has no composite index yet, Firebase will show an index error in console.
       setBookingStatus("⚠️ Could not load bookings yet (may need an index).");
       setBookings([]);
     } finally {
@@ -435,7 +524,6 @@ export default function HostPage() {
     }
   }
 
-  // ✅ ADD: capture current user uid (minimal, additive)
   useEffect(() => {
     const auth = getAuth();
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -444,13 +532,11 @@ export default function HostPage() {
     return () => unsub();
   }, []);
 
-  // ✅ IMPORTANT: reload whenever the signed-in user changes (ownership filter)
   useEffect(() => {
     loadListingsAndBookings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userUid]);
 
-  // ✅ derived: filtered listings for the right panel
   const filteredListings = useMemo(() => {
     const qText = searchText.trim().toLowerCase();
 
@@ -506,12 +592,17 @@ export default function HostPage() {
     setListingFilter("All");
   }
 
-  // ✅ derived: filtered bookings
   const filteredBookings = useMemo(() => {
     if (bookingFilter === "All") return bookings;
-    if (bookingFilter === "Requested") return bookings.filter((b) => b.status === "requested");
-    if (bookingFilter === "Confirmed") return bookings.filter((b) => b.status === "confirmed");
-    if (bookingFilter === "Cancelled") return bookings.filter((b) => b.status === "cancelled");
+    if (bookingFilter === "Requested") {
+      return bookings.filter((b) => b.status === "requested");
+    }
+    if (bookingFilter === "Confirmed") {
+      return bookings.filter((b) => b.status === "confirmed");
+    }
+    if (bookingFilter === "Cancelled") {
+      return bookings.filter((b) => b.status === "cancelled");
+    }
     return bookings;
   }, [bookings, bookingFilter]);
 
@@ -520,6 +611,27 @@ export default function HostPage() {
     const confirmed = bookings.filter((b) => b.status === "confirmed").length;
     const cancelled = bookings.filter((b) => b.status === "cancelled").length;
     return { requested, confirmed, cancelled, total: bookings.length };
+  }, [bookings]);
+
+  // ✅ ADD: analytics adapters
+  const analyticsListings = useMemo<HostAnalyticsListing[]>(() => {
+    return listings.map((l) => ({
+      id: l.id,
+      title: l.title,
+    }));
+  }, [listings]);
+
+  const analyticsBookings = useMemo<HostAnalyticsBooking[]>(() => {
+    return bookings.map((b) => ({
+      id: b.id,
+      listingId: b.listingId,
+      listingTitle: b.listingTitle,
+      checkIn: b.checkIn,
+      checkOut: b.checkOut,
+      nights: b.nights,
+      estimatedTotal: b.estimatedTotal,
+      status: b.status,
+    }));
   }, [bookings]);
 
   function validate(): string | null {
@@ -531,7 +643,15 @@ export default function HostPage() {
     if (!c) return "Please enter a city.";
     if (s.length !== 2) return "State must be 2 letters (example: TX).";
     if (!Number.isFinite(price) || price < 0) return "Price must be 0 or more.";
-    if (!Number.isFinite(maxLengthFt) || maxLengthFt < 0) return "Max length must be 0 or more.";
+    if (!Number.isFinite(maxLengthFt) || maxLengthFt < 0) {
+      return "Max length must be 0 or more.";
+    }
+
+    // ✅ ADD: if manual override enabled, require pin
+    if (manualLocationEnabled && (manualLat === null || manualLng === null)) {
+      return "Manual location is enabled — please drop a pin on the map (or turn manual location off).";
+    }
+
     return null;
   }
 
@@ -558,6 +678,12 @@ export default function HostPage() {
     setShowers(false);
   }
 
+  function resetManualPin() {
+    setManualLat(null);
+    setManualLng(null);
+    setManualLocationEnabled(false);
+  }
+
   async function handleCreate() {
     setStatus("");
     const err = validate();
@@ -566,22 +692,27 @@ export default function HostPage() {
       return;
     }
 
-    // ✅ ADD: require login for ownership field
     if (!userUid) {
       setStatus("⚠️ You must be logged in to create a listing.");
       return;
     }
 
+    const c = city.trim();
     const s = stateCode.trim().toUpperCase();
 
     setSaving(true);
     try {
-      await addDoc(collection(db, "listings"), {
-        // ✅ ADD (owner field)
+      // ✅ Auto-geocode unless manual pin is enabled
+      let geo: GeocodeResult | null = null;
+      if (!manualLocationEnabled && c && s) {
+        geo = await geocodeCityState(c, s);
+      }
+
+      const basePayload: any = {
         hostId: userUid,
 
         title: title.trim(),
-        city: city.trim(),
+        city: c,
         state: s,
 
         price: Number(price) || 0,
@@ -590,17 +721,14 @@ export default function HostPage() {
         maxLengthFt: Number(maxLengthFt) || 0,
         hookups,
 
-        // match listing detail page expectations
         power: powerValue,
         water: waterValue,
         sewer: sewerValue,
         laundry: laundryValue,
 
-        // optional text
         description: description.trim(),
         nearbyAttractions: nearbyAttractions.trim(),
 
-        // ✅ new amenities (safe/additive)
         wifi,
         petsAllowed,
         firePit,
@@ -613,15 +741,42 @@ export default function HostPage() {
         showers,
 
         createdAt: serverTimestamp(),
-      });
+      };
 
-      setStatus("✅ Listing created!");
+      // ✅ Manual pin override wins
+      if (manualLocationEnabled && manualLat !== null && manualLng !== null) {
+        basePayload.lat = manualLat;
+        basePayload.lng = manualLng;
+        basePayload.geocodeAddress = "MANUAL_PIN";
+        basePayload.placeId = "";
+      } else if (geo && geo.ok === true) {
+        basePayload.lat = geo.lat;
+        basePayload.lng = geo.lng;
+        basePayload.placeId = geo.placeId ?? "";
+        basePayload.geocodeAddress = (
+          geo.formattedAddress ??
+          geo.address ??
+          ""
+        ).toString();
+      }
+
+      await addDoc(collection(db, "listings"), basePayload);
+
+      if (manualLocationEnabled && manualLat !== null && manualLng !== null) {
+        setStatus("✅ Listing created! (Manual pin saved for map)");
+      } else if (geo && geo.ok === true) {
+        setStatus("✅ Listing created! (Coords saved for map)");
+      } else {
+        setStatus("✅ Listing created! (No coords yet — city/state may be too broad)");
+      }
+
       setTitle("");
       setCity("");
       setStateCode("");
       setDescription("");
       setNearbyAttractions("");
       resetAmenities();
+      resetManualPin();
 
       await loadListingsAndBookings();
     } catch (e) {
@@ -632,7 +787,10 @@ export default function HostPage() {
     }
   }
 
-  async function setBookingStatusValue(bookingId: string, nextStatus: "confirmed" | "cancelled") {
+  async function setBookingStatusValue(
+    bookingId: string,
+    nextStatus: "confirmed" | "cancelled"
+  ) {
     setBookingStatus("");
     setUpdatingBookingId(bookingId);
     try {
@@ -640,7 +798,6 @@ export default function HostPage() {
         status: nextStatus,
       });
 
-      // update locally (fast + stable)
       setBookings((prev) =>
         prev.map((b) =>
           b.id === bookingId
@@ -649,7 +806,9 @@ export default function HostPage() {
         )
       );
 
-      setBookingStatus(nextStatus === "confirmed" ? "✅ Booking approved." : "✅ Booking rejected.");
+      setBookingStatus(
+        nextStatus === "confirmed" ? "✅ Booking approved." : "✅ Booking rejected."
+      );
     } catch (e) {
       console.error(e);
       setBookingStatus("❌ Could not update booking status.");
@@ -658,7 +817,6 @@ export default function HostPage() {
     }
   }
 
-  // ✅ ADD: Wrap existing Host UI in role + auth gate (no refactor)
   return (
     <HostGuard>
       <main style={wrap}>
@@ -666,13 +824,38 @@ export default function HostPage() {
           <div>
             <h1 style={heroTitle}>Host Dashboard</h1>
             <p style={heroSub}>
-              Create listings and manage your spots. This is now connected to Firestore (real data).
+              Create listings and manage your spots. This is now connected to Firestore
+              (real data).
             </p>
           </div>
 
           <Link href="/listings" style={ghostBtn}>
             View public listings →
           </Link>
+        </div>
+
+        {/* ✅ ADD: Host business command center analytics */}
+        <div style={analyticsWrap}>
+          <HostDashboardKpis
+            listings={analyticsListings}
+            bookings={analyticsBookings}
+          />
+
+          <div style={analyticsGrid}>
+            <HostBookingCalendar bookings={analyticsBookings} />
+
+            <div style={analyticsSideCol}>
+              <HostOccupancyStats
+                listings={analyticsListings}
+                bookings={analyticsBookings}
+              />
+
+              <HostRevenueSummary
+                listings={analyticsListings}
+                bookings={analyticsBookings}
+              />
+            </div>
+          </div>
         </div>
 
         <div style={grid}>
@@ -718,6 +901,52 @@ export default function HostPage() {
                   maxLength={2}
                 />
               </div>
+            </div>
+
+            {/* ✅ ADD: Manual pin toggle */}
+            <div style={{ ...mutedBox, marginTop: 14 }}>
+              <label
+                style={{ display: "flex", gap: 10, alignItems: "center", cursor: "pointer" }}
+              >
+                <input
+                  type="checkbox"
+                  checked={manualLocationEnabled}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    setManualLocationEnabled(on);
+                    if (!on) {
+                      setManualLat(null);
+                      setManualLng(null);
+                    }
+                  }}
+                />
+                <div>
+                  <div style={{ fontWeight: 900 }}>
+                    Set exact location manually (recommended for rural)
+                  </div>
+                  <div style={{ opacity: 0.8, fontSize: 12, marginTop: 2 }}>
+                    If enabled, you’ll drop a pin and we’ll save its lat/lng (overrides
+                    auto-geocode).
+                  </div>
+                </div>
+              </label>
+
+              {manualLocationEnabled && (
+                <div style={{ marginTop: 12 }}>
+                  <HostLocationPicker
+                    height={320}
+                    initialValue={
+                      manualLat !== null && manualLng !== null
+                        ? { lat: manualLat, lng: manualLng }
+                        : null
+                    }
+                    onChange={(v) => {
+                      setManualLat(v?.lat ?? null);
+                      setManualLng(v?.lng ?? null);
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
             {/* PRICE */}
@@ -777,7 +1006,9 @@ export default function HostPage() {
                 />
                 <span style={unitSuffix}>ft</span>
               </div>
-              <small style={tinyHelp}>Enter the longest RV that can fit (max 50 ft).</small>
+              <small style={tinyHelp}>
+                Enter the longest RV that can fit (max 50 ft).
+              </small>
             </div>
 
             {/* HOOKUPS */}
@@ -827,7 +1058,9 @@ export default function HostPage() {
                 maxLength={500}
               />
               <div style={counterRow}>
-                <span style={tinyHelp}>Helps guests see what’s around your location.</span>
+                <span style={tinyHelp}>
+                  Helps guests see what’s around your location.
+                </span>
                 <span style={tinyHelp}>{nearbyAttractions.length}/500</span>
               </div>
             </div>
@@ -845,19 +1078,39 @@ export default function HostPage() {
               </AmenitySection>
 
               <AmenitySection title="Laundry">
-                <Checkbox label="🧺 Washer/Dryer Onsite" checked={laundry} onChange={setLaundry} />
-                <Checkbox label="🧼 Wash & Fold Service" checked={washFold} onChange={setWashFold} />
+                <Checkbox
+                  label="🧺 Washer/Dryer Onsite"
+                  checked={laundry}
+                  onChange={setLaundry}
+                />
+                <Checkbox
+                  label="🧼 Wash & Fold Service"
+                  checked={washFold}
+                  onChange={setWashFold}
+                />
               </AmenitySection>
 
               <AmenitySection title="Facilities">
                 <Checkbox label="🏋️ Gym Onsite" checked={gym} onChange={setGym} />
-                <Checkbox label="🚻 Bathrooms Onsite" checked={bathrooms} onChange={setBathrooms} />
-                <Checkbox label="🚿 Showers Onsite" checked={showers} onChange={setShowers} />
+                <Checkbox
+                  label="🚻 Bathrooms Onsite"
+                  checked={bathrooms}
+                  onChange={setBathrooms}
+                />
+                <Checkbox
+                  label="🚿 Showers Onsite"
+                  checked={showers}
+                  onChange={setShowers}
+                />
               </AmenitySection>
 
               <AmenitySection title="Convenience">
                 <Checkbox label="📶 Wi-Fi" checked={wifi} onChange={setWifi} />
-                <Checkbox label="🗑️ Trash Pickup" checked={trashPickup} onChange={setTrashPickup} />
+                <Checkbox
+                  label="🗑️ Trash Pickup"
+                  checked={trashPickup}
+                  onChange={setTrashPickup}
+                />
                 <Checkbox
                   label="📹 Security Cameras"
                   checked={securityCameras}
@@ -866,10 +1119,22 @@ export default function HostPage() {
               </AmenitySection>
 
               <AmenitySection title="Recreation / Site Features">
-                <Checkbox label="🐶 Pets Allowed" checked={petsAllowed} onChange={setPetsAllowed} />
+                <Checkbox
+                  label="🐶 Pets Allowed"
+                  checked={petsAllowed}
+                  onChange={setPetsAllowed}
+                />
                 <Checkbox label="🔥 Fire Pit" checked={firePit} onChange={setFirePit} />
-                <Checkbox label="🧺 Picnic Table" checked={picnicTable} onChange={setPicnicTable} />
-                <Checkbox label="🚚 Pull-Through Site" checked={pullThrough} onChange={setPullThrough} />
+                <Checkbox
+                  label="🧺 Picnic Table"
+                  checked={picnicTable}
+                  onChange={setPicnicTable}
+                />
+                <Checkbox
+                  label="🚚 Pull-Through Site"
+                  checked={pullThrough}
+                  onChange={setPullThrough}
+                />
               </AmenitySection>
             </div>
 
@@ -882,8 +1147,8 @@ export default function HostPage() {
             </button>
 
             <div style={tinyHelp}>
-              Saved legacy-compatible fields: <b>power</b>, <b>water</b>, <b>sewer</b>, <b>laundry</b>. New
-              amenities are additive & safe.
+              Saved legacy-compatible fields: <b>power</b>, <b>water</b>, <b>sewer</b>,{" "}
+              <b>laundry</b>. New amenities are additive & safe.
             </div>
           </section>
 
@@ -895,8 +1160,9 @@ export default function HostPage() {
                 <div style={{ flex: 1 }}>
                   <h2 style={sectionTitle}>Booking Requests</h2>
                   <p style={sectionSub}>
-                    Requested: <b>{bookingCounts.requested}</b> • Confirmed: <b>{bookingCounts.confirmed}</b> •
-                    Cancelled: <b>{bookingCounts.cancelled}</b>
+                    Requested: <b>{bookingCounts.requested}</b> • Confirmed:{" "}
+                    <b>{bookingCounts.confirmed}</b> • Cancelled:{" "}
+                    <b>{bookingCounts.cancelled}</b>
                   </p>
 
                   <div style={toolbar}>
@@ -945,11 +1211,18 @@ export default function HostPage() {
                 <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
                   {filteredBookings.map((b) => (
                     <div key={b.id} style={bookingCard}>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 12,
+                        }}
+                      >
                         <div>
                           <div style={{ fontWeight: 950, fontSize: 16 }}>{b.listingTitle}</div>
                           <div style={{ opacity: 0.8, marginTop: 4 }}>
-                            {safeDateLabel(b.checkIn)} → {safeDateLabel(b.checkOut)} • {b.nights} night
+                            {safeDateLabel(b.checkIn)} → {safeDateLabel(b.checkOut)} • {b.nights}{" "}
+                            night
                             {b.nights === 1 ? "" : "s"} • <b>${b.estimatedTotal}</b>
                           </div>
                         </div>
@@ -981,7 +1254,9 @@ export default function HostPage() {
 
                       <div style={bookingMetaRow}>
                         <span style={pill}>Type: {b.bookingType}</span>
-                        {b.createdAtLabel && <span style={pill}>Created: {b.createdAtLabel}</span>}
+                        {b.createdAtLabel && (
+                          <span style={pill}>Created: {b.createdAtLabel}</span>
+                        )}
                         <span style={pill}>Booking ID: {b.id}</span>
                       </div>
 
@@ -992,7 +1267,6 @@ export default function HostPage() {
                         </div>
                       )}
 
-                      {/* Actions */}
                       <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
                         {b.status === "requested" ? (
                           <>
@@ -1045,7 +1319,6 @@ export default function HostPage() {
                     <p style={sectionSub}>What’s currently in Firestore.</p>
                   </div>
 
-                  {/* Toolbar */}
                   <div style={toolbar}>
                     <input
                       style={searchInput}
@@ -1121,7 +1394,10 @@ export default function HostPage() {
                   <div style={{ opacity: 0.85, lineHeight: 1.4 }}>
                     Try clearing your search/filter, or create a new listing on the left.
                   </div>
-                  <button style={{ ...smallBtn, marginTop: 12 }} onClick={clearSearchAndFilter}>
+                  <button
+                    style={{ ...smallBtn, marginTop: 12 }}
+                    onClick={clearSearchAndFilter}
+                  >
                     Clear filters
                   </button>
                 </div>
@@ -1129,11 +1405,23 @@ export default function HostPage() {
                 <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
                   {filteredListings.map((l) => (
                     <div key={l.id} style={listingCard}>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 12,
+                        }}
+                      >
                         <div>
                           <div style={{ fontWeight: 900, fontSize: 18 }}>{l.title}</div>
                           <div style={{ opacity: 0.8 }}>
                             {l.city}, {l.state}
+                          </div>
+
+                          <div style={{ marginTop: 6, opacity: 0.75, fontSize: 12 }}>
+                            {typeof l.lat === "number" && typeof l.lng === "number"
+                              ? "📍 Coords saved"
+                              : "📍 No coords yet"}
                           </div>
                         </div>
 
@@ -1173,8 +1461,12 @@ export default function HostPage() {
 
                       {l.nearbyAttractions && (
                         <div style={descBox}>
-                          <div style={{ fontWeight: 800, marginBottom: 6 }}>Nearby Attractions</div>
-                          <div style={{ opacity: 0.9, lineHeight: 1.4 }}>{l.nearbyAttractions}</div>
+                          <div style={{ fontWeight: 800, marginBottom: 6 }}>
+                            Nearby Attractions
+                          </div>
+                          <div style={{ opacity: 0.9, lineHeight: 1.4 }}>
+                            {l.nearbyAttractions}
+                          </div>
                         </div>
                       )}
 
@@ -1249,7 +1541,29 @@ const hero: React.CSSProperties = {
 };
 
 const heroTitle: React.CSSProperties = { fontSize: 44, fontWeight: 950, margin: 0 };
-const heroSub: React.CSSProperties = { marginTop: 10, opacity: 0.8, maxWidth: 720, lineHeight: 1.5 };
+const heroSub: React.CSSProperties = {
+  marginTop: 10,
+  opacity: 0.8,
+  maxWidth: 720,
+  lineHeight: 1.5,
+};
+
+const analyticsWrap: React.CSSProperties = {
+  maxWidth: 1200,
+  margin: "0 auto 18px",
+};
+
+const analyticsGrid: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1.2fr 0.8fr",
+  gap: 18,
+  marginTop: 18,
+};
+
+const analyticsSideCol: React.CSSProperties = {
+  display: "grid",
+  gap: 18,
+};
 
 const grid: React.CSSProperties = {
   display: "grid",
@@ -1275,6 +1589,15 @@ const sectionHeader: React.CSSProperties = {
 
 const sectionTitle: React.CSSProperties = { margin: 0, fontSize: 20, fontWeight: 900 };
 const sectionSub: React.CSSProperties = { marginTop: 6, opacity: 0.75 };
+
+const mutedBox: React.CSSProperties = {
+  marginTop: 14,
+  padding: 14,
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,0.10)",
+  background: "rgba(0,0,0,0.18)",
+  opacity: 0.95,
+};
 
 const rightMetaRow: React.CSSProperties = {
   display: "flex",
@@ -1331,18 +1654,13 @@ const statusBox: React.CSSProperties = {
   fontWeight: 800,
 };
 
-const mutedBox: React.CSSProperties = {
-  marginTop: 14,
-  padding: 14,
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,0.10)",
-  background: "rgba(0,0,0,0.18)",
-  opacity: 0.9,
-};
-
 const fieldBlock: React.CSSProperties = { marginTop: 14 };
 
-const row2: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 140px", gap: 12 };
+const row2: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 140px",
+  gap: 12,
+};
 
 const input: React.CSSProperties = {
   width: "100%",
@@ -1415,9 +1733,17 @@ const selectFull: React.CSSProperties = {
   color: "white",
 };
 
-const optionStyle: React.CSSProperties = { backgroundColor: "#0b0f19", color: "white" };
+const optionStyle: React.CSSProperties = {
+  backgroundColor: "#0b0f19",
+  color: "white",
+};
 
-const unitRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10, marginTop: 8 };
+const unitRow: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  marginTop: 8,
+};
 
 const unitSuffix: React.CSSProperties = {
   padding: "10px 12px",
@@ -1502,7 +1828,12 @@ const actionBtn: React.CSSProperties = {
   cursor: "pointer",
 };
 
-const pillRow: React.CSSProperties = { display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 };
+const pillRow: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 8,
+  marginTop: 12,
+};
 
 const pill: React.CSSProperties = {
   padding: "6px 10px",
@@ -1564,7 +1895,11 @@ const smallBtn: React.CSSProperties = {
   cursor: "pointer",
 };
 
-const amenityWrap: React.CSSProperties = { marginTop: 18, display: "grid", gap: 12 };
+const amenityWrap: React.CSSProperties = {
+  marginTop: 18,
+  display: "grid",
+  gap: 12,
+};
 
 const amenityCard: React.CSSProperties = {
   padding: 12,
@@ -1573,7 +1908,11 @@ const amenityCard: React.CSSProperties = {
   background: "rgba(0,0,0,0.18)",
 };
 
-const amenityTitle: React.CSSProperties = { fontWeight: 950, marginBottom: 8, opacity: 0.95 };
+const amenityTitle: React.CSSProperties = {
+  fontWeight: 950,
+  marginBottom: 8,
+  opacity: 0.95,
+};
 
 const amenityGrid: React.CSSProperties = {
   display: "grid",
