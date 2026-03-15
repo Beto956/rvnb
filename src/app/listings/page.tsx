@@ -1,6 +1,8 @@
 import Link from "next/link";
 import styles from "./listings.module.css";
 
+import ListingsMapPanel from "../components/ListingsMapPanel";
+
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
 
@@ -14,6 +16,10 @@ type ListingDoc = {
 
   hookups?: Hookups;
   maxLengthFt?: number;
+
+  // ✅ ADD: optional map coordinates
+  lat?: number;
+  lng?: number;
 
   // OLD
   pricePerNight?: number;
@@ -31,6 +37,10 @@ type ListingUI = {
 
   hookups: Hookups;
   maxLengthFt: number;
+
+  // ✅ ADD: optional map coordinates
+  lat?: number;
+  lng?: number;
 
   displayPriceValue: number;
   displayPriceLabel: string;
@@ -51,6 +61,9 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
   const maxLengthFt =
     typeof data.maxLengthFt === "number" ? data.maxLengthFt : 0;
 
+  const lat = typeof data.lat === "number" ? data.lat : undefined;
+  const lng = typeof data.lng === "number" ? data.lng : undefined;
+
   const hasNewPrice = typeof data.price === "number";
   const hasNewPricingType =
     data.pricingType === "Night" ||
@@ -65,6 +78,8 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
       state: state || "(State)",
       hookups,
       maxLengthFt,
+      lat,
+      lng,
       displayPriceValue: data.price as number,
       displayPriceLabel: normalizePricingLabel(data.pricingType as PricingType),
     };
@@ -80,6 +95,8 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
     state: state || "(State)",
     hookups,
     maxLengthFt,
+    lat,
+    lng,
     displayPriceValue: oldPrice,
     displayPriceLabel: "night",
   };
@@ -256,40 +273,48 @@ export default async function ListingsPage({
           </div>
         </form>
 
-        <div className={styles.grid}>
-          {listings.map((l) => (
-            <Link
-              key={l.id}
-              href={`/listings/${l.id}`}
-              className={styles.card}
-            >
-              <div className={styles.cardTop}>
-                <div className={styles.cardTitle}>{l.title}</div>
-                <div className={styles.price}>
-                  <span className={styles.priceValue}>
-                    ${l.displayPriceValue}
-                  </span>
-                  <span className={styles.per}>
-                    / {l.displayPriceLabel}
-                  </span>
-                </div>
-              </div>
+        <div className={styles.resultsLayout}>
+          <div className={styles.mapCol}>
+            <ListingsMapPanel listings={listings} />
+          </div>
 
-              <div className={styles.cardMeta}>
-                <span className={styles.pill}>
-                  {l.city}, {l.state}
-                </span>
-                <span className={styles.pill}>{l.hookups} hookups</span>
-                <span className={styles.pill}>
-                  Max {l.maxLengthFt} ft
-                </span>
-              </div>
+          <div className={styles.cardsCol}>
+            <div className={styles.grid}>
+              {listings.map((l) => (
+                <Link
+                  key={l.id}
+                  href={`/listings/${l.id}`}
+                  className={styles.card}
+                >
+                  <div className={styles.cardTop}>
+                    <div className={styles.cardTitle}>{l.title}</div>
+                    <div className={styles.price}>
+                      <span className={styles.priceValue}>
+                        ${l.displayPriceValue}
+                      </span>
+                      <span className={styles.per}>
+                        / {l.displayPriceLabel}
+                      </span>
+                    </div>
+                  </div>
 
-              <div className={styles.cardCta}>
-                View spot →
-              </div>
-            </Link>
-          ))}
+                  <div className={styles.cardMeta}>
+                    <span className={styles.pill}>
+                      {l.city}, {l.state}
+                    </span>
+                    <span className={styles.pill}>{l.hookups} hookups</span>
+                    <span className={styles.pill}>
+                      Max {l.maxLengthFt} ft
+                    </span>
+                  </div>
+
+                  <div className={styles.cardCta}>
+                    View spot →
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -1,0 +1,614 @@
+.page {
+  min-height: 100vh;
+  background:
+    radial-gradient(1000px 700px at 20% 0%, rgba(70, 100, 255, 0.18), transparent),
+    radial-gradient(900px 700px at 80% 10%, rgba(90, 180, 255, 0.08), transparent),
+    #07101d;
+  color: #f5f7fb;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(12px);
+  background: rgba(5, 10, 18, 0.78);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.headerInner {
+  max-width: 1240px;
+  margin: 0 auto;
+  min-height: 78px;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.brandIcon {
+  display: block;
+  width: auto;
+  height: 44px;
+  object-fit: contain;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.navLink,
+.navCta {
+  text-decoration: none;
+  color: #f5f7fb;
+  font-size: 0.96rem;
+  font-weight: 500;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.navLink {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0.9;
+}
+
+.navLink:hover,
+.navCta:hover {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.navCta {
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.bannerSection {
+  position: relative;
+  min-height: 470px;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.bannerImage,
+.bannerOverlay {
+  position: absolute;
+  inset: 0;
+}
+
+.bannerImage {
+  background-image: url("/rvnb-account-banner.png");
+  background-size: cover;
+  background-position: center center;
+  transform: scale(1.02);
+}
+
+.bannerOverlay {
+  background:
+    linear-gradient(to bottom, rgba(3, 8, 16, 0.28), rgba(3, 8, 16, 0.75)),
+    linear-gradient(to right, rgba(4, 10, 18, 0.72), rgba(4, 10, 18, 0.28));
+}
+
+.bannerContent {
+  position: relative;
+  z-index: 1;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 64px 18px 54px;
+  display: flex;
+  align-items: end;
+  min-height: 470px;
+}
+
+.profileCard {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+.avatarWrap {
+  position: relative;
+}
+
+.avatar {
+  width: 138px;
+  height: 138px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 4rem;
+  font-weight: 700;
+  color: #ffffff;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(93, 133, 255, 0.45), rgba(17, 27, 54, 0.92)),
+    rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.verifiedDot {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #79d27d;
+  border: 3px solid rgba(8, 14, 24, 0.95);
+  box-shadow: 0 0 0 4px rgba(121, 210, 125, 0.14);
+}
+
+.identityBlock {
+  max-width: 700px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.name {
+  margin: 0;
+  font-size: clamp(2.2rem, 5vw, 3.6rem);
+  line-height: 1.02;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.roleLine {
+  margin: 10px 0 0;
+  font-size: 1.25rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.metaStack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-top: 18px;
+}
+
+.metaItem,
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.95rem;
+}
+
+.badge {
+  background: rgba(121, 210, 125, 0.12);
+  border-color: rgba(121, 210, 125, 0.28);
+  color: #d8f7d9;
+  font-weight: 600;
+}
+
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.primaryBtn,
+.secondaryBtn {
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.98rem;
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.primaryBtn {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: linear-gradient(180deg, rgba(117, 151, 255, 0.28), rgba(71, 98, 191, 0.22));
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.secondaryBtn {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(11, 17, 29, 0.48);
+  color: #ffffff;
+}
+
+.primaryBtn:hover,
+.secondaryBtn:hover {
+  transform: translateY(-1px);
+  opacity: 1;
+}
+
+.contentSection {
+  position: relative;
+  z-index: 1;
+}
+
+.container {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 34px 18px 80px;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: -48px;
+  position: relative;
+  z-index: 2;
+}
+
+.statCard {
+  padding: 22px 20px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(14px);
+}
+
+.statTop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.statIcon {
+  font-size: 1.12rem;
+}
+
+.statValue {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.statLabel {
+  margin-top: 14px;
+  font-size: 1.02rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.statSub {
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.sectionBlock {
+  margin-top: 34px;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 18px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.sectionSub {
+  margin: 8px 0 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.98rem;
+}
+
+.sectionLink {
+  text-decoration: none;
+  color: #cdddff;
+  font-weight: 600;
+  font-size: 0.96rem;
+}
+
+.sectionLink:hover {
+  text-decoration: underline;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.itemCard,
+.tripCard,
+.placeholderPanel {
+  border-radius: 24px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(14px);
+}
+
+.itemImage,
+.tripImage {
+  height: 190px;
+  background:
+    linear-gradient(rgba(8, 12, 20, 0.18), rgba(8, 12, 20, 0.58)),
+    url("/rvnb-account-banner.png");
+  background-size: cover;
+  background-position: center;
+}
+
+.itemBody,
+.tripBody {
+  padding: 18px;
+}
+
+.itemTopRow,
+.tripTopRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+}
+
+.itemTitle {
+  margin: 0;
+  font-size: 1.16rem;
+  font-weight: 650;
+}
+
+.itemPrice {
+  white-space: nowrap;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.itemMeta {
+  margin: 10px 0 0;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.95rem;
+}
+
+.itemText {
+  margin: 10px 0 0;
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.55;
+  font-size: 0.95rem;
+}
+
+.tripGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.tripBadge {
+  white-space: nowrap;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(116, 222, 165, 0.14);
+  border: 1px solid rgba(116, 222, 165, 0.24);
+  color: #d6ffea;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.placeholderPanel {
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.placeholderIcon {
+  font-size: 2rem;
+}
+
+.placeholderTitle {
+  margin: 16px 0 10px;
+  font-size: 1.4rem;
+}
+
+.placeholderText {
+  max-width: 720px;
+  margin: 0 auto;
+  color: rgba(255, 255, 255, 0.74);
+  line-height: 1.65;
+  font-size: 1rem;
+}
+
+.editForm {
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.formLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.formInput {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  color: white;
+}
+
+.formInput:focus {
+  outline: none;
+  border-color: rgba(117, 151, 255, 0.7);
+  box-shadow: 0 0 0 3px rgba(117, 151, 255, 0.14);
+}
+
+/* ✅ ADDITIVE STYLES FOR /account/edit */
+.editHeroSection {
+  position: relative;
+  padding: 42px 18px 90px;
+}
+
+.editHeroInner {
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 18px;
+  color: #cdddff;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+.editHeroCard {
+  max-width: 760px;
+  padding: 28px 24px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(14px);
+}
+
+.nameSmall {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  line-height: 1.04;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.editSubtitle {
+  margin: 12px 0 0;
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 1rem;
+  line-height: 1.6;
+  max-width: 620px;
+}
+
+.editActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+@media (max-width: 1100px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 24px;
+  }
+
+  .cardGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .tripGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .headerInner {
+    min-height: auto;
+    padding-top: 14px;
+    padding-bottom: 14px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .profileCard {
+    align-items: flex-start;
+  }
+
+  .avatar {
+    width: 108px;
+    height: 108px;
+    font-size: 3rem;
+  }
+
+  .name {
+    font-size: 2.2rem;
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .sectionTitle {
+    font-size: 1.6rem;
+  }
+
+  .itemImage,
+  .tripImage {
+    height: 170px;
+  }
+
+  .nameSmall {
+    font-size: 1.9rem;
+  }
+
+  .editHeroCard {
+    padding: 22px 18px;
+  }
+
+  .editActions {
+    flex-direction: column;
+  }
+}

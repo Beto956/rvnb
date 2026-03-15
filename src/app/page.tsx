@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import styles from "./page.module.css";
 import HomeQuickSearchBar from "./components/homequicksearchbar";
 import FeaturedListingsPreview from "./components/featuredlistingspreview";
+import AuthNav from "./components/authnav";
 
 export default function Home() {
   return (
@@ -22,12 +23,11 @@ export default function Home() {
           </Link>
 
           <nav className={styles.nav} aria-label="Primary">
-            <Link className={styles.navLink} href="/login">
-              Login
-            </Link>
-            <Link className={styles.navCta} href="/signup">
-              Sign Up
-            </Link>
+            <AuthNav
+              navLinkClassName={styles.navLink}
+              navCtaClassName={styles.navCta}
+              navLogoutClassName={styles.navLink}
+            />
           </nav>
         </div>
       </header>

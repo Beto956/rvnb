@@ -1,16 +1,21 @@
 .page {
   min-height: 100vh;
   background:
-    radial-gradient(1000px 600px at 50% -100px, rgba(90, 120, 255, 0.18), transparent),
-    radial-gradient(900px 500px at 30% 0px, rgba(40, 200, 255, 0.10), transparent),
-    #05070b;
+    linear-gradient(180deg, rgba(4, 8, 18, 0.22), rgba(4, 8, 18, 0.52)),
+    radial-gradient(1200px 700px at 50% -120px, rgba(90, 120, 255, 0.12), transparent),
+    radial-gradient(1000px 600px at 22% 2%, rgba(40, 200, 255, 0.05), transparent),
+    radial-gradient(900px 520px at 85% 8%, rgba(120, 90, 255, 0.05), transparent),
+    url("/rvnb-listings-bg.png");
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
   color: white;
 }
 
 .container {
-  max-width: 980px;
+  max-width: 1320px;
   margin: 0 auto;
-  padding: 48px 16px 80px;
+  padding: 48px 16px 88px;
 }
 
 /* Breadcrumb */
@@ -18,86 +23,112 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 14px;
-  opacity: 0.9;
+  margin-bottom: 16px;
+  opacity: 0.92;
   font-size: 13px;
 }
 
 .breadcrumbLink {
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.84);
   text-decoration: none;
+  transition: opacity 140ms ease;
 }
 
 .breadcrumbLink:hover {
+  opacity: 1;
   text-decoration: underline;
 }
 
 .breadcrumbSep {
-  opacity: 0.5;
+  opacity: 0.42;
 }
 
 .breadcrumbHere {
-  opacity: 0.85;
-  font-weight: 700;
+  opacity: 0.92;
+  font-weight: 800;
 }
 
 /* Divider to separate hero + filters */
 .sectionDivider {
   height: 1px;
-  margin: 18px 0 18px;
+  margin: 22px 0 18px;
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.10),
+    rgba(255, 255, 255, 0.12),
     transparent
   );
-  opacity: 0.9;
+  opacity: 0.95;
 }
 
+/* HERO */
 .heroCard {
-  border-radius: 18px;
-  padding: 28px 22px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  position: relative;
+  overflow: hidden;
+  border-radius: 22px;
+  padding: 34px 26px 30px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.025)), radial-gradient(600px 260px at 12% 0%, rgba(120, 170, 255, 0.10), transparent), radial-gradient(500px 220px at 88% 12%, rgba(100, 120, 255, 0.10), transparent);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+}
+
+.heroCard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(420px 120px at 50% 0%, rgba(255, 255, 255, 0.05), transparent), linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 40%);
+  pointer-events: none;
 }
 
 .badge {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 7px 11px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.065);
+  border: 1px solid rgba(255, 255, 255, 0.11);
   font-size: 12px;
   letter-spacing: 0.3px;
-  opacity: 0.95;
+  opacity: 0.97;
+  backdrop-filter: blur(6px);
 }
 
 .badgeDot {
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.35);
 }
 
 .h1 {
-  margin: 14px 0 6px;
+  position: relative;
+  z-index: 1;
+  margin: 14px 0 8px;
   font-size: 38px;
-  line-height: 1.1;
+  line-height: 1.06;
+  letter-spacing: -0.02em;
 }
 
 .sub {
+  position: relative;
+  z-index: 1;
   margin: 0;
-  opacity: 0.85;
+  opacity: 0.88;
   font-size: 16px;
+  line-height: 1.55;
   max-width: 760px;
 }
 
 .countLine {
+  position: relative;
+  z-index: 1;
   margin-top: 18px;
-  opacity: 0.75;
+  opacity: 0.78;
   font-size: 14px;
 }
 
@@ -120,15 +151,15 @@
   transition: transform 140ms ease;
 }
 
-/* --- FILTERS (upgrade to match homepage glass) --- */
+/* FILTERS */
 .filtersCard {
   margin-top: 14px;
-  border-radius: 18px;
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(8px);
+  border-radius: 22px;
+  padding: 18px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.055), rgba(255,255,255,0.025)), radial-gradient(500px 180px at 10% 0%, rgba(100, 150, 255, 0.05), transparent);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255,255,255,0.04);
+  backdrop-filter: blur(12px);
 }
 
 .filtersTop {
@@ -213,62 +244,58 @@
 
 .filtersLabel {
   font-size: 12px;
-  opacity: 0.85;
-  font-weight: 700;
+  opacity: 0.88;
+  font-weight: 800;
+  letter-spacing: 0.15px;
 }
 
 .filtersControl {
-  height: 42px;
-  border-radius: 12px;
-  padding: 0 12px;
+  height: 44px;
+  border-radius: 14px;
+  padding: 0 13px;
   color: white;
-
-  background: rgba(0, 0, 0, 0.32);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-
+  background: rgba(0, 0, 0, 0.34);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 8px 18px rgba(0, 0, 0, 0.16);
   outline: none;
-  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease, transform 120ms ease;
 }
 
 .filtersControl:focus {
-  border-color: rgba(255, 255, 255, 0.22);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    0 0 0 3px rgba(120, 160, 255, 0.18);
-  background: rgba(0, 0, 0, 0.45);
+  border-color: rgba(255, 255, 255, 0.24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 0 0 3px rgba(120, 160, 255, 0.18), 0 10px 22px rgba(0, 0, 0, 0.18);
+  background: rgba(0, 0, 0, 0.46);
 }
 
-/* ✅ Apply row: centered + doesn't force the card to feel taller */
 .filtersBtns {
   grid-column: 1 / -1;
   display: flex;
-  justify-content: center;   /* ✅ center the Apply row */
+  justify-content: center;
   align-items: center;
-  margin-top: 10px;          /* slightly tighter */
+  margin-top: 12px;
   padding-top: 2px;
 }
 
-/* ✅ Slimmer Apply button (still premium, just less bulky) */
 .applyBtn {
-  height: 38px;              /* ✅ slimmer than 42 */
-  padding: 0 18px;           /* ✅ slimmer look */
-  border-radius: 10px;
+  height: 40px;
+  padding: 0 20px;
+  border-radius: 12px;
   font-weight: 900;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(180deg, rgba(255,255,255,0.13), rgba(255,255,255,0.08));
   color: white;
   cursor: pointer;
-  transition: transform 140ms ease, border-color 160ms ease, background 160ms ease;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255,255,255,0.05);
+  transition: transform 140ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 
 .applyBtn:hover {
   transform: translateY(-1px);
-  border-color: rgba(255, 255, 255, 0.20);
-  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.24);
+  background: linear-gradient(180deg, rgba(255,255,255,0.15), rgba(255,255,255,0.10));
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28);
 }
 
-/* Reset button stays available if you want it shown later */
 .resetBtn {
   height: 42px;
   padding: 0 14px;
@@ -379,12 +406,42 @@
   background: rgba(255, 255, 255, 0.06);
 }
 
+/* MAP + CARDS LAYOUT */
+.resultsLayout {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: minmax(320px, 430px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.mapCol {
+  min-width: 0;
+}
+
+.cardsCol {
+  min-width: 0;
+}
+
+@media (max-width: 1080px) {
+  .resultsLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .mapCol {
+    order: 1;
+  }
+
+  .cardsCol {
+    order: 2;
+  }
+}
+
 /* GRID */
 .grid {
-  margin-top: 16px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
 }
 
 @media (max-width: 760px) {
@@ -395,36 +452,40 @@
 
 /* CARD */
 .card {
-  border-radius: 18px;
-  padding: 18px;
-  background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  text-decoration: none;
-  color: white;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  transition:
-    transform 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    background 200ms ease;
   position: relative;
   overflow: hidden;
+  border-radius: 22px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.025)), radial-gradient(220px 120px at 0% 0%, rgba(120, 170, 255, 0.06), transparent);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  text-decoration: none;
+  color: white;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255,255,255,0.04);
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background 220ms ease;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), transparent 32%), radial-gradient(280px 100px at 85% 0%, rgba(255,255,255,0.04), transparent);
+  pointer-events: none;
 }
 
 .card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-4px);
   border-color: rgba(255, 255, 255, 0.18);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
-  background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.48), 0 0 0 1px rgba(255,255,255,0.02);
+  background: linear-gradient(135deg, rgba(255,255,255,0.085), rgba(255,255,255,0.03)), radial-gradient(220px 120px at 0% 0%, rgba(120, 170, 255, 0.08), transparent);
 }
 
 /* PHOTO AREA (future-ready) */
 .photoArea {
   height: 120px;
   border-radius: 14px;
-  background:
-    radial-gradient(280px 140px at 30% 20%, rgba(255,255,255,0.10), transparent),
-    linear-gradient(120deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+  background: radial-gradient(280px 140px at 30% 20%, rgba(255,255,255,0.10), transparent), linear-gradient(120deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
   border: 1px solid rgba(255,255,255,0.08);
   margin-bottom: 14px;
   display: flex;
@@ -449,16 +510,19 @@
 
 /* Card top row */
 .cardTop {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
 }
 
 .cardTitle {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 900;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.15px;
+  line-height: 1.2;
 }
 
 /* Price */
@@ -472,38 +536,43 @@
 .priceValue {
   font-weight: 900;
   font-size: 20px;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
 }
 
 .per {
-  font-weight: 600;
+  font-weight: 700;
   font-size: 12px;
-  opacity: 0.65;
+  opacity: 0.62;
 }
 
 /* Meta pills */
 .cardMeta {
-  margin-top: 12px;
+  position: relative;
+  z-index: 1;
+  margin-top: 14px;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  opacity: 0.95;
+  opacity: 0.96;
 }
 
 .pill {
   font-size: 12px;
-  padding: 6px 10px;
+  padding: 7px 11px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.065);
   border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
 }
 
 /* CTA */
 .cardCta {
-  margin-top: 14px;
-  font-weight: 800;
+  position: relative;
+  z-index: 1;
+  margin-top: 16px;
+  font-weight: 900;
   font-size: 13px;
-  opacity: 0.9;
+  opacity: 0.94;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -520,10 +589,11 @@
 /* Empty state */
 .emptyCard {
   margin-top: 16px;
-  border-radius: 18px;
-  padding: 18px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
 }
 
 .emptyTitle {
