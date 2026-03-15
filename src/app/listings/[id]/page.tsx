@@ -20,24 +20,18 @@ type ListingDoc = {
   hookups?: Hookups;
   maxLengthFt?: number;
 
-  // Optional amenities
-  power?: string; // "None" | "15A" | "30A" | "50A" etc
+  power?: string;
   water?: string;
   sewer?: string;
   laundry?: string;
 
-  // OLD
   pricePerNight?: number;
-
-  // NEW
   price?: number;
   pricingType?: PricingType;
 
-  // ✅ ADDITIVE: exact location (host geocode OR manual pin)
   lat?: number;
   lng?: number;
 
-  // ✅ ADDITIVE: optional address metadata from geocoding
   geocodeAddress?: string;
   placeId?: string;
 };
@@ -59,7 +53,6 @@ type ListingUI = {
   sewer: string;
   laundry: string;
 
-  // ✅ ADDITIVE: exact location fields
   lat?: number;
   lng?: number;
   geocodeAddress?: string;
@@ -73,7 +66,6 @@ function normalizePricingLabel(pricingType: PricingType): string {
 }
 
 function buildGoogleMapsUrl(lat: number, lng: number, placeId?: string) {
-  // PlaceId gives cleaner results if available, but coords always work.
   if (placeId && placeId.trim()) {
     return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}&query_place_id=${encodeURIComponent(
       placeId
@@ -177,6 +169,36 @@ function CameraIcon() {
   );
 }
 
+function AmenityIcon({ symbol }: { symbol: string }) {
+  return <span className={styles.amenityIcon}>{symbol}</span>;
+}
+
+function buildAboutText(listing: ListingUI) {
+  const locationText = `${listing.city}, ${listing.state}`;
+  const rigText =
+    listing.maxLengthFt > 0 ? `for rigs up to ${listing.maxLengthFt} ft` : "for a range of RV sizes";
+
+  return `This RVNB stay in ${locationText} is designed to be a simple, comfortable stop ${
+    listing.hookups !== "None" ? `with ${listing.hookups.toLowerCase()} hookups` : ""
+  } ${rigText}. Whether you're passing through, staying for the week, or looking for a reliable reset point, this listing is built to give travelers a clean, host-backed place to park and settle in.`;
+}
+
+function buildTravelHighlights(listing: ListingUI) {
+  const highlights: string[] = [];
+
+  if (listing.hookups === "Full") highlights.push("Full hookup setup for an easier stay");
+  if (listing.hookups === "Partial") highlights.push("Partial hookups available for added convenience");
+  if (listing.maxLengthFt >= 35) highlights.push(`Large-rig friendly with room for up to ${listing.maxLengthFt} ft`);
+  if (listing.power !== "None") highlights.push(`${listing.power} power connection available`);
+  if (listing.water !== "None") highlights.push("Water access available");
+  if (listing.sewer !== "None") highlights.push("Sewer access available");
+  if (listing.laundry !== "None") highlights.push(`${listing.laundry} available on site`);
+  if (highlights.length < 4) highlights.push("Host-backed booking experience through RVNB");
+  if (highlights.length < 4) highlights.push("Simple stopover setup with future-ready listing details");
+
+  return highlights.slice(0, 4);
+}
+
 export default function ListingDetailPage() {
   const params = useParams<{ id?: string }>();
   const listingId = params?.id;
@@ -226,7 +248,6 @@ export default function ListingDetailPage() {
     return buildGoogleMapsUrl(listing.lat, listing.lng, listing.placeId);
   }, [listing]);
 
-  // Missing ID (or navigated weirdly)
   if (!listingId) {
     return (
       <div className={styles.page}>
@@ -277,6 +298,9 @@ export default function ListingDetailPage() {
     );
   }
 
+  const travelHighlights = buildTravelHighlights(listing);
+  const aboutText = buildAboutText(listing);
+
   return (
     <div className={styles.page}>
       <div className={styles.container}>
@@ -284,37 +308,27 @@ export default function ListingDetailPage() {
           ← Back to listings
         </Link>
 
-        {/* Header */}
         <div className={styles.header}>
-          <div>
+          <div className={styles.headerContent}>
             <h1 className={styles.h1}>{listing.title}</h1>
 
             <div className={styles.location}>
               {listing.city}, {listing.state}
-              {hasCoords ? (
-                <span
-                  style={{
-                    marginLeft: 10,
-                    fontSize: 12,
-                    opacity: 0.85,
-                    padding: "4px 10px",
-                    borderRadius: 999,
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    background: "rgba(255,255,255,0.06)",
-                    display: "inline-block",
-                  }}
-                >
-                  📍 Exact pin saved
-                </span>
-              ) : null}
             </div>
 
-            {/* ✅ Subtle enhancement: show address line (if available) */}
             {listing.geocodeAddress ? (
-              <div style={{ marginTop: 6, opacity: 0.82, fontSize: 13, lineHeight: 1.35 }}>
-                {listing.geocodeAddress}
-              </div>
+              <div className={styles.addressLine}>{listing.geocodeAddress}</div>
             ) : null}
+
+            <div className={styles.headerBadges}>
+              <span className={styles.headerBadge}>RV-ready stay</span>
+              <span className={styles.headerBadge}>Host-backed</span>
+              {hasCoords ? (
+                <span className={styles.headerBadgeAccent}>📍 Exact pin saved</span>
+              ) : (
+                <span className={styles.headerBadge}>Location details available</span>
+              )}
+            </div>
           </div>
 
           <div className={styles.priceBox}>
@@ -323,18 +337,61 @@ export default function ListingDetailPage() {
           </div>
         </div>
 
-        {/* Photo area */}
-        <div className={styles.photoArea}>
-          <div className={styles.photoBadge}>
-            <CameraIcon />
-            Photos coming soon
+        <div className={styles.photoShowcase}>
+          <div className={styles.photoHero}>
+            <div className={styles.photoOverlayContent}>
+              <div className={styles.photoEyebrow}>RVNB Listing Preview</div>
+              <div className={styles.photoHeadline}>A cleaner, richer listing experience starts here.</div>
+              <div className={styles.photoCaption}>
+                Photos can be added later without changing the page structure.
+              </div>
+              <div className={styles.photoBadge}>
+                <CameraIcon />
+                Photos coming soon
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.photoThumbGrid}>
+            <div className={styles.photoThumb}>Arrival view</div>
+            <div className={styles.photoThumb}>Hookup area</div>
+            <div className={styles.photoThumb}>Parking setup</div>
+            <div className={styles.photoThumb}>Surroundings</div>
           </div>
         </div>
 
-        {/* Main layout */}
         <div className={styles.layout}>
-          {/* Left column */}
           <div className={styles.leftCol}>
+            <div className={styles.card}>
+              <div className={styles.cardTitle}>Quick highlights</div>
+
+              <div className={styles.highlightsGrid}>
+                <div className={styles.highlightTile}>
+                  <div className={styles.highlightLabel}>Hookups</div>
+                  <div className={styles.highlightValue}>{listing.hookups}</div>
+                </div>
+
+                <div className={styles.highlightTile}>
+                  <div className={styles.highlightLabel}>Rig size</div>
+                  <div className={styles.highlightValue}>
+                    {listing.maxLengthFt > 0 ? `${listing.maxLengthFt} ft max` : "Flexible"}
+                  </div>
+                </div>
+
+                <div className={styles.highlightTile}>
+                  <div className={styles.highlightLabel}>Rate</div>
+                  <div className={styles.highlightValue}>
+                    ${listing.displayPriceValue}/{listing.displayPriceLabel}
+                  </div>
+                </div>
+
+                <div className={styles.highlightTile}>
+                  <div className={styles.highlightLabel}>Location</div>
+                  <div className={styles.highlightValue}>{hasCoords ? "Exact pin saved" : "General details"}</div>
+                </div>
+              </div>
+            </div>
+
             <div className={styles.card}>
               <div className={styles.cardTitle}>Spot details</div>
 
@@ -345,19 +402,34 @@ export default function ListingDetailPage() {
 
               <div className={styles.features}>
                 <div className={styles.featureRow}>
-                  <span className={styles.featureKey}>Power</span>
+                  <div className={styles.featureLeft}>
+                    <AmenityIcon symbol="⚡" />
+                    <span className={styles.featureKey}>Power</span>
+                  </div>
                   <span className={styles.featureVal}>{listing.power}</span>
                 </div>
+
                 <div className={styles.featureRow}>
-                  <span className={styles.featureKey}>Water</span>
+                  <div className={styles.featureLeft}>
+                    <AmenityIcon symbol="🚿" />
+                    <span className={styles.featureKey}>Water</span>
+                  </div>
                   <span className={styles.featureVal}>{listing.water}</span>
                 </div>
+
                 <div className={styles.featureRow}>
-                  <span className={styles.featureKey}>Sewer</span>
+                  <div className={styles.featureLeft}>
+                    <AmenityIcon symbol="🧻" />
+                    <span className={styles.featureKey}>Sewer</span>
+                  </div>
                   <span className={styles.featureVal}>{listing.sewer}</span>
                 </div>
+
                 <div className={styles.featureRow}>
-                  <span className={styles.featureKey}>Laundry</span>
+                  <div className={styles.featureLeft}>
+                    <AmenityIcon symbol="🧺" />
+                    <span className={styles.featureKey}>Laundry</span>
+                  </div>
                   <span className={styles.featureVal}>{listing.laundry}</span>
                 </div>
               </div>
@@ -367,9 +439,33 @@ export default function ListingDetailPage() {
               </div>
             </div>
 
-            {/* ✅ NEW: Location card (inserted exactly between Spot details and What to expect) */}
+            <div className={styles.card}>
+              <div className={styles.cardTitle}>About this spot</div>
+              <p className={styles.paragraph}>{aboutText}</p>
+            </div>
+
+            <div className={styles.card}>
+              <div className={styles.cardTitle}>Why travelers like this spot</div>
+
+              <div className={styles.travelList}>
+                {travelHighlights.map((item) => (
+                  <div key={item} className={styles.travelListItem}>
+                    <span className={styles.travelCheck}>✓</span>
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className={styles.card}>
               <div className={styles.cardTitle}>Location</div>
+
+              <div className={styles.locationStatusRow}>
+                <span className={styles.locationStatusLabel}>Location details</span>
+                <span className={hasCoords ? styles.locationBadgeExact : styles.locationBadgeSoft}>
+                  {hasCoords ? "Exact pin available" : "General location only"}
+                </span>
+              </div>
 
               {listing.geocodeAddress ? (
                 <p className={styles.paragraph} style={{ marginTop: 10 }}>
@@ -385,42 +481,40 @@ export default function ListingDetailPage() {
                 <>
                   <div className={styles.features} style={{ marginTop: 10 }}>
                     <div className={styles.featureRow}>
-                      <span className={styles.featureKey}>Latitude</span>
+                      <div className={styles.featureLeft}>
+                        <AmenityIcon symbol="📍" />
+                        <span className={styles.featureKey}>Latitude</span>
+                      </div>
                       <span className={styles.featureVal}>{listing.lat}</span>
                     </div>
+
                     <div className={styles.featureRow}>
-                      <span className={styles.featureKey}>Longitude</span>
+                      <div className={styles.featureLeft}>
+                        <AmenityIcon symbol="🧭" />
+                        <span className={styles.featureKey}>Longitude</span>
+                      </div>
                       <span className={styles.featureVal}>{listing.lng}</span>
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+                  <div className={styles.locationActions}>
                     <a
                       href={mapsUrl}
                       target="_blank"
                       rel="noreferrer"
-                      style={{
-                        display: "inline-block",
-                        padding: "10px 12px",
-                        borderRadius: 12,
-                        border: "1px solid rgba(255,255,255,0.15)",
-                        background: "rgba(255,255,255,0.10)",
-                        color: "white",
-                        fontWeight: 900,
-                        textDecoration: "none",
-                      }}
+                      className={styles.mapAction}
                     >
                       Open in Google Maps →
                     </a>
 
-                    <span style={{ opacity: 0.75, fontSize: 12, alignSelf: "center" }}>
-                      Tip: If you’re rural, hosts can drop the pin at the entrance/driveway.
+                    <span className={styles.locationHelpText}>
+                      Rural property? Hosts can save the entrance or driveway pin for easier arrival.
                     </span>
                   </div>
                 </>
               ) : (
                 <div className={styles.note} style={{ marginTop: 10 }}>
-                  No exact pin saved for this listing yet. (Hosts can add a manual pin when creating the listing.)
+                  No exact pin saved for this listing yet. Hosts can add a manual pin when creating the listing.
                 </div>
               )}
             </div>
@@ -434,7 +528,6 @@ export default function ListingDetailPage() {
             </div>
           </div>
 
-          {/* Right column (Booking) */}
           <div className={styles.rightCol}>
             <BookingPanel
               listingId={listing.id}
