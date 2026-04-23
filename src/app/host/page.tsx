@@ -829,9 +829,15 @@ export default function HostPage() {
             </p>
           </div>
 
-          <Link href="/listings" style={ghostBtn}>
-            View public listings →
-          </Link>
+          <div style={heroActions}>
+            <Link href="/host/opportunities" style={primaryAccentBtn}>
+              Review Opportunities →
+            </Link>
+
+            <Link href="/listings" style={ghostBtn}>
+              View public listings →
+            </Link>
+          </div>
         </div>
 
         {/* ✅ ADD: Host business command center analytics */}
@@ -1152,8 +1158,38 @@ export default function HostPage() {
             </div>
           </section>
 
-          {/* RIGHT COLUMN: BOOKINGS + LISTINGS */}
+          {/* RIGHT COLUMN: OPPORTUNITIES + BOOKINGS + LISTINGS */}
           <div style={{ display: "grid", gap: 18 }}>
+            {/* ✅ NEW: HOST OPPORTUNITIES ACCESS */}
+            <section style={pipelineCard}>
+              <div style={pipelineTopRow}>
+                <div>
+                  <div style={pipelineEyebrow}>Host Pipeline</div>
+                  <h2 style={pipelineTitle}>Review Opportunities</h2>
+                </div>
+
+                <span style={pipelinePill}>New</span>
+              </div>
+
+              <p style={pipelineText}>
+                Review submitted spaces, exploratory landowner leads, partial
+                setups, and more developed rig-ready hosting opportunities that
+                may support current or future RV request demand.
+              </p>
+
+              <div style={pipelineChipRow}>
+                <span style={pipelineChip}>Review intake</span>
+                <span style={pipelineChip}>Evaluate readiness</span>
+                <span style={pipelineChip}>Support matching</span>
+              </div>
+
+              <div style={{ marginTop: 18 }}>
+                <Link href="/host/opportunities" style={pipelineBtn}>
+                  Open Opportunities →
+                </Link>
+              </div>
+            </section>
+
             {/* BOOKINGS */}
             <section style={card}>
               <div style={sectionHeader}>
@@ -1548,6 +1584,25 @@ const heroSub: React.CSSProperties = {
   lineHeight: 1.5,
 };
 
+const heroActions: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  flexWrap: "wrap",
+};
+
+const primaryAccentBtn: React.CSSProperties = {
+  display: "inline-block",
+  padding: "10px 14px",
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,0.18)",
+  background: "rgba(255,255,255,0.14)",
+  color: "white",
+  fontWeight: 950,
+  textDecoration: "none",
+  whiteSpace: "nowrap",
+};
+
 const analyticsWrap: React.CSSProperties = {
   maxWidth: 1200,
   margin: "0 auto 18px",
@@ -1578,6 +1633,85 @@ const card: React.CSSProperties = {
   borderRadius: 18,
   border: "1px solid rgba(255,255,255,0.12)",
   background: "rgba(255,255,255,0.05)",
+};
+
+const pipelineCard: React.CSSProperties = {
+  padding: 20,
+  borderRadius: 18,
+  border: "1px solid rgba(255,255,255,0.12)",
+  background:
+    "linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.04) 100%)",
+  boxShadow:
+    "0 18px 40px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.04)",
+};
+
+const pipelineTopRow: React.CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  justifyContent: "space-between",
+  gap: 12,
+};
+
+const pipelineEyebrow: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: "0.12em",
+  textTransform: "uppercase",
+  opacity: 0.68,
+};
+
+const pipelineTitle: React.CSSProperties = {
+  margin: "8px 0 0",
+  fontSize: 24,
+  fontWeight: 950,
+};
+
+const pipelinePill: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  minHeight: 30,
+  padding: "0 10px",
+  borderRadius: 999,
+  border: "1px solid rgba(255,255,255,0.14)",
+  background: "rgba(255,255,255,0.08)",
+  fontSize: 12,
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "0.08em",
+};
+
+const pipelineText: React.CSSProperties = {
+  marginTop: 12,
+  opacity: 0.82,
+  lineHeight: 1.65,
+};
+
+const pipelineChipRow: React.CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 8,
+  marginTop: 14,
+};
+
+const pipelineChip: React.CSSProperties = {
+  padding: "6px 10px",
+  borderRadius: 999,
+  border: "1px solid rgba(255,255,255,0.12)",
+  background: "rgba(255,255,255,0.06)",
+  fontSize: 12,
+  fontWeight: 800,
+};
+
+const pipelineBtn: React.CSSProperties = {
+  display: "inline-block",
+  padding: "12px 14px",
+  borderRadius: 12,
+  border: "1px solid rgba(255,255,255,0.16)",
+  background: "rgba(255,255,255,0.12)",
+  color: "white",
+  fontWeight: 950,
+  textDecoration: "none",
 };
 
 const sectionHeader: React.CSSProperties = {

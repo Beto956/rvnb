@@ -1,0 +1,763 @@
+.page {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  color: #f6f7fb;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(5, 8, 18, 0.24) 0%,
+      rgba(6, 10, 20, 0.38) 18%,
+      rgba(8, 12, 24, 0.52) 40%,
+      rgba(9, 13, 26, 0.72) 72%,
+      rgba(10, 14, 28, 0.84) 100%
+    ),
+    radial-gradient(
+      1200px 760px at 20% 0%,
+      rgba(76, 122, 255, 0.14),
+      transparent 60%
+    ),
+    radial-gradient(
+      950px 680px at 82% 10%,
+      rgba(255, 166, 95, 0.12),
+      transparent 54%
+    ),
+    radial-gradient(
+      1100px 820px at 55% 42%,
+      rgba(58, 101, 228, 0.12),
+      transparent 62%
+    ),
+    radial-gradient(
+      1200px 800px at 50% 100%,
+      rgba(0, 0, 0, 0.34),
+      transparent 70%
+    ),
+    url("/rvnb-request-hub-bg.png");
+  background-size: 95%;
+  background-position: 60% 22%;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+.pageOverlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(6, 10, 20, 0.04) 0%,
+      rgba(8, 12, 24, 0.12) 100%
+    );
+}
+
+.pageInner {
+  position: relative;
+  z-index: 1;
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: 52px 40px 96px;
+}
+
+.shell {
+  position: relative;
+  border-radius: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(14, 22, 42, 0.28) 0%,
+      rgba(8, 13, 26, 0.42) 38%,
+      rgba(7, 11, 22, 0.56) 100%
+    );
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 60px 120px rgba(103, 146, 255, 0.05);
+  padding: 28px;
+}
+
+.shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      900px 260px at 20% 0%,
+      rgba(110, 150, 255, 0.08),
+      transparent 60%
+    ),
+    radial-gradient(
+      700px 240px at 88% 0%,
+      rgba(255, 170, 96, 0.06),
+      transparent 58%
+    );
+  opacity: 0.95;
+}
+
+.topBar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.ecosystemNav {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.topActions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.topNavLink,
+.topNavLinkActive {
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.74);
+  font-weight: 800;
+  font-size: 0.96rem;
+  transition:
+    color 0.18s ease,
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+.topNavLink:hover {
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.topNavLinkActive {
+  color: #ffffff;
+}
+
+.topLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.1) 0%,
+      rgba(255, 255, 255, 0.05) 100%
+    );
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 0.96rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 8px 20px rgba(0, 0, 0, 0.14);
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.topLink:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.hero {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 24px;
+}
+
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: -30px -20px auto -20px;
+  height: 220px;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      560px 220px at 20% 35%,
+      rgba(79, 125, 255, 0.08),
+      transparent 70%
+    ),
+    radial-gradient(
+      460px 180px at 78% 20%,
+      rgba(255, 170, 98, 0.06),
+      transparent 68%
+    );
+  filter: blur(16px);
+  opacity: 0.95;
+}
+
+.title {
+  position: relative;
+  margin: 0;
+  font-size: clamp(2.15rem, 3.2vw, 3.35rem);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  font-weight: 900;
+  max-width: 760px;
+  text-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+
+.subtitle {
+  position: relative;
+  margin: 16px 0 0;
+  max-width: 760px;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 1rem;
+  line-height: 1.68;
+}
+
+.formShell {
+  position: relative;
+  z-index: 1;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(14, 22, 42, 0.16) 0%,
+      rgba(8, 13, 26, 0.2) 32%,
+      rgba(7, 12, 24, 0.24) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 40px 90px rgba(95, 140, 255, 0.025);
+  padding: 24px;
+}
+
+.section {
+  display: grid;
+  gap: 16px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1.7rem;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  font-weight: 900;
+  text-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+}
+
+.segmentedControl {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.35fr;
+  gap: 0;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.055) 0%,
+      rgba(255, 255, 255, 0.028) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.segmentButton,
+.segmentButtonActive {
+  appearance: none;
+  border: 0;
+  min-height: 62px;
+  padding: 0 18px;
+  font-size: 1rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.84);
+  background: transparent;
+  cursor: pointer;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  transition:
+    background 0.18s ease,
+    color 0.18s ease;
+}
+
+.segmentButton:last-child,
+.segmentButtonActive:last-child {
+  border-right: 0;
+}
+
+.segmentButtonActive {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(78, 118, 255, 0.26) 0%,
+      rgba(70, 108, 240, 0.14) 100%
+    );
+  color: #ffffff;
+  box-shadow:
+    inset 0 0 0 1px rgba(130, 170, 255, 0.34),
+    0 10px 24px rgba(49, 84, 190, 0.08);
+}
+
+.helperText {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.divider {
+  height: 1px;
+  margin: 22px 0;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.02) 0%,
+      rgba(255, 255, 255, 0.1) 48%,
+      rgba(255, 255, 255, 0.02) 100%
+    );
+}
+
+.gridTwo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 18px;
+}
+
+.gridThree {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px 18px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.label {
+  font-size: 0.96rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(255, 255, 255, 0.04) 100%
+    );
+  color: #ffffff;
+  padding: 13px 15px;
+  font-size: 0.97rem;
+  outline: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.select {
+  appearance: none;
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: rgba(134, 174, 255, 0.42);
+  box-shadow:
+    0 0 0 1px rgba(134, 174, 255, 0.22),
+    0 10px 30px rgba(48, 83, 190, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.textarea {
+  min-height: 118px;
+  resize: vertical;
+}
+
+.checkRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  color: rgba(255, 255, 255, 0.88);
+  font-weight: 700;
+}
+
+.checkRow input {
+  width: 18px;
+  height: 18px;
+}
+
+.checkRowCard {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  color: rgba(255, 255, 255, 0.88);
+  font-weight: 700;
+}
+
+.checkRowCard input {
+  width: 18px;
+  height: 18px;
+}
+
+.durationRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.durationButton,
+.durationButtonActive {
+  appearance: none;
+  border-radius: 15px;
+  min-height: 54px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.07) 0%,
+      rgba(255, 255, 255, 0.04) 100%
+    );
+  color: rgba(255, 255, 255, 0.84);
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.durationButtonActive {
+  color: #ffffff;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.14) 0%,
+      rgba(255, 255, 255, 0.08) 100%
+    );
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.subsectionLabel {
+  font-size: 1rem;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: -0.02em;
+}
+
+.multiRvToggleWrap {
+  margin-top: 4px;
+}
+
+.additionalRvsWrap {
+  margin-top: 8px;
+  display: grid;
+  gap: 16px;
+}
+
+.additionalRvsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.additionalRvsList {
+  display: grid;
+  gap: 16px;
+}
+
+.additionalRvCard {
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.06) 0%,
+      rgba(255, 255, 255, 0.035) 100%
+    );
+  padding: 18px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 14px 34px rgba(0, 0, 0, 0.14);
+}
+
+.additionalRvTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.additionalRvTitle {
+  font-size: 1rem;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.addAnotherButton,
+.removeRvButton {
+  appearance: none;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.09) 0%,
+      rgba(255, 255, 255, 0.05) 100%
+    );
+  color: #ffffff;
+  font-weight: 800;
+  cursor: pointer;
+  min-height: 44px;
+  padding: 0 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 8px 18px rgba(0, 0, 0, 0.1);
+}
+
+.removeRvButton {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.07) 0%,
+      rgba(255, 255, 255, 0.04) 100%
+    );
+}
+
+.countRow {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.submitWrap {
+  margin-top: 30px;
+  display: grid;
+  gap: 14px;
+}
+
+.submitButton {
+  appearance: none;
+  width: 100%;
+  min-height: 64px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.16) 0%,
+      rgba(255, 255, 255, 0.08) 100%
+    );
+  color: #ffffff;
+  font-size: 1.65rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  cursor: pointer;
+  box-shadow:
+    0 18px 36px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.submitNote {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 0.98rem;
+  line-height: 1.65;
+}
+
+@media (max-width: 1100px) {
+  .topBar {
+    align-items: flex-start;
+  }
+
+  .ecosystemNav,
+  .topActions {
+    width: 100%;
+  }
+}
+
+@media (max-width: 980px) {
+  .segmentedControl,
+  .gridThree,
+  .gridTwo {
+    grid-template-columns: 1fr;
+  }
+
+  .page {
+    background-attachment: scroll;
+  }
+
+  .pageInner {
+    padding: 24px 16px 48px;
+  }
+
+  .shell {
+    padding: 20px;
+    border-radius: 24px;
+  }
+
+  .formShell {
+    padding: 20px;
+    border-radius: 22px;
+  }
+
+  .title {
+    font-size: 2.25rem;
+  }
+
+  .sectionTitle {
+    font-size: 1.45rem;
+  }
+
+  .submitButton {
+    font-size: 1.45rem;
+  }
+
+  .additionalRvsHeader,
+  .additionalRvTop {
+    align-items: flex-start;
+  }
+}
+
+.offerSpaceSection {
+  margin: 28px 0 10px;
+}
+
+.offerSpaceCard {
+  position: relative;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(14, 22, 42, 0.22) 0%,
+      rgba(8, 13, 26, 0.32) 40%,
+      rgba(7, 11, 22, 0.42) 100%
+    );
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 22px 20px;
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 40px 80px rgba(95, 140, 255, 0.035);
+  overflow: hidden;
+}
+
+/* subtle glow layer (same system as shell) */
+.offerSpaceCard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      600px 180px at 20% 0%,
+      rgba(110, 150, 255, 0.08),
+      transparent 60%
+    ),
+    radial-gradient(
+      500px 160px at 85% 10%,
+      rgba(255, 170, 96, 0.06),
+      transparent 60%
+    );
+  opacity: 0.9;
+}
+
+.offerSpaceContent {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.offerSpaceTextWrap {
+  max-width: 620px;
+}
+
+.offerSpaceTitle {
+  margin: 0 0 6px;
+  font-size: 1.2rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+}
+
+.offerSpaceText {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.offerSpaceBtn {
+  appearance: none;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.14) 0%,
+      rgba(255, 255, 255, 0.08) 100%
+    );
+  color: #ffffff;
+  font-weight: 900;
+  font-size: 0.95rem;
+  padding: 12px 18px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.offerSpaceBtn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.24);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.18) 0%,
+      rgba(255, 255, 255, 0.10) 100%
+    );
+}
