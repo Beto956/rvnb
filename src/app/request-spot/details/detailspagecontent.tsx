@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import styles from "./page.module.css";
@@ -128,10 +128,13 @@ function formatStayWindow(data: SpotRequestDoc | null) {
   return `${formatDate(data?.startDate)} — ${formatDate(data?.endDate)}`;
 }
 
-export default function DetailsPageContent() {
+type DetailsPageContentProps = {
+  requestId: string;
+};
+
+export default function DetailsPageContent({ requestId }: DetailsPageContentProps) {
+ 
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const requestId = searchParams.get("requestId");
 
   const [requestData, setRequestData] = useState<SpotRequestDoc | null>(null);
   const [loading, setLoading] = useState(true);
