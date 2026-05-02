@@ -54,7 +54,7 @@
 .pageInner {
   position: relative;
   z-index: 1;
-  max-width: 1220px;
+  max-width: 1440px;
   margin: 0 auto;
   padding: 52px 40px 96px;
 }
@@ -189,9 +189,10 @@
   background:
     linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.16) 0%,
-      rgba(255, 255, 255, 0.08) 100%
+      rgba(78, 118, 255, 0.32) 0%,
+      rgba(70, 108, 240, 0.18) 100%
     );
+  border-color: rgba(130, 170, 255, 0.28);
 }
 
 .hero {
@@ -385,6 +386,7 @@
 
 .requestGrid {
   display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -397,17 +399,30 @@
     linear-gradient(
       180deg,
       rgba(14, 22, 42, 0.22) 0%,
-      rgba(8, 13, 26, 0.32) 40%,
-      rgba(7, 11, 22, 0.42) 100%
+      rgba(8, 13, 26, 0.34) 40%,
+      rgba(7, 11, 22, 0.48) 100%
     );
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  padding: 22px 20px;
+  padding: 18px;
   box-shadow:
     0 18px 40px rgba(0, 0, 0, 0.26),
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     inset 0 40px 80px rgba(95, 140, 255, 0.035);
   overflow: hidden;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.requestCard:hover {
+  transform: translateY(-3px);
+  border-color: rgba(134, 174, 255, 0.24);
+  box-shadow:
+    0 24px 54px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 40px 80px rgba(95, 140, 255, 0.045);
 }
 
 .requestCard::before,
@@ -445,7 +460,7 @@
 .cardTopRow {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   align-items: flex-start;
 }
 
@@ -453,19 +468,20 @@
   margin: 0;
   color: rgba(167, 193, 255, 0.98);
   font-weight: 900;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
 }
 
 .requestTitle {
   margin: 5px 0 0;
-  font-size: 1.55rem;
+  font-size: 1.35rem;
   letter-spacing: -0.035em;
 }
 
 .finalizedPill,
 .draftPill {
-  padding: 8px 12px;
+  padding: 7px 10px;
   border-radius: 999px;
+  font-size: 0.78rem;
   font-weight: 900;
   white-space: nowrap;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -482,15 +498,15 @@
 }
 
 .summaryGrid {
-  margin-top: 18px;
+  margin-top: 16px;
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
 }
 
 .infoBlock {
-  padding: 12px;
-  border-radius: 16px;
+  padding: 10px;
+  border-radius: 14px;
   background:
     linear-gradient(
       180deg,
@@ -498,29 +514,33 @@
       rgba(5, 10, 24, 0.28) 100%
     );
   border: 1px solid rgba(255, 255, 255, 0.08);
+  min-width: 0;
 }
 
 .infoBlock span {
   display: block;
   color: rgba(255, 255, 255, 0.58);
-  font-size: 0.74rem;
+  font-size: 0.7rem;
   font-weight: 800;
   margin-bottom: 5px;
 }
 
 .infoBlock strong {
+  display: block;
   color: #ffffff;
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .notePreview {
-  margin: 16px 0 0;
-  padding: 14px;
-  border-radius: 18px;
+  margin: 14px 0 0;
+  padding: 12px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.055);
   color: rgba(255, 255, 255, 0.76);
-  line-height: 1.55;
+  line-height: 1.5;
+  font-size: 0.9rem;
 }
 
 .detailsPanel {
@@ -573,10 +593,12 @@
 }
 
 .cardActions {
-  margin-top: 18px;
-  display: flex;
+  position: relative;
+  z-index: 1;
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
-  flex-wrap: wrap;
 }
 
 .ghostButton,
@@ -618,13 +640,15 @@
   background:
     linear-gradient(
       180deg,
-      rgba(78, 118, 255, 0.26) 0%,
-      rgba(70, 108, 240, 0.14) 100%
+      rgba(78, 118, 255, 0.32) 0%,
+      rgba(70, 108, 240, 0.18) 100%
     );
+  border-color: rgba(130, 170, 255, 0.28);
 }
 
 .emptyCard {
   text-align: center;
+  grid-column: 1 / -1;
 }
 
 .emptyCard h2 {
@@ -664,6 +688,132 @@
   letter-spacing: -0.04em;
 }
 
+.slideOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(4, 8, 18, 0.58);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.slidePanel {
+  width: min(520px, 100%);
+  height: 100vh;
+  overflow: hidden;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(12, 20, 39, 0.97) 0%,
+      rgba(6, 11, 24, 0.99) 100%
+    );
+  box-shadow:
+    -24px 0 70px rgba(0, 0, 0, 0.42),
+    inset 1px 0 0 rgba(255, 255, 255, 0.06);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  animation: slideInRight 0.24s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+.slideHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.slideTitle {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.slideSubtitle {
+  margin: 8px 0 0;
+  color: rgba(167, 193, 255, 0.96);
+  font-weight: 800;
+}
+
+.closeButton {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.closeButton:hover {
+  color: #ffffff;
+}
+
+.slideMetaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.sideMiniPill {
+  padding: 8px 11px;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.82rem;
+  font-weight: 800;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.slideContent {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding-right: 4px;
+}
+
+.slideActions {
+  display: flex;
+  gap: 10px;
+  padding-top: 18px;
+  margin-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.slideActions .ghostButton,
+.slideActions .primarySmallButton {
+  flex: 1;
+}
+
+@media (max-width: 1180px) {
+  .requestGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (max-width: 1100px) {
   .topBar {
     align-items: flex-start;
@@ -672,14 +822,6 @@
   .ecosystemNav,
   .topActions {
     width: 100%;
-  }
-
-  .statsGrid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .summaryGrid {
-    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -698,6 +840,7 @@
   }
 
   .statsGrid,
+  .requestGrid,
   .summaryGrid {
     grid-template-columns: 1fr;
   }
@@ -712,5 +855,23 @@
 
   .ecosystemNav {
     gap: 12px;
+  }
+
+  .cardActions {
+    grid-template-columns: 1fr;
+  }
+
+  .slidePanel {
+    width: 100%;
+    padding: 20px;
+  }
+
+  .slideActions {
+    flex-direction: column;
+  }
+
+  .slideActions .ghostButton,
+  .slideActions .primarySmallButton {
+    width: 100%;
   }
 }
