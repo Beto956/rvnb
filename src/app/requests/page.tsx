@@ -32,7 +32,7 @@ type SpotRequest = {
     hookupsPreference?: string;
     pullThroughPreference?: string;
     laundryNeed?: string;
-    petsTraveling?: string;
+    petsTraveling?: string | boolean;
   };
   employerName?: string;
   teamName?: string;
@@ -72,7 +72,9 @@ export default function RequestsDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterMode>("All");
   const [search, setSearch] = useState("");
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<SpotRequest | null>(
+    null
+  );
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (currentUser) => {
@@ -277,186 +279,265 @@ export default function RequestsDashboardPage() {
                 </p>
               </div>
             ) : (
-              filteredRequests.map((request) => {
-                const expanded = expandedId === request.id;
-
-                return (
-                  <article key={request.id} className={styles.requestCard}>
-                    <div className={styles.cardTopRow}>
-                      <div>
-                        <p className={styles.requestType}>
-                          {request.requestType || "Request"}
-                        </p>
-                        <h2 className={styles.requestTitle}>
-                          {request.city || "Unknown City"}
-                          {request.state ? `, ${request.state}` : ""}
-                        </h2>
-                      </div>
-
-                      <span
-                        className={
-                          request.isFinalized
-                            ? styles.finalizedPill
-                            : styles.draftPill
-                        }
-                      >
-                        {request.isFinalized ? "Finalized" : "Draft"}
-                      </span>
-                    </div>
-
-                    <div className={styles.summaryGrid}>
-                      <Info label="Stay Window" value={formatStay(request)} />
-                      <Info label="Budget" value={formatBudget(request)} />
-                      <Info
-                        label="Rig"
-                        value={`${request.primaryRv?.rigType || "RV"}${
-                          request.primaryRv?.rigLength
-                            ? ` · ${request.primaryRv.rigLength} ft`
-                            : ""
-                        }`}
-                      />
-                      <Info
-                        label="Hookups"
-                        value={
-                          request.primaryRv?.hookupsPreference || "Not listed"
-                        }
-                      />
-                      <Info
-                        label="Spots Needed"
-                        value={String(
-                          request.spotsNeeded || request.rigsCount || 1
-                        )}
-                      />
-                      <Info
-                        label="Created"
-                        value={formatTimestamp(request.createdAt)}
-                      />
-                    </div>
-
-                    {(request.note || request.finalNotes) && (
-                      <p className={styles.notePreview}>
-                        {request.finalNotes || request.note}
+              filteredRequests.map((request) => (
+                <article key={request.id} className={styles.requestCard}>
+                  <div className={styles.cardTopRow}>
+                    <div>
+                      <p className={styles.requestType}>
+                        {request.requestType || "Request"}
                       </p>
-                    )}
-
-                    {expanded && (
-                      <div className={styles.detailsPanel}>
-                        <DetailSection title="Contact">
-                          <Info
-                            label="Name"
-                            value={request.contactName || "Not provided"}
-                          />
-                          <Info
-                            label="Email"
-                            value={request.contactEmail || "Not provided"}
-                          />
-                          <Info
-                            label="Phone"
-                            value={request.contactPhone || "Not provided"}
-                          />
-                          <Info
-                            label="Best Method"
-                            value={
-                              request.bestContactMethod || "Not provided"
-                            }
-                          />
-                        </DetailSection>
-
-                        <DetailSection title="RV Details">
-                          <Info
-                            label="RV Summary"
-                            value={
-                              request.rvDetails ||
-                              request.rigDetails ||
-                              "Not provided"
-                            }
-                          />
-                          <Info
-                            label="Pull Through"
-                            value={
-                              request.primaryRv?.pullThroughPreference ||
-                              "Not listed"
-                            }
-                          />
-                          <Info
-                            label="Laundry"
-                            value={
-                              request.primaryRv?.laundryNeed || "Not listed"
-                            }
-                          />
-                          <Info
-                            label="Pets"
-                            value={
-                              request.primaryRv?.petsTraveling || "Not listed"
-                            }
-                          />
-                        </DetailSection>
-
-                        <DetailSection title="Team / Employer">
-                          <Info
-                            label="Employer"
-                            value={request.employerName || "Not provided"}
-                          />
-                          <Info
-                            label="Team"
-                            value={request.teamName || "Not provided"}
-                          />
-                          <Info
-                            label="Team Location"
-                            value={request.teamLocation || "Not provided"}
-                          />
-                          <Info
-                            label="Workers"
-                            value={String(
-                              request.workersCount || "Not provided"
-                            )}
-                          />
-                        </DetailSection>
-
-                        <DetailSection title="Final Notes">
-                          <p className={styles.detailParagraph}>
-                            {request.finalNotes ||
-                              request.note ||
-                              "No notes provided."}
-                          </p>
-
-                          {request.priorityPreferences?.length ? (
-                            <div className={styles.pillWrap}>
-                              {request.priorityPreferences.map((pref) => (
-                                <span key={pref} className={styles.smallPill}>
-                                  {pref}
-                                </span>
-                              ))}
-                            </div>
-                          ) : null}
-                        </DetailSection>
-                      </div>
-                    )}
-
-                    <div className={styles.cardActions}>
-                      <button
-                        className={styles.ghostButton}
-                        onClick={() =>
-                          setExpandedId(expanded ? null : request.id)
-                        }
-                      >
-                        {expanded ? "Hide Details" : "View Details"}
-                      </button>
-
-                      <Link
-                        href={`/request-spot/respond?requestId=${request.id}`}
-                        className={styles.primarySmallButton}
-                      >
-                        Match / Respond
-                      </Link>
+                      <h2 className={styles.requestTitle}>
+                        {request.city || request.locationText || "Unknown City"}
+                        {request.state ? `, ${request.state}` : ""}
+                      </h2>
                     </div>
-                  </article>
-                );
-              })
+
+                    <span
+                      className={
+                        request.isFinalized
+                          ? styles.finalizedPill
+                          : styles.draftPill
+                      }
+                    >
+                      {request.isFinalized ? "Finalized" : "Draft"}
+                    </span>
+                  </div>
+
+                  <div className={styles.summaryGrid}>
+                    <Info label="Stay Window" value={formatStay(request)} />
+                    <Info label="Budget" value={formatBudget(request)} />
+                    <Info
+                      label="Rig"
+                      value={`${request.primaryRv?.rigType || "RV"}${
+                        request.primaryRv?.rigLength
+                          ? ` · ${request.primaryRv.rigLength} ft`
+                          : ""
+                      }`}
+                    />
+                    <Info
+                      label="Hookups"
+                      value={request.primaryRv?.hookupsPreference || "Not listed"}
+                    />
+                    <Info
+                      label="Spots Needed"
+                      value={String(request.spotsNeeded || request.rigsCount || 1)}
+                    />
+                    <Info
+                      label="Created"
+                      value={formatTimestamp(request.createdAt)}
+                    />
+                  </div>
+
+                  {(request.note || request.finalNotes) && (
+                    <p className={styles.notePreview}>
+                      {request.finalNotes || request.note}
+                    </p>
+                  )}
+
+                  <div className={styles.cardActions}>
+                    <button
+                      className={styles.ghostButton}
+                      onClick={() => setSelectedRequest(request)}
+                    >
+                      View Details
+                    </button>
+
+                    <Link
+                      href={`/request-spot/respond?requestId=${request.id}`}
+                      className={styles.primarySmallButton}
+                    >
+                      Match / Respond
+                    </Link>
+                  </div>
+                </article>
+              ))
             )}
           </section>
         </section>
       </div>
+
+      {selectedRequest && (
+        <aside
+          className={styles.slideOverlay}
+          onClick={() => setSelectedRequest(null)}
+        >
+          <section
+            className={styles.slidePanel}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className={styles.slideHeader}>
+              <div>
+                <p className={styles.eyebrow}>Request Details</p>
+                <h2 className={styles.slideTitle}>
+                  {selectedRequest.city ||
+                    selectedRequest.locationText ||
+                    "Unknown City"}
+                  {selectedRequest.state ? `, ${selectedRequest.state}` : ""}
+                </h2>
+                <p className={styles.slideSubtitle}>
+                  {selectedRequest.requestType || "Request"}
+                </p>
+              </div>
+
+              <button
+                className={styles.closeButton}
+                onClick={() => setSelectedRequest(null)}
+                aria-label="Close request details"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className={styles.slideMetaRow}>
+              <span
+                className={
+                  selectedRequest.isFinalized
+                    ? styles.finalizedPill
+                    : styles.draftPill
+                }
+              >
+                {selectedRequest.isFinalized ? "Finalized" : "Draft"}
+              </span>
+
+              <span className={styles.sideMiniPill}>
+                {formatStay(selectedRequest)}
+              </span>
+
+              <span className={styles.sideMiniPill}>
+                {formatBudget(selectedRequest)}
+              </span>
+            </div>
+
+            <div className={styles.slideContent}>
+              <DetailSection title="Contact Information">
+                <Info
+                  label="Name"
+                  value={selectedRequest.contactName || "Not provided"}
+                />
+                <Info
+                  label="Email"
+                  value={selectedRequest.contactEmail || "Not provided"}
+                />
+                <Info
+                  label="Phone"
+                  value={selectedRequest.contactPhone || "Not provided"}
+                />
+                <Info
+                  label="Best Contact"
+                  value={selectedRequest.bestContactMethod || "Not provided"}
+                />
+              </DetailSection>
+
+              <DetailSection title="RV Details">
+                <Info
+                  label="RV Summary"
+                  value={
+                    selectedRequest.rvDetails ||
+                    selectedRequest.rigDetails ||
+                    "Not provided"
+                  }
+                />
+                <Info
+                  label="Rig Type"
+                  value={selectedRequest.primaryRv?.rigType || "Not listed"}
+                />
+                <Info
+                  label="Rig Length"
+                  value={
+                    selectedRequest.primaryRv?.rigLength
+                      ? `${selectedRequest.primaryRv.rigLength} ft`
+                      : "Not listed"
+                  }
+                />
+                <Info
+                  label="Hookups"
+                  value={
+                    selectedRequest.primaryRv?.hookupsPreference || "Not listed"
+                  }
+                />
+                <Info
+                  label="Pull Through"
+                  value={
+                    selectedRequest.primaryRv?.pullThroughPreference ||
+                    "Not listed"
+                  }
+                />
+                <Info
+                  label="Laundry"
+                  value={selectedRequest.primaryRv?.laundryNeed || "Not listed"}
+                />
+                <Info
+                  label="Pets"
+                  value={String(
+                    selectedRequest.primaryRv?.petsTraveling || "Not listed"
+                  )}
+                />
+              </DetailSection>
+
+              <DetailSection title="Team / Employer">
+                <Info
+                  label="Employer"
+                  value={selectedRequest.employerName || "Not provided"}
+                />
+                <Info
+                  label="Team"
+                  value={selectedRequest.teamName || "Not provided"}
+                />
+                <Info
+                  label="Team Location"
+                  value={selectedRequest.teamLocation || "Not provided"}
+                />
+                <Info
+                  label="Workers"
+                  value={String(selectedRequest.workersCount || "Not provided")}
+                />
+                <Info
+                  label="Rigs"
+                  value={String(selectedRequest.rigsCount || "Not provided")}
+                />
+                <Info
+                  label="Spots Needed"
+                  value={String(selectedRequest.spotsNeeded || 1)}
+                />
+              </DetailSection>
+
+              <DetailSection title="Additional Information">
+                <p className={styles.detailParagraph}>
+                  {selectedRequest.finalNotes ||
+                    selectedRequest.note ||
+                    "No notes provided."}
+                </p>
+
+                {selectedRequest.priorityPreferences?.length ? (
+                  <div className={styles.pillWrap}>
+                    {selectedRequest.priorityPreferences.map((pref) => (
+                      <span key={pref} className={styles.smallPill}>
+                        {pref}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </DetailSection>
+            </div>
+
+            <div className={styles.slideActions}>
+              <button
+                className={styles.ghostButton}
+                onClick={() => setSelectedRequest(null)}
+              >
+                Close
+              </button>
+
+              <Link
+                href={`/request-spot/respond?requestId=${selectedRequest.id}`}
+                className={styles.primarySmallButton}
+              >
+                Match / Respond
+              </Link>
+            </div>
+          </section>
+        </aside>
+      )}
     </main>
   );
 }
