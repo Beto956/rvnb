@@ -174,7 +174,8 @@
   transition:
     transform 0.18s ease,
     border-color 0.18s ease,
-    background 0.18s ease;
+    background 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
 .topLink:hover,
@@ -182,6 +183,9 @@
 .primaryLink:hover {
   transform: translateY(-1px);
   border-color: rgba(255, 255, 255, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 12px 26px rgba(0, 0, 0, 0.18);
 }
 
 .topLinkPrimary,
@@ -627,13 +631,17 @@
   transition:
     transform 0.18s ease,
     border-color 0.18s ease,
-    background 0.18s ease;
+    background 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
 .ghostButton:hover,
 .primarySmallButton:hover {
   transform: translateY(-1px);
   border-color: rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 10px 24px rgba(0, 0, 0, 0.16);
 }
 
 .primarySmallButton {
@@ -688,45 +696,126 @@
   letter-spacing: -0.04em;
 }
 
+/* Premium slide-over panel */
 .slideOverlay {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(4, 8, 18, 0.58);
-  backdrop-filter: blur(7px);
-  -webkit-backdrop-filter: blur(7px);
+  background:
+    radial-gradient(
+      900px 560px at 78% 22%,
+      rgba(78, 118, 255, 0.16),
+      transparent 58%
+    ),
+    rgba(4, 8, 18, 0.64);
+  backdrop-filter: blur(10px) saturate(1.15);
+  -webkit-backdrop-filter: blur(10px) saturate(1.15);
   display: flex;
   justify-content: flex-end;
+  animation: overlayFadeIn 0.22s ease-out;
 }
 
-.slidePanel {
-  width: min(520px, 100%);
-  height: 100vh;
-  overflow: hidden;
-  border-left: 1px solid rgba(255, 255, 255, 0.12);
-  background:
-    linear-gradient(
-      180deg,
-      rgba(12, 20, 39, 0.97) 0%,
-      rgba(6, 11, 24, 0.99) 100%
-    );
-  box-shadow:
-    -24px 0 70px rgba(0, 0, 0, 0.42),
-    inset 1px 0 0 rgba(255, 255, 255, 0.06);
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  animation: slideInRight 0.24s ease-out;
-}
-
-@keyframes slideInRight {
+@keyframes overlayFadeIn {
   from {
-    transform: translateX(100%);
+    opacity: 0;
   }
 
   to {
-    transform: translateX(0);
+    opacity: 1;
   }
+}
+
+.slidePanel {
+  position: relative;
+  width: min(560px, 100%);
+  height: 100vh;
+  overflow: hidden;
+  border-left: 1px solid rgba(167, 193, 255, 0.22);
+  background:
+    radial-gradient(
+      520px 260px at 8% 0%,
+      rgba(107, 140, 255, 0.2),
+      transparent 64%
+    ),
+    radial-gradient(
+      460px 260px at 100% 18%,
+      rgba(255, 170, 96, 0.09),
+      transparent 62%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(13, 22, 43, 0.88) 0%,
+      rgba(7, 13, 27, 0.94) 44%,
+      rgba(4, 8, 18, 0.98) 100%
+    );
+  backdrop-filter: blur(22px) saturate(1.25);
+  -webkit-backdrop-filter: blur(22px) saturate(1.25);
+  box-shadow:
+    -52px 0 110px rgba(0, 0, 0, 0.56),
+    -12px 0 34px rgba(70, 108, 240, 0.2),
+    inset 1px 0 0 rgba(255, 255, 255, 0.08),
+    inset 52px 0 80px rgba(98, 137, 255, 0.045);
+  padding: 26px;
+  display: flex;
+  flex-direction: column;
+  animation: slideInRightPremium 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.slidePanel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -2px;
+  width: 3px;
+  height: 100%;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(167, 193, 255, 0.06) 0%,
+      rgba(118, 154, 255, 0.72) 24%,
+      rgba(255, 170, 96, 0.42) 52%,
+      rgba(118, 154, 255, 0.54) 76%,
+      rgba(167, 193, 255, 0.06) 100%
+    );
+  box-shadow:
+    0 0 18px rgba(118, 154, 255, 0.42),
+    0 0 42px rgba(118, 154, 255, 0.22);
+}
+
+.slidePanel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      120deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(255, 255, 255, 0.02) 34%,
+      transparent 54%
+    );
+  opacity: 0.5;
+}
+
+@keyframes slideInRightPremium {
+  from {
+    opacity: 0.4;
+    transform: translateX(104%) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.slideHeader,
+.slideMetaRow,
+.slideContent,
+.slideActions {
+  position: relative;
+  z-index: 1;
 }
 
 .slideHeader {
@@ -739,30 +828,61 @@
 
 .slideTitle {
   margin: 0;
-  font-size: 2rem;
-  line-height: 1.05;
-  letter-spacing: -0.04em;
+  font-size: 2.15rem;
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+  text-shadow: 0 12px 32px rgba(0, 0, 0, 0.34);
 }
 
 .slideSubtitle {
   margin: 8px 0 0;
   color: rgba(167, 193, 255, 0.96);
-  font-weight: 800;
+  font-weight: 900;
 }
 
 .closeButton {
   appearance: none;
-  border: 0;
-  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.09) 0%,
+      rgba(255, 255, 255, 0.04) 100%
+    );
   color: rgba(255, 255, 255, 0.78);
-  font-size: 2rem;
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
+  font-size: 1.6rem;
   line-height: 1;
   cursor: pointer;
-  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 10px 24px rgba(0, 0, 0, 0.18);
+  transition:
+    transform 0.18s ease,
+    color 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
 .closeButton:hover {
   color: #ffffff;
+  transform: translateY(-1px);
+  border-color: rgba(167, 193, 255, 0.3);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.14) 0%,
+      rgba(255, 255, 255, 0.07) 100%
+    );
+  box-shadow:
+    0 0 0 1px rgba(134, 174, 255, 0.12),
+    0 14px 30px rgba(0, 0, 0, 0.24);
 }
 
 .slideMetaRow {
@@ -775,11 +895,19 @@
 .sideMiniPill {
   padding: 8px 11px;
   border-radius: 999px;
-  color: rgba(255, 255, 255, 0.88);
+  color: rgba(255, 255, 255, 0.9);
   font-size: 0.82rem;
-  font-weight: 800;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.055);
+  font-weight: 900;
+  border: 1px solid rgba(167, 193, 255, 0.13);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.075) 0%,
+      rgba(255, 255, 255, 0.04) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 8px 18px rgba(0, 0, 0, 0.12);
 }
 
 .slideContent {
@@ -788,7 +916,84 @@
   display: grid;
   align-content: start;
   gap: 14px;
-  padding-right: 4px;
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(167, 193, 255, 0.45) rgba(255, 255, 255, 0.06);
+}
+
+.slideContent::-webkit-scrollbar {
+  width: 8px;
+}
+
+.slideContent::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.045);
+  border-radius: 999px;
+}
+
+.slideContent::-webkit-scrollbar-thumb {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(167, 193, 255, 0.58),
+      rgba(78, 118, 255, 0.3)
+    );
+  border-radius: 999px;
+}
+
+.slideContent .detailSection {
+  position: relative;
+  border-radius: 22px;
+  border: 1px solid rgba(167, 193, 255, 0.12);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.06) 0%,
+      rgba(255, 255, 255, 0.03) 100%
+    );
+  padding: 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 16px 34px rgba(0, 0, 0, 0.16);
+  overflow: hidden;
+}
+
+.slideContent .detailSection::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      360px 120px at 10% 0%,
+      rgba(118, 154, 255, 0.08),
+      transparent 64%
+    );
+}
+
+.slideContent .detailSection h3,
+.slideContent .detailGrid,
+.slideContent .detailParagraph,
+.slideContent .pillWrap {
+  position: relative;
+  z-index: 1;
+}
+
+.slideContent .infoBlock {
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.slideContent .infoBlock:hover {
+  transform: translateY(-1px);
+  border-color: rgba(167, 193, 255, 0.18);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(12, 20, 42, 0.54) 0%,
+      rgba(5, 10, 24, 0.34) 100%
+    );
 }
 
 .slideActions {
@@ -802,6 +1007,21 @@
 .slideActions .ghostButton,
 .slideActions .primarySmallButton {
   flex: 1;
+  min-height: 48px;
+}
+
+.slideActions .primarySmallButton {
+  box-shadow:
+    0 0 0 1px rgba(134, 174, 255, 0.12),
+    0 14px 32px rgba(70, 108, 240, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.slideActions .primarySmallButton:hover {
+  box-shadow:
+    0 0 0 1px rgba(134, 174, 255, 0.2),
+    0 18px 40px rgba(70, 108, 240, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
 }
 
 @media (max-width: 1180px) {
