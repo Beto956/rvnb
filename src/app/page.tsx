@@ -13,7 +13,6 @@ export default function Home() {
       <header className={styles.header}>
         <div className={styles.headerInner}>
           <Link href="/" className={styles.brand} aria-label="RVNB Home">
-            {/* ✅ LOGO ICON (image scales, container stays stable) */}
             <img
               src="/rvnb-logo-icon.png"
               alt="RVNB"
@@ -56,20 +55,21 @@ export default function Home() {
       >
         <div className={styles.heroBg} aria-hidden="true" />
         <div className={styles.heroOverlay} aria-hidden="true" />
-        {/* Optional grain */}
-        {/* <div className={styles.heroGrain} aria-hidden="true" /> */}
 
         <div className={styles.heroInner}>
-          <p className={styles.heroKicker}>
+          <p className={styles.heroBadge}>
             Nationwide RV stays • Built for real RV life
           </p>
 
-          <h1 className={styles.title}>RVNB</h1>
+          <h1 className={styles.title}>
+            More Than Parking.
+            <span className={styles.titleHighlight}>It’s a Lifestyle.</span>
+          </h1>
 
           <p className={styles.subtitle}>
-            Freedom doesn’t need a hotel key. Find safe, host-backed RV spots
-            across the country — or request exactly what you need and let the
-            RVNB ecosystem help connect the road.
+            Find safe, host-backed RV spots across the country — or request
+            exactly what you need and let the RVNB ecosystem help connect the
+            road.
           </p>
 
           <div className={styles.ctaRow}>
@@ -87,25 +87,22 @@ export default function Home() {
           </div>
 
           <p className={styles.heroNote}>
-            Search available spots, request custom stays, and connect with the
-            RV services built around the journey.
+            Search available spots, request custom stays, and connect with RV
+            services built around the journey.
           </p>
         </div>
       </section>
 
-      {/* 2–5) SUNLIGHT BAND (now includes Quick Search + Ecosystem Nav at the top) */}
+      {/* 2–5) SUNLIGHT BAND */}
       <div className={styles.sunWrap} role="region" aria-label="Sunlight band">
-        {/* ✅ QUICK SEARCH */}
         <section className={styles.quickSearchSection} aria-label="Quick search">
           <div className={styles.quickSearchBubble}>
             <HomeQuickSearchBar />
           </div>
         </section>
 
-        {/* ✅ RVNB ECOSYSTEM NAV */}
         <EcosystemNav active="home" />
 
-        {/* 3) FEATURED LISTINGS PREVIEW */}
         <section className={styles.section} aria-label="Featured listings">
           <div className={styles.container}>
             <div className={styles.sectionHeader}>
@@ -126,7 +123,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* 4) ECOSYSTEM EXPANSION */}
         <section className={styles.section} aria-label="Ecosystem expansion">
           <div className={styles.container}>
             <div className={styles.sectionHeader}>
@@ -166,7 +162,7 @@ export default function Home() {
               <Link
                 href="/transport"
                 className={styles.cardLink}
-                aria-label="Transport Network (Coming Soon)"
+                aria-label="Transport Network"
               >
                 <div className={styles.card}>
                   <div className={styles.cardTop}>
@@ -174,11 +170,11 @@ export default function Home() {
                     <span className={styles.badge}>Coming Soon</span>
                   </div>
                   <p className={styles.cardBody}>
-                    Hotshot driver listings + booking lanes for moving rigs,
-                    trailers, and RVs safely between locations.
+                    Move RVs, trailers, and rigs with trusted drivers and
+                    route-based logistics.
                   </p>
                   <span className={styles.cardMuted}>
-                    Future: driver accounts, dispatch, tracking
+                    Driver relocation • Route scheduling • Verified partners
                   </span>
                 </div>
               </Link>
@@ -186,7 +182,7 @@ export default function Home() {
               <Link
                 href="/insurance"
                 className={styles.cardLink}
-                aria-label="Insurance Directory (Coming Soon)"
+                aria-label="Insurance Directory"
               >
                 <div className={styles.card}>
                   <div className={styles.cardTop}>
@@ -194,11 +190,11 @@ export default function Home() {
                     <span className={styles.badge}>Coming Soon</span>
                   </div>
                   <p className={styles.cardBody}>
-                    Compare RV insurance options, specialized coverage, and
-                    trusted providers built for RV life.
+                    Compare RV insurance options, coverage types, and trusted
+                    providers built for RV life.
                   </p>
                   <span className={styles.cardMuted}>
-                    Future: affiliate lanes, verified partners
+                    Plan comparisons • Coverage guidance • Verified providers
                   </span>
                 </div>
               </Link>
@@ -206,7 +202,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* 5) HOW IT WORKS */}
         <section className={styles.section} aria-label="How it works">
           <div className={styles.container}>
             <div className={styles.sectionHeader}>
@@ -251,7 +246,6 @@ export default function Home() {
         </section>
       </div>
 
-      {/* 6) COMMUNITY STRIP */}
       <section className={styles.strip} aria-label="Community positioning">
         <div className={styles.container}>
           <div className={styles.stripInner}>
@@ -283,7 +277,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 7) FOOTER */}
       <footer className={styles.footer}>
         <div className={styles.container}>
           <div className={styles.footerTop}>
@@ -292,7 +285,9 @@ export default function Home() {
               <div className={styles.footerBrandSub}>
                 Recreational Vehicle Nationwide Booking
               </div>
-              <div className={styles.footerMeta}>Built with Next.js + Firebase</div>
+              <div className={styles.footerMeta}>
+                Built with Next.js + Firebase
+              </div>
             </div>
           </div>
 
