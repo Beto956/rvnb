@@ -4,6 +4,7 @@ import styles from "./page.module.css";
 import HomeQuickSearchBar from "./components/homequicksearchbar";
 import FeaturedListingsPreview from "./components/featuredlistingspreview";
 import AuthNav from "./components/authnav";
+import EcosystemNav from "./components/ecosystemnav";
 
 export default function Home() {
   return (
@@ -23,6 +24,18 @@ export default function Home() {
           </Link>
 
           <nav className={styles.nav} aria-label="Primary">
+            <Link className={styles.navLink} href="/listings">
+              Listings
+            </Link>
+
+            <Link className={styles.navLink} href="/request-spot">
+              Request Spot
+            </Link>
+
+            <Link className={styles.navLink} href="/requests">
+              Open Requests
+            </Link>
+
             <AuthNav
               navLinkClassName={styles.navLink}
               navCtaClassName={styles.navCta}
@@ -54,8 +67,9 @@ export default function Home() {
           <h1 className={styles.title}>RVNB</h1>
 
           <p className={styles.subtitle}>
-            Freedom doesn’t need a hotel key. Find safe, host-backed RV spots across
-            the country — and build the community that powers the road.
+            Freedom doesn’t need a hotel key. Find safe, host-backed RV spots
+            across the country — or request exactly what you need and let the
+            RVNB ecosystem help connect the road.
           </p>
 
           <div className={styles.ctaRow}>
@@ -63,29 +77,33 @@ export default function Home() {
               Find RV Spots
             </Link>
 
-            <Link href="/host" className={styles.secondaryCta}>
-              List Your Spot
+            <Link href="/request-spot" className={styles.secondaryCta}>
+              Request a Spot
             </Link>
 
-            <Link href="/listings" className={styles.tertiaryCta}>
-              Browse Listings
+            <Link href="/host" className={styles.tertiaryCta}>
+              List Your Spot
             </Link>
           </div>
 
           <p className={styles.heroNote}>
-            Clean booking experience today. Ecosystem-ready platform tomorrow.
+            Search available spots, request custom stays, and connect with the
+            RV services built around the journey.
           </p>
         </div>
       </section>
 
-      {/* 2–5) SUNLIGHT BAND (now includes Quick Search at the very top of block 2) */}
+      {/* 2–5) SUNLIGHT BAND (now includes Quick Search + Ecosystem Nav at the top) */}
       <div className={styles.sunWrap} role="region" aria-label="Sunlight band">
-        {/* ✅ QUICK SEARCH (Block 2 top, bubble wrapper added) */}
+        {/* ✅ QUICK SEARCH */}
         <section className={styles.quickSearchSection} aria-label="Quick search">
           <div className={styles.quickSearchBubble}>
             <HomeQuickSearchBar />
           </div>
         </section>
+
+        {/* ✅ RVNB ECOSYSTEM NAV */}
+        <EcosystemNav active="home" />
 
         {/* 3) FEATURED LISTINGS PREVIEW */}
         <section className={styles.section} aria-label="Featured listings">
@@ -94,7 +112,8 @@ export default function Home() {
               <div>
                 <h2 className={styles.sectionTitle}>Featured Spots</h2>
                 <p className={styles.sectionSub}>
-                  A few places to start — filtered results and maps come next.
+                  A few places to start — or request a custom RV spot if nothing
+                  matches your trip yet.
                 </p>
               </div>
 
@@ -112,14 +131,38 @@ export default function Home() {
           <div className={styles.container}>
             <div className={styles.sectionHeader}>
               <div>
-                <h2 className={styles.sectionTitle}>Built to Become an Ecosystem</h2>
+                <h2 className={styles.sectionTitle}>
+                  Built to Become an Ecosystem
+                </h2>
                 <p className={styles.sectionSub}>
-                  RVNB is positioned to support the entire RV lifestyle — not just parking.
+                  RVNB is positioned to support the entire RV lifestyle — not
+                  just parking.
                 </p>
               </div>
             </div>
 
             <div className={styles.cardGrid}>
+              <Link
+                href="/request-spot"
+                className={styles.cardLink}
+                aria-label="Request a custom RV spot"
+              >
+                <div className={styles.card}>
+                  <div className={styles.cardTop}>
+                    <h3 className={styles.cardTitle}>📍 Request a Spot</h3>
+                    <span className={styles.badge}>Live</span>
+                  </div>
+                  <p className={styles.cardBody}>
+                    Need a specific location, longer stay, work housing, or
+                    multiple RV spots? Post what you need and create demand
+                    hosts can respond to.
+                  </p>
+                  <span className={styles.cardMuted}>
+                    Built for travelers, workers, and team housing
+                  </span>
+                </div>
+              </Link>
+
               <Link
                 href="/transport"
                 className={styles.cardLink}
@@ -131,8 +174,8 @@ export default function Home() {
                     <span className={styles.badge}>Coming Soon</span>
                   </div>
                   <p className={styles.cardBody}>
-                    Hotshot driver listings + booking lanes for moving rigs, trailers, and RVs
-                    safely between locations.
+                    Hotshot driver listings + booking lanes for moving rigs,
+                    trailers, and RVs safely between locations.
                   </p>
                   <span className={styles.cardMuted}>
                     Future: driver accounts, dispatch, tracking
@@ -151,31 +194,11 @@ export default function Home() {
                     <span className={styles.badge}>Coming Soon</span>
                   </div>
                   <p className={styles.cardBody}>
-                    Compare RV insurance options, specialized coverage, and trusted providers
-                    built for RV life.
+                    Compare RV insurance options, specialized coverage, and
+                    trusted providers built for RV life.
                   </p>
                   <span className={styles.cardMuted}>
                     Future: affiliate lanes, verified partners
-                  </span>
-                </div>
-              </Link>
-
-              <Link
-                href="/community"
-                className={styles.cardLink}
-                aria-label="Community Discussions (Coming Soon)"
-              >
-                <div className={styles.card}>
-                  <div className={styles.cardTop}>
-                    <h3 className={styles.cardTitle}>💬 Community Discussions</h3>
-                    <span className={styles.badge}>Coming Soon</span>
-                  </div>
-                  <p className={styles.cardBody}>
-                    Spot reviews, safety tips, region threads, and host-to-traveler support —
-                    built into the platform.
-                  </p>
-                  <span className={styles.cardMuted}>
-                    Future: moderation, profiles, reputation
                   </span>
                 </div>
               </Link>
@@ -190,7 +213,8 @@ export default function Home() {
               <div>
                 <h2 className={styles.sectionTitle}>How It Works</h2>
                 <p className={styles.sectionSub}>
-                  Simple, familiar, and built for trust at scale.
+                  Simple, familiar, and built for both direct bookings and
+                  request-based RV stays.
                 </p>
               </div>
             </div>
@@ -198,17 +222,19 @@ export default function Home() {
             <div className={styles.stepsGrid}>
               <div className={styles.step}>
                 <div className={styles.stepNum}>1</div>
-                <h3 className={styles.stepTitle}>Find a Spot</h3>
+                <h3 className={styles.stepTitle}>Search or Request</h3>
                 <p className={styles.stepBody}>
-                  Search by state, hookups, price range, and rig size.
+                  Browse available spots, search by location, or submit a custom
+                  request when your trip needs something specific.
                 </p>
               </div>
 
               <div className={styles.step}>
                 <div className={styles.stepNum}>2</div>
-                <h3 className={styles.stepTitle}>Book Securely</h3>
+                <h3 className={styles.stepTitle}>Connect with Hosts</h3>
                 <p className={styles.stepBody}>
-                  Book with confidence through a clean flow designed for hosts and travelers.
+                  Travelers find available stays, while hosts can view open
+                  requests and discover real demand in their area.
                 </p>
               </div>
 
@@ -216,7 +242,8 @@ export default function Home() {
                 <div className={styles.stepNum}>3</div>
                 <h3 className={styles.stepTitle}>Park &amp; Enjoy</h3>
                 <p className={styles.stepBody}>
-                  Arrive, park, and live the RV life.
+                  Arrive, park, and live the RV life with a platform designed to
+                  grow around the full journey.
                 </p>
               </div>
             </div>
@@ -233,18 +260,23 @@ export default function Home() {
                 Built for Hosts. Built for Travelers. Built for Growth.
               </h2>
               <p className={styles.stripBody}>
-                RVNB is designed to expand into transport, insurance, community, reviews, and
-                maps — without rebuilding the foundation.
+                RVNB is designed to expand into requests, transport, insurance,
+                community, reviews, and maps — without rebuilding the
+                foundation.
               </p>
             </div>
 
             <div className={styles.stripCtas}>
-              <Link href="/host" className={styles.stripBtnPrimary}>
-                Become a Host
+              <Link href="/request-spot" className={styles.stripBtnPrimary}>
+                Request a Spot
               </Link>
 
-              <Link href="/search" className={styles.stripBtnSecondary}>
-                Start Searching
+              <Link href="/requests" className={styles.stripBtnSecondary}>
+                Browse Open Requests
+              </Link>
+
+              <Link href="/host" className={styles.stripBtnSecondary}>
+                Become a Host
               </Link>
             </div>
           </div>
