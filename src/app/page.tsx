@@ -27,10 +27,6 @@ export default function Home() {
               Listings
             </Link>
 
-            <Link className={styles.navLink} href="/request-spot">
-              Request Spot
-            </Link>
-
             <Link className={styles.navLink} href="/requests">
               Open Requests
             </Link>
@@ -109,8 +105,8 @@ export default function Home() {
               <div>
                 <h2 className={styles.sectionTitle}>Featured Spots</h2>
                 <p className={styles.sectionSub}>
-                  A few places to start — or request a custom RV spot if nothing
-                  matches your trip yet.
+                  A few places to start — or browse open traveler demand if you
+                  are a host looking for opportunities.
                 </p>
               </div>
 
@@ -138,16 +134,15 @@ export default function Home() {
             </div>
 
             <div className={styles.cardGrid}>
-              <Link href="/request-spot" className={styles.cardLink}>
+              <Link href="/requests" className={styles.cardLink}>
                 <div className={`${styles.card} ${styles.serviceCardLive}`}>
                   <div className={styles.cardTop}>
-                    <h3 className={styles.cardTitle}>📍 Request a Spot</h3>
+                    <h3 className={styles.cardTitle}>📍 Open RV Demand</h3>
                     <span className={styles.badge}>Live</span>
                   </div>
                   <p className={styles.cardBody}>
-                    Need a specific location, longer stay, work housing, or
-                    multiple RV spots? Post what you need and create demand
-                    hosts can respond to.
+                    Hosts can view real traveler needs, work stays, team housing
+                    demand, and location-based RV opportunities.
                   </p>
                   <span className={styles.cardMuted}>
                     Travelers • Workers • Team housing
@@ -197,7 +192,7 @@ export default function Home() {
                 <h2 className={styles.sectionTitle}>How It Works</h2>
                 <p className={styles.sectionSub}>
                   Simple, familiar, and built for both direct bookings and
-                  request-based RV stays.
+                  demand-based RV stays.
                 </p>
               </div>
             </div>
@@ -205,10 +200,10 @@ export default function Home() {
             <div className={styles.stepsGrid}>
               <div className={styles.step}>
                 <div className={styles.stepNum}>1</div>
-                <h3 className={styles.stepTitle}>Search or Request</h3>
+                <h3 className={styles.stepTitle}>Search the Platform</h3>
                 <p className={styles.stepBody}>
-                  Browse available spots, search by location, or submit a custom
-                  request when your trip needs something specific.
+                  Browse available spots, search by location, and explore the
+                  RVNB ecosystem from one connected homepage.
                 </p>
               </div>
 
@@ -217,7 +212,7 @@ export default function Home() {
                 <h3 className={styles.stepTitle}>Connect with Hosts</h3>
                 <p className={styles.stepBody}>
                   Travelers find available stays, while hosts can view open
-                  requests and discover real demand in their area.
+                  demand and discover real opportunities in their area.
                 </p>
               </div>
 
@@ -242,18 +237,14 @@ export default function Home() {
                 Built for Hosts. Built for Travelers. Built for Growth.
               </h2>
               <p className={styles.stripBody}>
-                RVNB is designed to expand into requests, transport, insurance,
-                community, reviews, and maps — without rebuilding the
-                foundation.
+                RVNB is designed to expand into listings, open demand,
+                transport, insurance, community, reviews, and maps — without
+                rebuilding the foundation.
               </p>
             </div>
 
             <div className={styles.stripCtas}>
-              <Link href="/request-spot" className={styles.stripBtnPrimary}>
-                Request a Spot
-              </Link>
-
-              <Link href="/requests" className={styles.stripBtnSecondary}>
+              <Link href="/requests" className={styles.stripBtnPrimary}>
                 Browse Open Requests
               </Link>
 
@@ -274,7 +265,9 @@ export default function Home() {
               <div className={styles.footerBrandSub}>
                 Recreational Vehicle Nationwide Booking
               </div>
-              <div className={styles.footerMeta}>Built with Next.js + Firebase</div>
+              <div className={styles.footerMeta}>
+                Built with Next.js + Firebase
+              </div>
             </div>
           </div>
 
