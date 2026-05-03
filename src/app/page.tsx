@@ -138,12 +138,8 @@ export default function Home() {
             </div>
 
             <div className={styles.cardGrid}>
-              <Link
-                href="/request-spot"
-                className={styles.cardLink}
-                aria-label="Request a custom RV spot"
-              >
-                <div className={styles.card}>
+              <Link href="/request-spot" className={styles.cardLink}>
+                <div className={`${styles.card} ${styles.serviceCardLive}`}>
                   <div className={styles.cardTop}>
                     <h3 className={styles.cardTitle}>📍 Request a Spot</h3>
                     <span className={styles.badge}>Live</span>
@@ -154,17 +150,13 @@ export default function Home() {
                     hosts can respond to.
                   </p>
                   <span className={styles.cardMuted}>
-                    Built for travelers, workers, and team housing
+                    Travelers • Workers • Team housing
                   </span>
                 </div>
               </Link>
 
-              <Link
-                href="/transport"
-                className={styles.cardLink}
-                aria-label="Transport Network"
-              >
-                <div className={styles.card}>
+              <Link href="/transport" className={styles.cardLink}>
+                <div className={`${styles.card} ${styles.serviceCardBlue}`}>
                   <div className={styles.cardTop}>
                     <h3 className={styles.cardTitle}>🚛 Transport Network</h3>
                     <span className={styles.badge}>Coming Soon</span>
@@ -179,12 +171,8 @@ export default function Home() {
                 </div>
               </Link>
 
-              <Link
-                href="/insurance"
-                className={styles.cardLink}
-                aria-label="Insurance Directory"
-              >
-                <div className={styles.card}>
+              <Link href="/insurance" className={styles.cardLink}>
+                <div className={`${styles.card} ${styles.serviceCardGold}`}>
                   <div className={styles.cardTop}>
                     <h3 className={styles.cardTitle}>🛡 Insurance Directory</h3>
                     <span className={styles.badge}>Coming Soon</span>
@@ -277,6 +265,7 @@ export default function Home() {
         </div>
       </section>
 
+      {/* 7) FOOTER */}
       <footer className={styles.footer}>
         <div className={styles.container}>
           <div className={styles.footerTop}>
@@ -285,9 +274,7 @@ export default function Home() {
               <div className={styles.footerBrandSub}>
                 Recreational Vehicle Nationwide Booking
               </div>
-              <div className={styles.footerMeta}>
-                Built with Next.js + Firebase
-              </div>
+              <div className={styles.footerMeta}>Built with Next.js + Firebase</div>
             </div>
           </div>
 

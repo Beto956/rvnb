@@ -24,18 +24,15 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* ✅ UPDATED: wider header row so logo sits closer left on full width
-   ✅ Locks header height so it never stretches
-*/
 .headerInner {
-  max-width: 1400px; /* was 1100px */
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 8px 18px; /* was 8px 4px */
+  padding: 8px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 64px; /* ✅ prevents stretch */
+  min-height: 64px;
 }
 
 /* Brand */
@@ -46,7 +43,6 @@
   align-items: center;
   gap: 12px;
   line-height: 1.1;
-
   height: 48px;
   width: 138px;
 }
@@ -109,17 +105,14 @@
   border-color: rgba(255, 255, 255, 0.22);
 }
 
-/* HERO (✅ shortened height so Block 1 isn't too long) */
+/* HERO */
 .hero {
   position: relative;
   overflow: hidden;
-
-  /* ✅ shorter hero */
-  padding: 56px 0 26px;
-  min-height: 420px;
+  padding: 74px 0 46px;
+  min-height: 500px;
 }
 
-/* cinematic overlays */
 .hero::before {
   content: "";
   position: absolute;
@@ -157,11 +150,16 @@
   z-index: 0;
   pointer-events: none;
   background: radial-gradient(
-      130% 90% at 50% 40%,
-      rgba(0, 0, 0, 0.00),
-      rgba(0, 0, 0, 0.40)
+      80% 65% at 50% 35%,
+      rgba(15, 23, 42, 0.14),
+      rgba(15, 23, 42, 0.58)
     ),
-    linear-gradient(to bottom, rgba(15, 23, 42, 0.22), rgba(15, 23, 42, 0.88));
+    linear-gradient(
+      to bottom,
+      rgba(15, 23, 42, 0.18),
+      rgba(15, 23, 42, 0.72),
+      rgba(15, 23, 42, 0.92)
+    );
   opacity: 1;
 }
 
@@ -173,8 +171,8 @@
   background-position: center;
   background-repeat: no-repeat;
   background-color: transparent;
-  filter: saturate(1.02) contrast(1.03);
-  transform: scale(1.12);
+  filter: saturate(1.08) contrast(1.08);
+  transform: scale(1.1);
   opacity: 1;
 }
 
@@ -184,6 +182,11 @@
   z-index: 0;
   pointer-events: none;
   background: radial-gradient(
+      680px 260px at 50% 28%,
+      rgba(59, 130, 246, 0.16),
+      transparent 66%
+    ),
+    radial-gradient(
       900px 500px at 20% 15%,
       rgba(56, 189, 248, 0.12),
       transparent 60%
@@ -193,16 +196,11 @@
       rgba(168, 85, 247, 0.14),
       transparent 62%
     ),
-    radial-gradient(
-      900px 680px at 50% 85%,
-      rgba(34, 197, 94, 0.09),
-      transparent 62%
-    ),
     linear-gradient(
       to bottom,
-      rgba(15, 23, 42, 0.18),
-      rgba(15, 23, 42, 0.60),
-      rgba(15, 23, 42, 0.90)
+      rgba(15, 23, 42, 0.12),
+      rgba(15, 23, 42, 0.50),
+      rgba(15, 23, 42, 0.92)
     );
   opacity: 1;
 }
@@ -234,7 +232,7 @@
 .heroInner {
   position: relative;
   z-index: 1;
-  max-width: 900px;
+  max-width: 1040px;
   margin: 0 auto;
   padding: 0 18px;
   text-align: center;
@@ -247,19 +245,54 @@
   letter-spacing: 0.2px;
 }
 
+.heroBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 16px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  background: rgba(15, 23, 42, 0.58);
+  border: 1px solid rgba(147, 180, 255, 0.22);
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
 .title {
-  font-size: 3.2rem;
-  margin: 0 0 10px;
-  letter-spacing: 1px;
-  text-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
+  font-size: clamp(3.2rem, 7vw, 5.6rem);
+  margin: 0 0 18px;
+  line-height: 0.95;
+  letter-spacing: -0.06em;
+  font-weight: 950;
+  text-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.52),
+    0 0 30px rgba(255, 255, 255, 0.08);
+}
+
+.titleHighlight {
+  display: block;
+  margin-top: 8px;
+  color: #8fb3ff;
+  text-shadow:
+    0 0 18px rgba(96, 165, 250, 0.42),
+    0 0 42px rgba(59, 130, 246, 0.26),
+    0 16px 42px rgba(0, 0, 0, 0.48);
 }
 
 .subtitle {
-  font-size: 1.18rem;
+  font-size: 1.12rem;
   margin: 0 auto 26px;
-  opacity: 0.86;
+  opacity: 0.92;
   line-height: 1.55;
-  max-width: 780px;
+  max-width: 760px;
   text-shadow: 0 8px 20px rgba(0, 0, 0, 0.30);
 }
 
@@ -270,80 +303,88 @@
   flex-wrap: wrap;
 }
 
-.primaryCta {
+.primaryCta,
+.secondaryCta,
+.tertiaryCta {
   text-decoration: none;
   display: inline-block;
+  min-width: 150px;
+  text-align: center;
   padding: 12px 22px;
   font-size: 1rem;
   border-radius: 12px;
-  background: white;
-  color: #0f172a;
   font-weight: 800;
   transition: transform 160ms ease, box-shadow 180ms ease, filter 180ms ease,
-    border-color 180ms ease;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+    border-color 180ms ease, background 180ms ease, outline-color 180ms ease;
   will-change: transform;
+}
+
+.primaryCta {
+  background: white;
+  color: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
 .primaryCta:hover {
   transform: translateY(-2px);
-  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.32);
+  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.34);
   filter: brightness(1.02);
   border-color: rgba(255, 255, 255, 0.26);
 }
 
 .secondaryCta {
-  text-decoration: none;
-  display: inline-block;
-  padding: 12px 22px;
-  font-size: 1rem;
-  border-radius: 12px;
-  background: transparent;
+  background: linear-gradient(
+    180deg,
+    rgba(59, 130, 246, 0.96),
+    rgba(37, 99, 235, 0.84)
+  );
   color: white;
-  outline: 1px solid rgba(255, 255, 255, 0.35);
-  font-weight: 700;
-  transition: transform 160ms ease, background 160ms ease, box-shadow 180ms ease,
-    outline-color 180ms ease;
-  will-change: transform;
+  outline: 1px solid rgba(147, 180, 255, 0.55);
+  box-shadow:
+    0 16px 38px rgba(37, 99, 235, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
 .secondaryCta:hover {
   transform: translateY(-2px);
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.26);
-  outline-color: rgba(255, 255, 255, 0.46);
+  background: linear-gradient(
+    180deg,
+    rgba(96, 165, 250, 1),
+    rgba(37, 99, 235, 0.92)
+  );
+  box-shadow:
+    0 20px 46px rgba(37, 99, 235, 0.42),
+    0 16px 34px rgba(0, 0, 0, 0.32);
+  outline-color: rgba(147, 180, 255, 0.70);
 }
 
 .tertiaryCta {
-  text-decoration: none;
-  display: inline-block;
-  padding: 12px 22px;
-  font-size: 1rem;
-  border-radius: 12px;
   background: rgba(255, 255, 255, 0.08);
   color: white;
-  outline: 1px solid rgba(255, 255, 255, 0.14);
-  font-weight: 700;
-  transition: transform 160ms ease, background 160ms ease, box-shadow 180ms ease,
-    outline-color 180ms ease;
-  will-change: transform;
+  outline: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.20),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .tertiaryCta:hover {
   transform: translateY(-2px);
-  background: rgba(255, 255, 255, 0.10);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24);
-  outline-color: rgba(255, 255, 255, 0.20);
+  background: rgba(255, 255, 255, 0.11);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.28);
+  outline-color: rgba(255, 255, 255, 0.28);
 }
 
 .heroNote {
   margin: 18px 0 0;
-  opacity: 0.75;
+  opacity: 0.78;
   font-size: 0.95rem;
   text-shadow: 0 6px 16px rgba(0, 0, 0, 0.26);
 }
 
-/* ✅ QUICK SEARCH (now starts cleanly after hero; no overlap) */
+/* ✅ QUICK SEARCH */
 .quickSearchSection {
   width: 100%;
   display: flex;
@@ -354,35 +395,24 @@
   z-index: 6;
 }
 
-/* ✅ REQUIRED: page.tsx uses styles.quickSearchBubble
-   ✅ UPDATED: bubble is the premium glass container (always visible)
-   ✅ FIXED: stronger contrast so the box doesn't disappear into sunlight band
-*/
 .quickSearchBubble {
   width: 100%;
   max-width: 980px;
   margin: 0 auto;
   border-radius: 18px;
   padding: 18px;
-
-  /* ✅ stronger background */
   background: linear-gradient(
     to bottom,
     rgba(15, 23, 42, 0.82),
     rgba(15, 23, 42, 0.64)
   );
-
   border: 1px solid rgba(255, 255, 255, 0.18);
-
-  /* ✅ deeper shadow + subtle inner highlight */
   box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42),
     inset 0 1px 0 rgba(255, 255, 255, 0.10);
-
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
 
-/* premium divider line */
 .quickSearchBubble::before {
   content: "";
   display: block;
@@ -396,7 +426,6 @@
   );
 }
 
-/* If HomeQuickSearchBar renders a qsCard, we keep it clean (no double card look) */
 .quickSearchBubble .qsCard {
   background: transparent;
   border: none;
@@ -407,7 +436,6 @@
   max-width: 100%;
 }
 
-/* FAILSAFE: even plain HTML inside gets premium input/button styling */
 .quickSearchBubble input,
 .quickSearchBubble select {
   width: 100%;
@@ -453,7 +481,6 @@
 
 /* =========================================================
    ✅ HomeQuickSearchBar styles (qs* classes)
-   (kept for your component’s structure)
    ========================================================= */
 
 .qsHeader {
@@ -734,21 +761,79 @@
 }
 
 .card {
+  position: relative;
+  overflow: hidden;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(15, 23, 42, 0.46);
+  border: 1px solid rgba(255, 255, 255, 0.13);
   padding: 16px;
   transition: transform 160ms ease, background 160ms ease, border-color 160ms ease,
     box-shadow 180ms ease;
   height: 100%;
   will-change: transform;
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.8;
+  background: radial-gradient(
+    420px 180px at 20% 0%,
+    rgba(255, 255, 255, 0.08),
+    transparent 62%
+  );
+}
+
+.card > * {
+  position: relative;
+  z-index: 1;
 }
 
 .card:hover {
-  transform: translateY(-3px);
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.16);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.26);
+  transform: translateY(-5px);
+  background: rgba(15, 23, 42, 0.56);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.serviceCardLive {
+  border-color: rgba(34, 197, 94, 0.24);
+  background:
+    radial-gradient(
+      420px 220px at 15% 0%,
+      rgba(34, 197, 94, 0.12),
+      transparent 62%
+    ),
+    rgba(15, 23, 42, 0.5);
+}
+
+.serviceCardBlue {
+  border-color: rgba(59, 130, 246, 0.34);
+  background:
+    radial-gradient(
+      420px 220px at 15% 0%,
+      rgba(59, 130, 246, 0.18),
+      transparent 62%
+    ),
+    rgba(15, 23, 42, 0.5);
+}
+
+.serviceCardGold {
+  border-color: rgba(245, 158, 11, 0.34);
+  background:
+    radial-gradient(
+      420px 220px at 15% 0%,
+      rgba(245, 158, 11, 0.16),
+      transparent 62%
+    ),
+    rgba(15, 23, 42, 0.5);
 }
 
 .cardTop {
@@ -760,14 +845,16 @@
 
 .cardTitle {
   margin: 0;
-  font-size: 1.08rem;
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
 }
 
 .badge {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
+  font-weight: 850;
   padding: 5px 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.09);
   border: 1px solid rgba(255, 255, 255, 0.12);
   opacity: 0.95;
   white-space: nowrap;
@@ -775,13 +862,16 @@
 
 .cardBody {
   margin: 10px 0 10px;
-  opacity: 0.82;
+  opacity: 0.9;
   line-height: 1.48;
 }
 
 .cardMuted {
-  opacity: 0.65;
+  display: block;
+  margin-top: 12px;
+  opacity: 0.76;
   font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 /* How it works */
@@ -987,7 +1077,24 @@
     width: 124px;
   }
 
-  /* ✅ quick search no overlap on mobile too */
+  .title {
+    font-size: clamp(2.55rem, 14vw, 3.35rem);
+    line-height: 1;
+  }
+
+  .titleHighlight {
+    margin-top: 6px;
+  }
+
+  .heroBadge {
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+  }
+
+  .subtitle {
+    font-size: 1rem;
+  }
+
   .quickSearchSection {
     margin-top: 0;
     padding: 16px 14px 0;
