@@ -150,11 +150,11 @@ export default function Home() {
                 </div>
               </Link>
 
-              <Link href="/transport" className={styles.cardLink}>
+              <Link href="/transport-network" className={styles.ecosystemCard}>
                 <div className={`${styles.card} ${styles.serviceCardBlue}`}>
                   <div className={styles.cardTop}>
                     <h3 className={styles.cardTitle}>🚛 Transport Network</h3>
-                    <span className={styles.badge}>Coming Soon</span>
+                    <span className={styles.badge}>Live</span>
                   </div>
                   <p className={styles.cardBody}>
                     Move RVs, trailers, and rigs with trusted drivers and
