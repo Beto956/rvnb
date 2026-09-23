@@ -1,0 +1,885 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc(userId) {
+      return get(/databases/$(database)/documents/users/$(userId));
+    }
+
+    function isHost() {
+      return signedIn()
+        && userDoc(request.auth.uid).data.role == 'host';
+    }
+
+    function listingExists(listingId) {
+      return exists(/databases/$(database)/documents/listings/$(listingId));
+    }
+
+    function listingHost(listingId) {
+      return get(/databases/$(database)/documents/listings/$(listingId)).data.hostId;
+    }
+
+    function ownsListing(listingId) {
+      return signedIn() && listingExists(listingId) && listingHost(listingId) == request.auth.uid;
+    }
+
+    function bookingListingIsValid(data) {
+      return data.listingId is string
+        && data.listingId.size() > 0
+        && listingExists(data.listingId)
+        && data.hostId is string
+        && data.hostId.size() > 0
+        && data.hostId == listingHost(data.listingId);
+    }
+
+    function bookingGuest(data) {
+      return data.guestId is string && data.guestId.size() > 0;
+    }
+
+    function legacyGuestMatches(data, guestId) {
+      return (data.userId is string && data.userId == guestId)
+        || (data.renterId is string && data.renterId == guestId)
+        || (data.travelerId is string && data.travelerId == guestId)
+        || (data.uid is string && data.uid == guestId);
+    }
+
+    function bookingStatus(data) {
+      return data.status is string;
+    }
+
+    // ---- Review eligibility (reviews/{reviewId}) ----
+    // Checkout is stored as a plain 'YYYY-MM-DD' string; appending a UTC time makes it a
+    // valid RFC3339 value that timestamp.value() can safely parse and compare to request.time.
+    function bookingIsEligibleForReview(booking) {
+      return booking.status in ['approved', 'confirmed', 'completed']
+        && booking.checkOut is string
+        && timestamp.value(booking.checkOut + 'T00:00:00Z') <= request.time;
+    }
+
+    function reviewDirectionMatches(booking, reviewerId, revieweeId, direction) {
+      return (direction == 'traveler_to_host'
+          && booking.guestId == reviewerId
+          && booking.hostId == revieweeId)
+        || (direction == 'host_to_traveler'
+          && booking.hostId == reviewerId
+          && booking.guestId == revieweeId);
+    }
+
+    function validCategoryRatingValue(v) {
+      return v is int && v >= 1 && v <= 5;
+    }
+
+    function safeCategoryRatingsForDirection(data) {
+      return (data.direction == 'traveler_to_host'
+          && data.categoryRatings.keys().hasOnly(['accuracy', 'communication', 'location', 'overall'])
+          && validCategoryRatingValue(data.categoryRatings.accuracy)
+          && validCategoryRatingValue(data.categoryRatings.communication)
+          && validCategoryRatingValue(data.categoryRatings.location)
+          && validCategoryRatingValue(data.categoryRatings.overall))
+        || (data.direction == 'host_to_traveler'
+          && data.categoryRatings.keys().hasOnly(['communication', 'respect', 'cleanliness', 'overall'])
+          && validCategoryRatingValue(data.categoryRatings.communication)
+          && validCategoryRatingValue(data.categoryRatings.respect)
+          && validCategoryRatingValue(data.categoryRatings.cleanliness)
+          && validCategoryRatingValue(data.categoryRatings.overall));
+    }
+
+    function safeReview(data) {
+      return data.keys().hasOnly([
+          'bookingId', 'listingId', 'reviewerId', 'revieweeId', 'direction',
+          'rating', 'categoryRatings', 'comment', 'createdAt', 'status'
+        ])
+        && data.bookingId is string && data.bookingId.size() > 0
+        && data.listingId is string && data.listingId.size() > 0
+        && data.reviewerId is string && data.reviewerId.size() > 0
+        && data.revieweeId is string && data.revieweeId.size() > 0
+        && data.reviewerId != data.revieweeId
+        && data.direction in ['traveler_to_host', 'host_to_traveler']
+        && data.rating is int && data.rating >= 1 && data.rating <= 5
+        && data.categoryRatings is map
+        && safeCategoryRatingsForDirection(data)
+        && data.comment is string
+        && data.comment.size() >= 1
+        && data.comment.size() <= 1000
+        && data.status == 'published'
+        && data.createdAt is timestamp;
+    }
+
+    function safeReviewReport(data) {
+      return data.keys().hasOnly(['reviewId', 'reporterId', 'reason', 'details', 'createdAt', 'status'])
+        && data.reviewId is string && data.reviewId.size() > 0
+        && data.reporterId is string && data.reporterId.size() > 0
+        && data.reason in ['spam', 'inappropriate', 'fake', 'harassment', 'other']
+        && (data.details == null || (data.details is string && data.details.size() <= 500))
+        && data.createdAt is timestamp
+        && data.status == 'open';
+    }
+
+    function isOpenSpotRequest(data) {
+      return data.status == 'open' && data.isFinalized == true;
+    }
+
+    function safePublicSpotRequest(data) {
+      return data.publicVersion == 2
+        && data.keys().hasOnly([
+          'requesterId', 'publicVersion', 'status', 'isFinalized',
+          'createdAt', 'updatedAt', 'finalizedAt', 'requestType',
+          'locationText', 'city', 'state', 'startDate', 'endDate',
+          'flexibleDates', 'employerName', 'teamName', 'teamLocation',
+          'workersCount', 'rigsCount', 'spotsNeeded', 'stayDurationType',
+          'primaryRv', 'moreThanOneRv', 'additionalRvs', 'hookupsNeeded',
+          'budgetMax', 'budgetPeriod', 'rvDetails', 'note'
+        ]);
+    }
+
+    function safeSpotRequestPublic(data) {
+      return data.requestId is string
+        && data.publicVersion == 2
+        && data.status == 'open'
+        && data.isFinalized == true
+        && data.keys().hasOnly([
+          'requestId', 'requesterId', 'publicVersion', 'status', 'isFinalized',
+          'createdAt', 'updatedAt', 'finalizedAt', 'requestType', 'locationText',
+          'city', 'state', 'startDate', 'endDate', 'flexibleDates', 'employerName',
+          'teamName', 'teamLocation', 'workersCount', 'rigsCount', 'spotsNeeded',
+          'stayDurationType', 'primaryRv', 'moreThanOneRv', 'additionalRvs',
+          'hookupsNeeded', 'budgetMax', 'budgetPeriod', 'rvDetails', 'note'
+        ]);
+    }
+
+    function safePrivateSpotRequest(data) {
+      return data.keys().hasOnly([
+          'requestId', 'requesterId', 'contactName', 'contactEmail', 'contactPhone',
+          'bestContactMethod', 'openToNearby', 'notifyMatches', 'finalNotes',
+          'priorityPreferences', 'createdAt', 'updatedAt'
+        ])
+        && data.requestId is string
+        && data.requesterId is string;
+    }
+
+    function safeTransportRegion(data) {
+      return data is map
+        && data.keys().hasOnly(['city', 'state', 'zip', 'locationType'])
+        && data.city is string
+        && data.city.size() > 0
+        && data.state is string
+        && data.state.size() == 2
+        && data.zip is string
+        && data.locationType is string
+        && data.locationType.size() > 0;
+    }
+
+    function safeTransportRequest(data) {
+      return data.keys().hasOnly([
+          'schemaVersion', 'requesterId', 'status', 'rv', 'pickup', 'destination',
+          'timing', 'logistics', 'contact', 'confirmations', 'createdAt', 'updatedAt'
+        ])
+        && data.schemaVersion == 1
+        && data.requesterId is string
+        && data.requesterId.size() > 0
+        && data.status == 'submitted'
+        && data.rv is map
+        && data.rv.keys().hasOnly([
+          'type', 'year', 'make', 'model', 'lengthFt', 'weightLb', 'condition',
+          'movementMethod', 'tires', 'lightsBrakes', 'slidesAwnings', 'connectedUtilities'
+        ])
+        && data.rv.type is string
+        && data.rv.type.size() > 0
+        && data.rv.year is string
+        && data.rv.make is string
+        && data.rv.model is string
+        && data.rv.lengthFt is number
+        && data.rv.lengthFt > 0
+        && data.rv.weightLb is number
+        && data.rv.weightLb >= 0
+        && data.rv.condition is string
+        && data.rv.movementMethod is string
+        && data.rv.tires is string
+        && data.rv.lightsBrakes is string
+        && data.rv.slidesAwnings is string
+        && data.rv.connectedUtilities is string
+        && safeTransportRegion(data.pickup)
+        && safeTransportRegion(data.destination)
+        && data.timing is map
+        && data.timing.keys().hasOnly([
+          'pickupDate', 'flexibleDates', 'flexibilityNote', 'deliveryDate', 'priority'
+        ])
+        && data.timing.pickupDate is string
+        && data.timing.pickupDate.size() == 10
+        && data.timing.flexibleDates is bool
+        && data.timing.flexibilityNote is string
+        && data.timing.deliveryDate is string
+        && data.timing.priority is string
+        && data.logistics is map
+        && data.logistics.keys().hasOnly([
+          'tripType', 'restrictedAccess', 'accessDetails', 'specialInstructions'
+        ])
+        && data.logistics.tripType is string
+        && data.logistics.restrictedAccess is bool
+        && data.logistics.accessDetails is string
+        && data.logistics.specialInstructions is string
+        && data.contact is map
+        && data.contact.keys().hasOnly(['fullName', 'email', 'phone', 'preferredMethod'])
+        && data.contact.fullName is string
+        && data.contact.fullName.size() > 0
+        && data.contact.email is string
+        && data.contact.email.size() > 0
+        && data.contact.phone is string
+        && data.contact.phone.size() > 0
+        && data.contact.preferredMethod is string
+        && data.confirmations is map
+        && data.confirmations.keys().hasOnly(['informationAccurate', 'noGuaranteeUnderstood'])
+        && data.confirmations.informationAccurate == true
+        && data.confirmations.noGuaranteeUnderstood == true
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function safeTransportInterest(data) {
+      return data.keys().hasOnly(['userId', 'email', 'interestType', 'createdAt', 'source', 'page'])
+        && data.userId is string
+        && data.userId.size() > 0
+        && data.email is string
+        && data.email.size() >= 3
+        && data.email.size() <= 120
+        && data.interestType in ['traveler', 'host', 'provider', 'employer', 'investor', 'other']
+        && data.source is string
+        && data.source.size() <= 50
+        && data.page is string
+        && data.page.size() <= 50
+        && data.createdAt is timestamp;
+    }
+
+    function safeTransportProvider(data) {
+      return data.keys().hasOnly([
+          'userId', 'name', 'email', 'phone', 'company', 'homeCity', 'homeState',
+          'providerType', 'services', 'equipment', 'serviceArea', 'operatingScope',
+          'cdlStatus', 'insuranceStatus', 'experienceYears', 'notes',
+          'confirmations', 'createdAt', 'source', 'page'
+        ])
+        && data.userId is string
+        && data.userId.size() > 0
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 100
+        && data.email is string
+        && data.email.size() >= 3
+        && data.email.size() <= 120
+        && data.phone is string
+        && data.phone.size() >= 5
+        && data.phone.size() <= 30
+        && (data.company == null || (data.company is string && data.company.size() <= 100))
+        && data.homeCity is string
+        && data.homeCity.size() > 0
+        && data.homeCity.size() <= 100
+        && data.homeState is string
+        && data.homeState.size() == 2
+        && data.providerType in ['independent', 'company', 'driveaway', 'towaway', 'other']
+        && data.services is list
+        && data.services.size() <= 20
+        && data.equipment is list
+        && data.equipment.size() <= 20
+        && data.serviceArea is string
+        && data.serviceArea.size() > 0
+        && data.serviceArea.size() <= 500
+        && data.operatingScope in ['intrastate', 'regional', 'nationwide']
+        && data.cdlStatus in ['none', 'class_a', 'class_b', 'class_c', 'not_applicable']
+        && data.insuranceStatus in ['active', 'in_process', 'none_planning', 'not_applicable']
+        && data.experienceYears in ['less_than_1', '1_to_3', '3_to_5', '5_to_10', '10_plus']
+        && (data.notes == null || (data.notes is string && data.notes.size() <= 2000))
+        && data.confirmations is map
+        && data.confirmations.keys().hasOnly(['informationAccurate', 'earlyAccessUnderstood'])
+        && data.confirmations.informationAccurate == true
+        && data.confirmations.earlyAccessUnderstood == true
+        && data.source is string
+        && data.source.size() <= 50
+        && data.page is string
+        && data.page.size() <= 50
+        && data.createdAt is timestamp;
+    }
+
+    function safeInsuranceInterest(data) {
+      return data.keys().hasOnly([
+          'userId', 'email', 'state', 'rvType', 'usageType',
+          'primaryInterest', 'confirmations', 'createdAt', 'source', 'page'
+        ])
+        && data.userId is string
+        && data.userId.size() > 0
+        && data.email is string
+        && data.email.size() >= 3
+        && data.email.size() <= 120
+        && data.state is string
+        && data.state.size() == 2
+        && data.rvType is string
+        && data.rvType.size() > 0
+        && data.rvType.size() <= 50
+        && data.usageType is string
+        && data.usageType.size() > 0
+        && data.usageType.size() <= 50
+        && data.primaryInterest in [
+          'new_policy', 'renewal_comparison', 'full_time_coverage',
+          'high_value_custom', 'roadside_emergency', 'rental_use',
+          'general_guidance', 'other'
+        ]
+        && data.confirmations is map
+        && data.confirmations.keys().hasOnly(['informationAccurate', 'earlyAccessUnderstood'])
+        && data.confirmations.informationAccurate == true
+        && data.confirmations.earlyAccessUnderstood == true
+        && data.source is string
+        && data.source.size() <= 50
+        && data.page is string
+        && data.page.size() <= 50
+        && data.createdAt is timestamp;
+    }
+
+    function safeInsuranceProvider(data) {
+      return data.keys().hasOnly([
+          'userId', 'name', 'email', 'phone', 'agency', 'npn',
+          'residentState', 'otherStates', 'professionalType', 'experienceYears',
+          'customerTypes', 'serviceArea', 'website', 'notes',
+          'confirmations', 'createdAt', 'source', 'page'
+        ])
+        && data.userId is string
+        && data.userId.size() > 0
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 100
+        && data.email is string
+        && data.email.size() >= 3
+        && data.email.size() <= 120
+        && data.phone is string
+        && data.phone.size() >= 5
+        && data.phone.size() <= 30
+        && (data.agency == null || (data.agency is string && data.agency.size() <= 100))
+        && (data.npn == null || (data.npn is string && data.npn.size() <= 20))
+        && data.residentState is string
+        && data.residentState.size() == 2
+        && (data.otherStates == null || (data.otherStates is string && data.otherStates.size() <= 300))
+        && data.professionalType in ['individual_agent', 'agency', 'brokerage', 'other']
+        && data.experienceYears in ['less_than_1', '1_to_3', '3_to_5', '5_to_10', '10_plus']
+        && data.customerTypes is list
+        && data.customerTypes.size() <= 20
+        && data.serviceArea is string
+        && data.serviceArea.size() > 0
+        && data.serviceArea.size() <= 300
+        && (data.website == null || (data.website is string && data.website.size() <= 200))
+        && (data.notes == null || (data.notes is string && data.notes.size() <= 2000))
+        && data.confirmations is map
+        && data.confirmations.keys().hasOnly(['informationAccurate', 'earlyAccessUnderstood'])
+        && data.confirmations.informationAccurate == true
+        && data.confirmations.earlyAccessUnderstood == true
+        && data.source is string
+        && data.source.size() <= 50
+        && data.page is string
+        && data.page.size() <= 50
+        && data.createdAt is timestamp;
+    }
+
+    function safeCommunityInterest(data) {
+      return data.keys().hasOnly([
+          'userId', 'email', 'role', 'topics', 'regions', 'primaryReason',
+          'notes', 'confirmations', 'createdAt', 'source', 'page'
+        ])
+        && data.userId is string
+        && data.userId.size() > 0
+        && data.email is string
+        && data.email.size() >= 3
+        && data.email.size() <= 120
+        && data.role in [
+          'traveler', 'host', 'both', 'new_owner', 'full_timer', 'experienced_contributor'
+        ]
+        && data.topics is list
+        && data.topics.size() <= 20
+        && (data.regions == null || (data.regions is string && data.regions.size() <= 200))
+        && data.primaryReason in [
+          'ask_questions', 'share_knowledge', 'learn_destinations',
+          'connect_travelers', 'help_rvers', 'follow_regional_updates', 'find_events'
+        ]
+        && (data.notes == null || (data.notes is string && data.notes.size() <= 1000))
+        && data.confirmations is map
+        && data.confirmations.keys().hasOnly(['informationAccurate', 'earlyAccessUnderstood'])
+        && data.confirmations.informationAccurate == true
+        && data.confirmations.earlyAccessUnderstood == true
+        && data.source is string
+        && data.source.size() <= 50
+        && data.page is string
+        && data.page.size() <= 50
+        && data.createdAt is timestamp;
+    }
+
+    function communityCategories() {
+      return [
+        'destinations_campgrounds', 'routes_road_conditions', 'ownership_maintenance',
+        'full_time_living', 'boondocking_dry_camping', 'families_pets',
+        'safety_preparedness', 'hosting_guest_advice', 'repairs_roadside',
+        'events_meetups', 'general_discussion'
+      ];
+    }
+
+    function safeAuthorDisplayName(name) {
+      return name == null
+        || (name is string
+          && name.size() <= 60
+          && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          && name == userDoc(request.auth.uid).data.displayName);
+    }
+
+    function safeCommunityPost(data) {
+      return data.keys().hasOnly([
+          'authorId', 'authorDisplayName', 'title', 'body', 'category',
+          'region', 'rigType', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.authorId is string
+        && data.authorId.size() > 0
+        && (data.authorDisplayName == null || (data.authorDisplayName is string && data.authorDisplayName.size() <= 60))
+        && data.title is string
+        && data.title.size() >= 8
+        && data.title.size() <= 140
+        && data.body is string
+        && data.body.size() >= 20
+        && data.body.size() <= 4000
+        && data.category in communityCategories()
+        && (data.region == null || (data.region is string && data.region.size() <= 100))
+        && (data.rigType == null || (data.rigType is string && data.rigType.size() <= 60))
+        && data.status in ['active', 'removed']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function safeCommunityReply(data) {
+      return data.keys().hasOnly([
+          'authorId', 'authorDisplayName', 'body', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.authorId is string
+        && data.authorId.size() > 0
+        && (data.authorDisplayName == null || (data.authorDisplayName is string && data.authorDisplayName.size() <= 60))
+        && data.body is string
+        && data.body.size() >= 2
+        && data.body.size() <= 2000
+        && data.status in ['active', 'removed']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function safeCommunityReport(data) {
+      return data.keys().hasOnly([
+          'reporterId', 'targetType', 'postId', 'replyId', 'reason', 'details', 'createdAt', 'status'
+        ])
+        && data.reporterId is string
+        && data.reporterId.size() > 0
+        && data.targetType in ['post', 'reply']
+        && data.postId is string
+        && data.postId.size() > 0
+        && (data.replyId == null || (data.replyId is string && data.replyId.size() > 0))
+        && data.reason in [
+          'spam', 'scam_fraud', 'harassment', 'dangerous_advice',
+          'private_information', 'misinformation', 'other'
+        ]
+        && (data.details == null || (data.details is string && data.details.size() <= 500))
+        && data.createdAt is timestamp
+        && data.status == 'open';
+    }
+
+    function safeMemberProfile(data) {
+      return data.keys().hasOnly([
+          'userId', 'displayName', 'city', 'state', 'bio', 'photoURL', 'visibility', 'createdAt', 'updatedAt'
+        ])
+        && data.userId is string
+        && data.userId.size() > 0
+        && data.displayName is string
+        && data.displayName.size() > 0
+        && data.displayName.size() <= 60
+        && (data.city == null || (data.city is string && data.city.size() <= 80))
+        && (data.state == null || (data.state is string && data.state.size() <= 40))
+        && (data.bio == null || (data.bio is string && data.bio.size() <= 500))
+        && (data.photoURL == null || (data.photoURL is string && data.photoURL.size() <= 500))
+        && data.visibility in ['public', 'private']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role in ['guest', 'host'];
+      allow update: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'displayName', 'city', 'state', 'role'
+        ])
+        && request.resource.data.role in ['guest', 'host']
+        && (resource.data.role == request.resource.data.role
+          || (resource.data.role == 'guest' && request.resource.data.role == 'host'));
+      allow delete: if false;
+    }
+
+    // Public-safe projection of a user's profile — never the full private users/{uid} doc.
+    match /memberProfiles/{userId} {
+      // `exists()` guards against evaluating resource.data on a document that was never
+      // published — otherwise reading a missing profile would error instead of denying.
+      allow get: if (exists(/databases/$(database)/documents/memberProfiles/$(userId))
+          && resource.data.visibility == 'public')
+        || (signedIn() && request.auth.uid == userId);
+      allow list: if (exists(/databases/$(database)/documents/memberProfiles/$(userId))
+          && resource.data.visibility == 'public')
+        || (signedIn() && request.auth.uid == userId);
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.userId == userId
+        && safeMemberProfile(request.resource.data)
+        && request.resource.data.createdAt == request.resource.data.updatedAt;
+      allow update: if signedIn()
+        && request.auth.uid == userId
+        && resource.data.userId == userId
+        && request.resource.data.userId == userId
+        && safeMemberProfile(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if false;
+    }
+
+    match /listings/{listingId} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.hostId == request.auth.uid;
+      allow update, delete: if signedIn()
+        && resource.data.hostId == request.auth.uid
+        && request.resource.data.hostId == resource.data.hostId;
+    }
+
+    match /bookings/{bookingId} {
+      allow create: if signedIn()
+        && bookingListingIsValid(request.resource.data)
+        && bookingGuest(request.resource.data)
+        && request.resource.data.guestId == request.auth.uid
+        && request.resource.data.guestId != request.resource.data.hostId
+        && bookingStatus(request.resource.data)
+        && request.resource.data.status == 'pending';
+
+      allow read: if signedIn()
+        && (resource.data.guestId == request.auth.uid
+          || resource.data.hostId == request.auth.uid
+          || (resource.data.listingId is string
+            && listingExists(resource.data.listingId)
+            && listingHost(resource.data.listingId) == request.auth.uid));
+
+      allow update: if signedIn()
+        && resource.data.listingId is string
+        && listingExists(resource.data.listingId)
+        && listingHost(resource.data.listingId) == request.auth.uid
+        && request.resource.data.listingId == resource.data.listingId
+        && (request.resource.data.hostId == resource.data.hostId
+          || (!resource.data.keys().hasAny(['hostId'])
+            && request.resource.data.hostId == request.auth.uid))
+        && (request.resource.data.guestId == resource.data.guestId
+          || (!resource.data.keys().hasAny(['guestId'])
+            && legacyGuestMatches(resource.data, request.resource.data.guestId)))
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'approvedAt', 'declinedAt', 'hostId', 'guestId'
+        ])
+        && resource.data.status in ['pending', 'requested']
+        && request.resource.data.status in ['approved', 'declined'];
+
+      allow delete: if false;
+    }
+
+    match /listingReservations/{listingId} {
+      allow read: if ownsListing(listingId)
+        && (!exists(/databases/$(database)/documents/listingReservations/$(listingId))
+          || (resource.data.listingId == listingId
+            && resource.data.hostId == request.auth.uid));
+      allow create: if ownsListing(listingId)
+        && request.resource.data.listingId == listingId
+        && request.resource.data.hostId == request.auth.uid;
+      allow update: if ownsListing(listingId)
+        && resource.data.listingId == listingId
+        && resource.data.hostId == request.auth.uid
+        && request.resource.data.listingId == listingId
+        && request.resource.data.hostId == request.auth.uid;
+      allow delete: if false;
+    }
+
+    match /dayMeta/{docId} {
+      allow read: if signedIn()
+        && resource.data.listingId is string
+        && resource.data.hostId == request.auth.uid
+        && ownsListing(resource.data.listingId);
+      allow delete: if signedIn()
+        && resource.data.listingId is string
+        && resource.data.date is string
+        && resource.data.hostId == request.auth.uid
+        && ownsListing(resource.data.listingId)
+        && docId == resource.data.listingId + '__' + resource.data.date;
+      allow create: if signedIn()
+        && request.resource.data.listingId is string
+        && request.resource.data.hostId == request.auth.uid
+        && request.resource.data.date is string
+        && docId == request.resource.data.listingId + '__' + request.resource.data.date
+        && ownsListing(request.resource.data.listingId);
+      allow update: if signedIn()
+        && resource.data.listingId is string
+        && resource.data.hostId == request.auth.uid
+        && ownsListing(resource.data.listingId)
+        && request.resource.data.listingId == resource.data.listingId
+        && request.resource.data.hostId == resource.data.hostId
+        && request.resource.data.date == resource.data.date
+        && docId == request.resource.data.listingId + '__' + request.resource.data.date;
+    }
+
+    match /spotRequests/{requestId} {
+      allow create: if signedIn()
+        && request.resource.data.requesterId == request.auth.uid
+        && safePublicSpotRequest(request.resource.data)
+        && request.resource.data.status == 'draft'
+        && request.resource.data.isFinalized == false;
+      allow get: if signedIn() && resource.data.requesterId == request.auth.uid;
+      allow update: if signedIn()
+        && resource.data.requesterId == request.auth.uid
+        && request.resource.data.requesterId == resource.data.requesterId
+        && safePublicSpotRequest(request.resource.data)
+        && (
+          (resource.data.isFinalized == false
+            && request.resource.data.isFinalized == false
+            && request.resource.data.status == 'draft')
+          || (resource.data.isFinalized == false
+            && request.resource.data.isFinalized == true
+            && request.resource.data.status == 'open')
+        );
+      allow delete: if false;
+    }
+
+    match /spotRequestPublic/{requestId} {
+      allow get: if signedIn()
+        && ((!exists(/databases/$(database)/documents/spotRequestPublic/$(requestId))
+          && get(/databases/$(database)/documents/spotRequests/$(requestId)).data.requesterId == request.auth.uid)
+          || (safeSpotRequestPublic(resource.data)
+            && (isHost() || resource.data.requesterId == request.auth.uid)));
+      allow list: if signedIn()
+        && isHost()
+        && resource.data.publicVersion == 2
+        && resource.data.status == 'open'
+        && resource.data.isFinalized == true;
+      allow create: if signedIn()
+        && requestId == request.resource.data.requestId
+        && request.resource.data.requesterId == request.auth.uid
+        && safeSpotRequestPublic(request.resource.data)
+        && getAfter(/databases/$(database)/documents/spotRequests/$(requestId)).data.requesterId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/spotRequests/$(requestId)).data.status == 'open'
+        && getAfter(/databases/$(database)/documents/spotRequests/$(requestId)).data.isFinalized == true;
+      allow update: if signedIn()
+        && requestId == resource.data.requestId
+        && resource.data.requesterId == request.auth.uid
+        && request.resource.data.requestId == resource.data.requestId
+        && request.resource.data.requesterId == resource.data.requesterId
+        && safeSpotRequestPublic(request.resource.data)
+        && getAfter(/databases/$(database)/documents/spotRequests/$(requestId)).data.requesterId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/spotRequests/$(requestId)).data.status == 'open'
+        && getAfter(/databases/$(database)/documents/spotRequests/$(requestId)).data.isFinalized == true;
+      allow delete: if false;
+    }
+
+    match /spotRequestPrivate/{requestId} {
+      allow create: if signedIn()
+        && requestId == request.resource.data.requestId
+        && request.resource.data.requesterId == request.auth.uid
+        && safePrivateSpotRequest(request.resource.data)
+        && get(/databases/$(database)/documents/spotRequests/$(requestId)).data.requesterId == request.auth.uid;
+      allow read: if signedIn()
+        && ((!exists(/databases/$(database)/documents/spotRequestPrivate/$(requestId))
+          && get(/databases/$(database)/documents/spotRequests/$(requestId)).data.requesterId == request.auth.uid)
+          || (resource.data.requesterId == request.auth.uid
+            && resource.data.requestId == requestId));
+      allow update: if signedIn()
+        && resource.data.requesterId == request.auth.uid
+        && resource.data.requestId == requestId
+        && request.resource.data.requesterId == resource.data.requesterId
+        && request.resource.data.requestId == requestId
+        && safePrivateSpotRequest(request.resource.data);
+      allow delete: if false;
+    }
+
+    // Deterministic ID `${bookingId}_${reviewerId}` blocks duplicate reviews per booking.
+    match /reviews/{reviewId} {
+      allow get: if resource.data.status == 'published';
+      allow list: if resource.data.status == 'published';
+      allow create: if signedIn()
+        && exists(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId))
+        && reviewId == request.resource.data.bookingId + '_' + request.auth.uid
+        && request.resource.data.reviewerId == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && safeReview(request.resource.data)
+        && bookingIsEligibleForReview(
+             get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data)
+        && reviewDirectionMatches(
+             get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data,
+             request.resource.data.reviewerId,
+             request.resource.data.revieweeId,
+             request.resource.data.direction)
+        && request.resource.data.listingId ==
+             get(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId)).data.listingId;
+      allow update, delete: if false;
+    }
+
+    // Deterministic ID `${reviewId}_${reporterId}` blocks duplicate reports per reviewer.
+    // Reports are never publicly readable and never expose moderation state to clients.
+    match /reviewReports/{reportId} {
+      allow create: if signedIn()
+        && exists(/databases/$(database)/documents/reviews/$(request.resource.data.reviewId))
+        && reportId == request.resource.data.reviewId + '_' + request.auth.uid
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && safeReviewReport(request.resource.data);
+      allow get, list: if false;
+      allow update, delete: if false;
+    }
+
+    match /hostOpportunities/{docId} {
+      allow create: if (
+          !request.resource.data.keys().hasAny(['requestId', 'hostId', 'requesterId'])
+          && request.resource.data.keys().hasAny(['submissionType', 'sourceType'])
+        ) || (
+          signedIn()
+          && isHost()
+          && request.resource.data.requestId is string
+          && request.resource.data.hostId == request.auth.uid
+          && request.resource.data.requesterId == get(/databases/$(database)/documents/spotRequestPublic/$(request.resource.data.requestId)).data.requesterId
+          && safeSpotRequestPublic(get(/databases/$(database)/documents/spotRequestPublic/$(request.resource.data.requestId)).data)
+          && get(/databases/$(database)/documents/spotRequestPublic/$(request.resource.data.requestId)).data.status == 'open'
+          && get(/databases/$(database)/documents/spotRequestPublic/$(request.resource.data.requestId)).data.isFinalized == true
+          && docId == request.resource.data.requestId + '__' + request.auth.uid
+        );
+      allow read: if signedIn()
+        && ((!exists(/databases/$(database)/documents/hostOpportunities/$(docId))
+          && isHost())
+          || (resource.data.hostId == request.auth.uid)
+          || (resource.data.requesterId == request.auth.uid));
+      allow update, delete: if false;
+    }
+
+    match /transportRequests/{requestId} {
+      allow create: if signedIn()
+        && request.resource.data.requesterId == request.auth.uid
+        && safeTransportRequest(request.resource.data);
+      allow get: if signedIn() && resource.data.requesterId == request.auth.uid;
+      allow list: if false;
+      allow update, delete: if false;
+    }
+
+    match /transportInterest/{interestId} {
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && safeTransportInterest(request.resource.data);
+      allow get: if signedIn() && resource.data.userId == request.auth.uid;
+      allow list: if false;
+      allow update, delete: if false;
+    }
+
+    match /transportProviders/{providerId} {
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && safeTransportProvider(request.resource.data);
+      allow get: if signedIn() && resource.data.userId == request.auth.uid;
+      allow list: if false;
+      allow update, delete: if false;
+    }
+
+    match /insuranceInterest/{interestId} {
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && safeInsuranceInterest(request.resource.data);
+      allow get: if signedIn() && resource.data.userId == request.auth.uid;
+      allow list: if false;
+      allow update, delete: if false;
+    }
+
+    match /insuranceProviders/{providerId} {
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && safeInsuranceProvider(request.resource.data);
+      allow get: if signedIn() && resource.data.userId == request.auth.uid;
+      allow list: if false;
+      allow update, delete: if false;
+    }
+
+    match /communityInterest/{interestId} {
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && safeCommunityInterest(request.resource.data);
+      allow get: if signedIn() && resource.data.userId == request.auth.uid;
+      allow list: if false;
+      allow update, delete: if false;
+    }
+
+    match /communityPosts/{postId} {
+      allow get: if resource.data.status == 'active'
+        || (signedIn() && resource.data.authorId == request.auth.uid);
+      allow list: if resource.data.status == 'active'
+        || (signedIn() && resource.data.authorId == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.authorId == request.auth.uid
+        && safeCommunityPost(request.resource.data)
+        && safeAuthorDisplayName(request.resource.data.authorDisplayName)
+        && request.resource.data.status == 'active'
+        && request.resource.data.createdAt == request.resource.data.updatedAt;
+      allow update: if signedIn()
+        && resource.data.authorId == request.auth.uid
+        && request.resource.data.authorId == resource.data.authorId
+        && request.resource.data.authorDisplayName == resource.data.authorDisplayName
+        && request.resource.data.createdAt == resource.data.createdAt
+        && safeCommunityPost(request.resource.data)
+        && (
+          (resource.data.status == 'active'
+            && request.resource.data.status == 'active'
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['title', 'body', 'category', 'region', 'rigType', 'updatedAt']))
+          || (resource.data.status == 'active'
+            && request.resource.data.status == 'removed'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']))
+        );
+      allow delete: if false;
+
+      match /replies/{replyId} {
+        allow get: if resource.data.status == 'active'
+          || (signedIn() && resource.data.authorId == request.auth.uid);
+        allow list: if resource.data.status == 'active'
+          || (signedIn() && resource.data.authorId == request.auth.uid);
+        allow create: if signedIn()
+          && request.resource.data.authorId == request.auth.uid
+          && safeCommunityReply(request.resource.data)
+          && safeAuthorDisplayName(request.resource.data.authorDisplayName)
+          && request.resource.data.status == 'active'
+          && request.resource.data.createdAt == request.resource.data.updatedAt
+          && get(/databases/$(database)/documents/communityPosts/$(postId)).data.status == 'active';
+        allow update: if signedIn()
+          && resource.data.authorId == request.auth.uid
+          && request.resource.data.authorId == resource.data.authorId
+          && request.resource.data.authorDisplayName == resource.data.authorDisplayName
+          && request.resource.data.createdAt == resource.data.createdAt
+          && safeCommunityReply(request.resource.data)
+          && (
+            (resource.data.status == 'active'
+              && request.resource.data.status == 'active'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['body', 'updatedAt']))
+            || (resource.data.status == 'active'
+              && request.resource.data.status == 'removed'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']))
+          );
+        allow delete: if false;
+      }
+    }
+
+    match /communityReports/{reportId} {
+      allow create: if signedIn()
+        && request.resource.data.reporterId == request.auth.uid
+        && safeCommunityReport(request.resource.data);
+      allow get: if signedIn() && resource.data.reporterId == request.auth.uid;
+      allow list: if false;
+      allow update, delete: if false;
+    }
+  }
+}

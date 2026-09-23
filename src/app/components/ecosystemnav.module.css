@@ -11,7 +11,7 @@
   max-width: 1040px;
   margin: 0 auto;
   border-radius: 24px;
-  padding: 20px;
+  padding: 24px;
   overflow: hidden;
   background:
     radial-gradient(
@@ -60,11 +60,12 @@
 .ecosystemHeader {
   position: relative;
   z-index: 1;
-  margin-bottom: 16px;
+  max-width: 650px;
+  margin-bottom: 20px;
 }
 
 .eyebrow {
-  margin: 0 0 5px;
+  margin: 0 0 7px;
   font-size: 0.76rem;
   font-weight: 950;
   letter-spacing: 0.14em;
@@ -74,33 +75,38 @@
 
 .title {
   margin: 0;
-  font-size: 1.18rem;
+  font-size: clamp(1.55rem, 2.4vw, 2rem);
   font-weight: 950;
   letter-spacing: -0.03em;
   color: #ffffff;
   text-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
 }
 
+.subtitle {
+  margin: 8px 0 0;
+  max-width: 580px;
+  color: rgba(226, 232, 240, 0.72);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
 .ecosystemNav {
   position: relative;
   z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
 }
 
-.ecosystemLink,
-.ecosystemLinkActive {
+.ecosystemCard {
   text-decoration: none;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 10px 15px;
-  border-radius: 999px;
-  font-size: 0.92rem;
-  font-weight: 900;
+  gap: 11px;
+  min-width: 0;
+  min-height: 92px;
+  padding: 14px;
+  border-radius: 16px;
   color: rgba(255, 255, 255, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.12);
   background:
@@ -120,7 +126,7 @@
     box-shadow 180ms ease;
 }
 
-.ecosystemLink:hover {
+.ecosystemCard:hover {
   transform: translateY(-2px);
   color: #ffffff;
   background:
@@ -135,25 +141,60 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-.ecosystemLink:focus-visible,
-.ecosystemLinkActive:focus-visible {
+.ecosystemCard:focus-visible {
   outline: 3px solid rgba(147, 180, 255, 0.5);
   outline-offset: 3px;
 }
 
-.ecosystemLinkActive {
-  color: #0f172a;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 1),
-      rgba(219, 234, 254, 0.94)
-    );
-  border-color: rgba(255, 255, 255, 0.46);
-  box-shadow:
-    0 18px 42px rgba(37, 99, 235, 0.24),
-    0 12px 28px rgba(0, 0, 0, 0.26),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+.cardMarker {
+  display: grid;
+  flex: 0 0 34px;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: rgba(191, 219, 254, 0.96);
+  border: 1px solid rgba(147, 180, 255, 0.3);
+  background: rgba(37, 99, 235, 0.18);
+  font-size: 0.68rem;
+  font-weight: 950;
+  letter-spacing: 0.06em;
+}
+
+.cardIcon {
+  width: 18px;
+  height: 18px;
+}
+
+.cardContent {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.cardTitle {
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 900;
+}
+
+.cardDescription {
+  color: rgba(226, 232, 240, 0.68);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.cardArrow {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: rgba(191, 219, 254, 0.72);
+  font-size: 1.1rem;
+  transition: transform 160ms ease, color 160ms ease;
+}
+
+.ecosystemCard:hover .cardArrow {
+  color: #ffffff;
+  transform: translateX(3px);
 }
 
 @media (max-width: 700px) {
@@ -167,15 +208,18 @@
   }
 
   .ecosystemNav {
-    display: grid;
     grid-template-columns: 1fr 1fr;
   }
 
-  .ecosystemLink,
-  .ecosystemLinkActive {
+  .ecosystemCard {
     width: 100%;
-    min-height: 42px;
-    padding: 10px 12px;
-    font-size: 0.88rem;
+    min-height: 88px;
+    padding: 12px;
+  }
+}
+
+@media (max-width: 430px) {
+  .ecosystemNav {
+    grid-template-columns: 1fr;
   }
 }

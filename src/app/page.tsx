@@ -97,7 +97,7 @@ export default function Home() {
           </div>
         </section>
 
-        <EcosystemNav active="home" />
+        <EcosystemNav />
 
         <section className={styles.section} aria-label="Featured listings">
           <div className={styles.container}>
@@ -150,7 +150,7 @@ export default function Home() {
                 </div>
               </Link>
 
-              <Link href="/transport-network" className={styles.ecosystemCard}>
+              <Link href="/transport" className={styles.ecosystemCard}>
                 <div className={`${styles.card} ${styles.serviceCardBlue}`}>
                   <div className={styles.cardTop}>
                     <h3 className={styles.cardTitle}>🚛 Transport Network</h3>

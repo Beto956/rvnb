@@ -1,0 +1,821 @@
+.page {
+  min-height: 100vh;
+  overflow-x: hidden;
+  background:
+    radial-gradient(1100px 620px at 15% -10%, rgba(60, 120, 255, 0.14), transparent),
+    radial-gradient(900px 620px at 85% 0%, rgba(80, 170, 255, 0.07), transparent),
+    #060b14;
+  color: #f5f7fb;
+}
+
+.container {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 26px 20px 64px;
+  box-sizing: border-box;
+}
+
+/* ---------- Page header ---------- */
+
+.pageHeader {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 22px 22px;
+  margin-bottom: 22px;
+  border-radius: 18px;
+  border: 1px solid rgba(96, 165, 250, 0.16);
+}
+
+.pageHeaderBg {
+  position: absolute;
+  inset: 0;
+  background-image: url("/rvnb-home-bg.png");
+  background-size: cover;
+  background-position: center 40%;
+  opacity: 0.28;
+  filter: saturate(0.85) brightness(0.8);
+}
+
+.pageHeader::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    120deg,
+    rgba(6, 11, 20, 0.82) 0%,
+    rgba(6, 11, 20, 0.62) 55%,
+    rgba(6, 11, 20, 0.88) 100%
+  );
+}
+
+.pageHeaderWatermark {
+  position: absolute;
+  top: 50%;
+  right: -20px;
+  transform: translateY(-50%);
+  height: 210px;
+  width: auto;
+  opacity: 0.05;
+  pointer-events: none;
+  user-select: none;
+  filter: grayscale(1) brightness(3);
+}
+
+@media (max-width: 640px) {
+  .pageHeaderWatermark {
+    display: none;
+  }
+}
+
+.pageHeaderContent {
+  position: relative;
+  z-index: 1;
+}
+
+.eyebrow {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #7fb1ff;
+  margin: 0 0 6px;
+}
+
+.pageTitle {
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 900;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.pageSub {
+  margin-top: 8px;
+  color: #9aa7c2;
+  max-width: 560px;
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+.headerActions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  color: white;
+  font-weight: 800;
+  font-size: 13.5px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btnPrimary:hover {
+  transform: translateY(-1px);
+}
+
+.btnSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 15px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f5f7fb;
+  font-weight: 700;
+  font-size: 13.5px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.btnSecondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+.btnPrimary:focus-visible,
+.btnSecondary:focus-visible,
+.tab:focus-visible,
+.dropdown:focus-visible,
+.dayTile:focus-visible,
+.navBtn:focus-visible,
+.drawerClose:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+}
+
+/* ---------- Error / empty states ---------- */
+
+.errorBanner {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.08);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.warningBanner {
+  margin-bottom: 18px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(250, 204, 21, 0.3);
+  background: rgba(250, 204, 21, 0.08);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #fde68a;
+}
+
+.emptyState {
+  padding: 40px 20px;
+  text-align: center;
+  border-radius: 16px;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.emptyStateTitle {
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.emptyStateText {
+  margin-top: 8px;
+  color: #9aa7c2;
+  font-size: 13px;
+}
+
+/* ---------- Listing selector ---------- */
+
+.selectorWrap {
+  margin-bottom: 18px;
+}
+
+.tabsRow {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tab {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #e5e7eb;
+  cursor: pointer;
+  text-align: left;
+  min-width: 140px;
+}
+
+.tabActive {
+  border-color: rgba(96, 165, 250, 0.5);
+  background: rgba(59, 130, 246, 0.16);
+}
+
+.tabTitle {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.tabMeta {
+  font-size: 11px;
+  color: #9aa7c2;
+}
+
+.dropdownWrap {
+  display: none;
+}
+
+.dropdown {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #0d1524;
+  color: #f5f7fb;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+@media (max-width: 680px) {
+  .tabsRow {
+    display: none;
+  }
+
+  .dropdownWrap {
+    display: block;
+  }
+}
+
+/* ---------- Calendar workspace ---------- */
+
+.calendarPanel {
+  border-radius: 18px;
+  padding: 20px 22px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025));
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
+  min-width: 0;
+}
+
+.calendarTopRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.listingTitle {
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.listingMeta {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: #9aa7c2;
+}
+
+.navBtns {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.navBtn {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f5f7fb;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.navBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.monthLabel {
+  font-weight: 800;
+  font-size: 14px;
+  padding: 0 6px;
+}
+
+.statsRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.statPill {
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #d3dbee;
+}
+
+.legendRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+  font-size: 11.5px;
+  color: #d3dbee;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.calendarScroll {
+  overflow-x: auto;
+  margin-top: 14px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.calendarScrollInner {
+  min-width: 560px;
+}
+
+.dowRow {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.dowCell {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #9aa7c2;
+  padding: 4px 0;
+}
+
+.monthGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dayTile {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 88px;
+  appearance: none;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.18);
+  padding: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+}
+
+.dayTile:hover {
+  border-color: rgba(147, 197, 253, 0.32);
+  transform: translateY(-1px);
+}
+
+.dayTileMuted {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.dayTileMuted:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: none;
+}
+
+.dayTileToday {
+  box-shadow: inset 0 0 0 1.5px rgba(147, 197, 253, 0.65);
+}
+
+.dayTileSelected {
+  box-shadow: inset 0 0 0 2px #60a5fa;
+}
+
+.dayTileBlocked {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.dayTopRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.dayNum {
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.dayIcons {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.dayChipList {
+  display: grid;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.dayChip {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.dayChipApproved {
+  border-color: rgba(96, 165, 250, 0.4);
+  background: rgba(59, 130, 246, 0.18);
+}
+
+.dayChipPending {
+  border-color: rgba(250, 204, 21, 0.35);
+  background: rgba(250, 204, 21, 0.14);
+}
+
+.dayChipBlocked {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.14);
+}
+
+.dayChipExtra {
+  opacity: 0.75;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.helperText {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #9aa7c2;
+}
+
+/* ---------- Day Inspector drawer ---------- */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 8, 16, 0.6);
+  z-index: 80;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: min(420px, 92vw);
+  background: #0a0f1a;
+  border-left: 1px solid rgba(96, 165, 250, 0.18);
+  box-shadow: -20px 0 50px rgba(0, 0, 0, 0.45);
+  padding: 18px;
+  z-index: 90;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.drawerHeaderRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.drawerTitle {
+  font-weight: 900;
+  font-size: 17px;
+}
+
+.drawerSub {
+  margin-top: 4px;
+  color: #9aa7c2;
+  font-size: 13px;
+}
+
+.drawerClose {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: white;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.drawerClose:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.miniCard {
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sectionLabel {
+  margin-top: 18px;
+  font-weight: 800;
+  opacity: 0.9;
+  font-size: 13px;
+}
+
+.labelRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.fieldLabel {
+  font-weight: 700;
+  opacity: 0.85;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+}
+
+.inputField {
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+  font-size: 13.5px;
+  box-sizing: border-box;
+}
+
+.btnStrong {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  background: rgba(59, 130, 246, 0.2);
+  color: #dbeafe;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.btnStrong:hover {
+  background: rgba(59, 130, 246, 0.3);
+}
+
+.btnStrong:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnGhost {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(248, 113, 113, 0.32);
+  background: rgba(248, 113, 113, 0.12);
+  color: #fecaca;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.btnGhost:hover {
+  background: rgba(248, 113, 113, 0.2);
+}
+
+.btnGhost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bookingBadge {
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+@media (max-width: 720px) {
+  .drawer {
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    height: auto;
+    max-height: 85vh;
+    width: auto;
+    border-left: none;
+    border-top: 1px solid rgba(96, 165, 250, 0.2);
+    border-radius: 18px 18px 0 0;
+  }
+
+  .calendarScrollInner {
+    min-width: 480px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dayTile,
+  .tab,
+  .btnPrimary,
+  .btnSecondary {
+    transition: none;
+  }
+}
+
+/* ---------- Range selection ---------- */
+
+.navBtnActive {
+  background: rgba(59, 130, 246, 0.28);
+  border-color: rgba(96, 165, 250, 0.5);
+  color: #dbeafe;
+}
+
+.rangeGuidanceBar {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  background: rgba(59, 130, 246, 0.1);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #dbeafe;
+}
+
+.dayRangeStart,
+.dayRangeEnd {
+  box-shadow: inset 0 0 0 2px #60a5fa;
+  background: rgba(59, 130, 246, 0.28);
+}
+
+.dayRangeInterior {
+  background: rgba(59, 130, 246, 0.14);
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+.dayRangeTentative {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(96, 165, 250, 0.22);
+  border-style: dashed;
+}
+
+/* ---------- Range management panel ---------- */
+
+.rangePanel {
+  margin-top: 18px;
+  padding: 20px 22px;
+  border-radius: 18px;
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  background: linear-gradient(165deg, rgba(59, 130, 246, 0.08), rgba(255, 255, 255, 0.025));
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
+}
+
+.rangePanelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rangePanelEyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7fb1ff;
+  margin: 0 0 4px;
+}
+
+.rangePanelTitle {
+  font-size: 17px;
+  font-weight: 900;
+  margin: 0;
+}
+
+.rangePanelSub {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: #9aa7c2;
+}
+
+.rangeChipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.rangeChipConflict,
+.rangeChipBlocked,
+.rangeChipPending,
+.rangeChipAvailable {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.rangeChipConflict {
+  background: rgba(59, 130, 246, 0.2);
+  color: #bfdbfe;
+  border: 1px solid rgba(96, 165, 250, 0.35);
+}
+
+.rangeChipBlocked {
+  background: rgba(248, 113, 113, 0.14);
+  color: #fecaca;
+  border: 1px solid rgba(248, 113, 113, 0.32);
+}
+
+.rangeChipPending {
+  background: rgba(250, 204, 21, 0.14);
+  color: #fde68a;
+  border: 1px solid rgba(250, 204, 21, 0.32);
+}
+
+.rangeChipAvailable {
+  background: rgba(34, 197, 94, 0.14);
+  color: #bbf7d0;
+  border: 1px solid rgba(74, 222, 128, 0.32);
+}
+
+.rangeStatus {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 12.5px;
+}
+
+.rangeActionGroup {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.rangeButtonRow {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}

@@ -5,12 +5,13 @@ import Link from "next/link";
 import {
   collection,
   getDocs,
-  orderBy,
   query,
   Timestamp,
+  where,
 } from "firebase/firestore";
-import { onAuthStateChanged, User } from "firebase/auth";
-import { db, auth } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
+import HostGuard from "../components/HostGuard";
+import { isFinalizedOpenRequest } from "@/lib/request-spot-contract";
 import styles from "./page.module.css";
 
 type SpotRequest = {
@@ -43,15 +44,9 @@ type SpotRequest = {
   stayDurationType?: string;
   note?: string;
   status?: string;
-  contactName?: string;
-  contactEmail?: string;
-  contactPhone?: string;
-  bestContactMethod?: string;
-  openToNearby?: boolean;
-  notifyMatches?: boolean;
-  finalNotes?: string;
-  priorityPreferences?: string[];
+  publicVersion?: number;
   isFinalized?: boolean;
+  requesterId?: string;
   createdAt?: Timestamp;
   finalizedAt?: Timestamp;
 };
@@ -65,9 +60,7 @@ type FilterMode =
   | "Work Stay"
   | "Employer / Team Housing";
 
-export default function RequestsDashboardPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+function RequestsDashboardContent() {
   const [requests, setRequests] = useState<SpotRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterMode>("All");
@@ -77,28 +70,27 @@ export default function RequestsDashboardPage() {
   );
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setAuthLoading(false);
-    });
-
-    return () => unsub();
-  }, []);
-
-  useEffect(() => {
     async function loadRequests() {
       try {
-        const q = query(
-          collection(db, "spotRequests"),
-          orderBy("createdAt", "desc")
+        const openSnap = await getDocs(
+          query(
+            collection(db, "spotRequestPublic"),
+            where("publicVersion", "==", 2),
+            where("status", "==", "open"),
+            where("isFinalized", "==", true)
+          )
         );
 
-        const snap = await getDocs(q);
-
-        const data = snap.docs.map((doc) => ({
-          id: doc.id,
-          ...(doc.data() as Omit<SpotRequest, "id">),
-        }));
+        const data = openSnap.docs
+          .map((doc) => ({
+            id: doc.id,
+            ...(doc.data() as Omit<SpotRequest, "id">),
+          }))
+          .filter((request, index, all) => {
+            if (all.findIndex((item) => item.id === request.id) !== index) return false;
+            return isFinalizedOpenRequest(request);
+          })
+          .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
         setRequests(data);
       } catch (error) {
@@ -108,14 +100,8 @@ export default function RequestsDashboardPage() {
       }
     }
 
-    if (!authLoading && user) {
-      loadRequests();
-    }
-
-    if (!authLoading && !user) {
-      setLoading(false);
-    }
-  }, [authLoading, user]);
+    loadRequests();
+  }, []);
 
   const filteredRequests = useMemo(() => {
     return requests.filter((request) => {
@@ -125,10 +111,6 @@ export default function RequestsDashboardPage() {
         request.state,
         request.locationText,
         request.note,
-        request.finalNotes,
-        request.contactName,
-        request.contactEmail,
-        request.status,
         request.teamName,
         request.employerName,
         request.primaryRv?.rigType,
@@ -157,32 +139,12 @@ export default function RequestsDashboardPage() {
     (r) => r.requestType === "Employer / Team Housing"
   ).length;
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <main className={styles.page}>
         <div className={styles.pageOverlay} />
         <div className={styles.pageInner}>
           <section className={styles.centerCard}>Loading RVNB requests...</section>
-        </div>
-      </main>
-    );
-  }
-
-  if (!user) {
-    return (
-      <main className={styles.page}>
-        <div className={styles.pageOverlay} />
-        <div className={styles.pageInner}>
-          <section className={styles.centerCard}>
-            <p className={styles.eyebrow}>RVNB Request Dashboard</p>
-            <h1 className={styles.lockedTitle}>Sign in required</h1>
-            <p className={styles.mutedText}>
-              Please log in before viewing submitted spot requests.
-            </p>
-            <Link href="/login" className={styles.primaryLink}>
-              Go to Login
-            </Link>
-          </section>
         </div>
       </main>
     );
@@ -292,14 +254,8 @@ export default function RequestsDashboardPage() {
                       </h2>
                     </div>
 
-                    <span
-                      className={
-                        request.isFinalized
-                          ? styles.finalizedPill
-                          : styles.draftPill
-                      }
-                    >
-                      {request.isFinalized ? "Finalized" : "Draft"}
+                    <span className={styles.finalizedPill}>
+                      {request.isFinalized ? "Finalized" : "Open"}
                     </span>
                   </div>
 
@@ -328,9 +284,9 @@ export default function RequestsDashboardPage() {
                     />
                   </div>
 
-                  {(request.note || request.finalNotes) && (
+                  {request.note && (
                     <p className={styles.notePreview}>
-                      {request.finalNotes || request.note}
+                      {request.note}
                     </p>
                   )}
 
@@ -390,13 +346,9 @@ export default function RequestsDashboardPage() {
 
             <div className={styles.slideMetaRow}>
               <span
-                className={
-                  selectedRequest.isFinalized
-                    ? styles.finalizedPill
-                    : styles.draftPill
-                }
+                className={styles.finalizedPill}
               >
-                {selectedRequest.isFinalized ? "Finalized" : "Draft"}
+                {selectedRequest.isFinalized ? "Finalized" : "Open"}
               </span>
 
               <span className={styles.sideMiniPill}>
@@ -409,25 +361,6 @@ export default function RequestsDashboardPage() {
             </div>
 
             <div className={styles.slideContent}>
-              <DetailSection title="Contact Information">
-                <Info
-                  label="Name"
-                  value={selectedRequest.contactName || "Not provided"}
-                />
-                <Info
-                  label="Email"
-                  value={selectedRequest.contactEmail || "Not provided"}
-                />
-                <Info
-                  label="Phone"
-                  value={selectedRequest.contactPhone || "Not provided"}
-                />
-                <Info
-                  label="Best Contact"
-                  value={selectedRequest.bestContactMethod || "Not provided"}
-                />
-              </DetailSection>
-
               <DetailSection title="RV Details">
                 <Info
                   label="RV Summary"
@@ -503,20 +436,9 @@ export default function RequestsDashboardPage() {
 
               <DetailSection title="Additional Information">
                 <p className={styles.detailParagraph}>
-                  {selectedRequest.finalNotes ||
-                    selectedRequest.note ||
-                    "No notes provided."}
+                  {selectedRequest.note || "No request notes provided."}
                 </p>
 
-                {selectedRequest.priorityPreferences?.length ? (
-                  <div className={styles.pillWrap}>
-                    {selectedRequest.priorityPreferences.map((pref) => (
-                      <span key={pref} className={styles.smallPill}>
-                        {pref}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
               </DetailSection>
             </div>
 
@@ -539,6 +461,14 @@ export default function RequestsDashboardPage() {
         </aside>
       )}
     </main>
+  );
+}
+
+export default function RequestsDashboardPage() {
+  return (
+    <HostGuard redirectTo="/login?next=/requests">
+      <RequestsDashboardContent />
+    </HostGuard>
   );
 }
 

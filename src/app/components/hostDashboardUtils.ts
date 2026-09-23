@@ -4,9 +4,12 @@ export type HostAnalyticsListing = {
 };
 
 export type HostAnalyticsBookingStatus =
+  | "pending"
+  | "approved"
+  | "declined"
+  | "cancelled"
   | "requested"
   | "confirmed"
-  | "cancelled"
   | "other";
 
 export type HostAnalyticsBooking = {
@@ -18,6 +21,8 @@ export type HostAnalyticsBooking = {
   nights: number;
   estimatedTotal: number;
   status: HostAnalyticsBookingStatus;
+  // Safe display label only — never a fabricated name (see host/page.tsx guestLabel logic).
+  guestLabel?: string;
 };
 
 export type MonthlyRevenueItem = {
@@ -349,4 +354,287 @@ export function getOccupancyStats(
     overallOccupancyPct,
     perListing,
   };
+}
+
+/* ================================
+   Per-day calendar summaries (dashboard preview + day popover)
+   ================================ */
+
+export type DayListingStatus = "available" | "booked" | "pending" | "blocked";
+
+export type DayOverallStatus =
+  | "no-listings"
+  | "available"
+  | "partial"
+  | "booked"
+  | "blocked"
+  | "unavailable";
+
+export type DayListingBreakdown = {
+  listingId: string;
+  title: string;
+  status: DayListingStatus;
+  guestLabel?: string;
+  bookingId?: string;
+  checkIn?: string;
+  checkOut?: string;
+  blockReason?: string;
+  signal?: string;
+  note?: string;
+};
+
+/** Minimal day-level host settings, independent of the Firestore `dayMeta` doc shape. */
+export type DayMetaLite = {
+  blocked?: boolean;
+  blockReason?: string;
+  signal?: string;
+  note?: string;
+};
+
+export type DaySummary = {
+  dateISO: string;
+  totalListings: number;
+  availableCount: number;
+  bookedCount: number;
+  pendingCount: number;
+  blockedCount: number;
+  overallStatus: DayOverallStatus;
+  hasNote: boolean;
+  signals: string[];
+  listings: DayListingBreakdown[];
+};
+
+const YMD_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Validates a `YYYY-MM-DD` string represents a real calendar date (for query params, etc.). */
+export function isValidYmd(value: string | null | undefined): value is string {
+  if (!value || !YMD_PATTERN.test(value)) return false;
+  return parseYmd(value) !== null;
+}
+
+/** Checkout day is excluded (matches /host/calendar's booking-covers-day convention). */
+export function bookingCoversDay(checkIn: string, checkOut: string, day: Date): boolean {
+  const start = parseYmd(checkIn);
+  const end = parseYmd(checkOut);
+  if (!start || !end) return false;
+
+  const x = startOfDay(day).getTime();
+  return x >= startOfDay(start).getTime() && x < startOfDay(end).getTime();
+}
+
+/**
+ * Groups active (approved/pending) bookings by day and listing in a single pass, so
+ * per-day summaries don't need to re-scan every booking on every render.
+ * Approved bookings take precedence over pending ones for the same listing/day.
+ */
+export function buildBookingsByDayAndListing(
+  bookings: HostAnalyticsBooking[]
+): Map<string, Map<string, HostAnalyticsBooking>> {
+  const byDay = new Map<string, Map<string, HostAnalyticsBooking>>();
+
+  bookings
+    .filter((b) => b.status === "approved" || b.status === "pending")
+    .forEach((b) => {
+      const start = parseYmd(b.checkIn);
+      const end = parseYmd(b.checkOut);
+      if (!start || !end) return;
+
+      const stop = startOfDay(end).getTime();
+      let cur = startOfDay(start);
+
+      while (cur.getTime() < stop) {
+        const key = dateToYmd(cur);
+        let dayMap = byDay.get(key);
+        if (!dayMap) {
+          dayMap = new Map();
+          byDay.set(key, dayMap);
+        }
+
+        const existing = dayMap.get(b.listingId);
+        if (!existing || (existing.status !== "approved" && b.status === "approved")) {
+          dayMap.set(b.listingId, b);
+        }
+
+        cur = addDays(cur, 1);
+      }
+    });
+
+  return byDay;
+}
+
+/**
+ * Computes an availability summary for one calendar day across all of a host's listings.
+ * Pending requests never reduce availability (only blocked days and approved bookings do),
+ * matching the project's existing overlap-protection rules.
+ */
+export function computeDaySummary(
+  dateISO: string,
+  listings: HostAnalyticsListing[],
+  bookingsForDay: Map<string, HostAnalyticsBooking> | undefined,
+  dayMetaForDay: Map<string, DayMetaLite> | undefined
+): DaySummary {
+  let availableCount = 0;
+  let bookedCount = 0;
+  let pendingCount = 0;
+  let blockedCount = 0;
+  let hasNote = false;
+  const signalsSet = new Set<string>();
+
+  const listingBreakdown: DayListingBreakdown[] = listings.map((listing) => {
+    const meta = dayMetaForDay?.get(listing.id);
+    const booking = bookingsForDay?.get(listing.id);
+
+    let status: DayListingStatus;
+    if (meta?.blocked) {
+      status = "blocked";
+      blockedCount += 1;
+    } else if (booking?.status === "approved") {
+      status = "booked";
+      bookedCount += 1;
+    } else if (booking?.status === "pending") {
+      status = "pending";
+      pendingCount += 1;
+    } else {
+      status = "available";
+      availableCount += 1;
+    }
+
+    if (meta?.note?.trim()) hasNote = true;
+    if (meta?.signal && meta.signal !== "none") signalsSet.add(meta.signal);
+
+    return {
+      listingId: listing.id,
+      title: listing.title || "Untitled Listing",
+      status,
+      guestLabel: booking?.guestLabel,
+      bookingId: booking?.id,
+      checkIn: booking?.checkIn,
+      checkOut: booking?.checkOut,
+      blockReason: meta?.blockReason,
+      signal: meta?.signal && meta.signal !== "none" ? meta.signal : undefined,
+      note: meta?.note,
+    };
+  });
+
+  const totalListings = listings.length;
+
+  let overallStatus: DayOverallStatus;
+  if (totalListings === 0) {
+    overallStatus = "no-listings";
+  } else if (blockedCount === totalListings) {
+    overallStatus = "blocked";
+  } else if (bookedCount === totalListings) {
+    overallStatus = "booked";
+  } else if (bookedCount === 0 && blockedCount === 0) {
+    // Pending-only (or fully open) days remain bookable — never claim they're unavailable.
+    overallStatus = "available";
+  } else if (bookedCount + blockedCount === totalListings) {
+    overallStatus = "unavailable";
+  } else {
+    overallStatus = "partial";
+  }
+
+  return {
+    dateISO,
+    totalListings,
+    availableCount,
+    bookedCount,
+    pendingCount,
+    blockedCount,
+    overallStatus,
+    hasNote,
+    signals: Array.from(signalsSet),
+    listings: listingBreakdown,
+  };
+}
+
+/* ================================
+   Date-range selection (mini + full calendar)
+   ================================ */
+
+/** Safe upper bound on a single host-managed range, to keep bulk writes bounded. */
+export const MAX_RANGE_DAYS = 365;
+
+export function normalizeDateRange(aISO: string, bISO: string): { start: string; end: string } {
+  return aISO <= bISO ? { start: aISO, end: bISO } : { start: bISO, end: aISO };
+}
+
+export function daysBetweenInclusive(startISO: string, endISO: string): number {
+  const start = parseYmd(startISO);
+  const end = parseYmd(endISO);
+  if (!start || !end) return 0;
+  return differenceInCalendarDaysInclusive(start, end);
+}
+
+/** Clamps an end date so the range never exceeds `maxDays` (defaults to MAX_RANGE_DAYS). */
+export function clampRangeEnd(
+  startISO: string,
+  endISO: string,
+  maxDays: number = MAX_RANGE_DAYS
+): { end: string; clamped: boolean } {
+  const { start, end } = normalizeDateRange(startISO, endISO);
+  const span = daysBetweenInclusive(start, end);
+  if (span <= maxDays) return { end, clamped: false };
+
+  const startDate = parseYmd(start);
+  if (!startDate) return { end, clamped: false };
+  return { end: dateToYmd(addDays(startDate, maxDays - 1)), clamped: true };
+}
+
+export function enumerateDatesInclusive(startISO: string, endISO: string): string[] {
+  const { start, end } = normalizeDateRange(startISO, endISO);
+  const startDate = parseYmd(start);
+  const endDate = parseYmd(end);
+  if (!startDate || !endDate) return [];
+
+  const out: string[] = [];
+  let cur = startOfDay(startDate);
+  const stop = startOfDay(endDate).getTime();
+  while (cur.getTime() <= stop) {
+    out.push(dateToYmd(cur));
+    cur = addDays(cur, 1);
+  }
+  return out;
+}
+
+export type RangeListingSummary = {
+  listingId: string;
+  title: string;
+  fullyAvailable: boolean;
+  hasApprovedConflict: boolean;
+  hasBlocked: boolean;
+  hasPending: boolean;
+  conflictDates: string[];
+  blockedDates: string[];
+};
+
+/** Aggregates per-day DaySummary rows (already computed for the range) into per-listing status. */
+export function summarizeRangeByListing(
+  listings: HostAnalyticsListing[],
+  daySummariesInRange: DaySummary[]
+): RangeListingSummary[] {
+  return listings.map((listing) => {
+    const conflictDates: string[] = [];
+    const blockedDates: string[] = [];
+    let hasPending = false;
+
+    daySummariesInRange.forEach((day) => {
+      const row = day.listings.find((l) => l.listingId === listing.id);
+      if (!row) return;
+      if (row.status === "booked") conflictDates.push(day.dateISO);
+      if (row.status === "blocked") blockedDates.push(day.dateISO);
+      if (row.status === "pending") hasPending = true;
+    });
+
+    return {
+      listingId: listing.id,
+      title: listing.title || "Untitled Listing",
+      fullyAvailable: conflictDates.length === 0 && blockedDates.length === 0,
+      hasApprovedConflict: conflictDates.length > 0,
+      hasBlocked: blockedDates.length > 0,
+      hasPending,
+      conflictDates,
+      blockedDates,
+    };
+  });
 }

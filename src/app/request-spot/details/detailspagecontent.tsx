@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/auth-context";
+import { normalizeSpotRequestStatus } from "@/lib/request-spot-contract";
 import styles from "./page.module.css";
 
 type SpotRequestDoc = {
+  createdAt?: unknown;
   requestType?: string;
   locationText?: string;
   city?: string;
@@ -35,6 +38,8 @@ type SpotRequestDoc = {
   spotsNeeded?: number;
   stayDurationType?: string;
   moreThanOneRv?: boolean;
+  additionalRvs?: unknown;
+  hookupsNeeded?: string;
   note?: string;
 
   contactName?: string;
@@ -46,6 +51,8 @@ type SpotRequestDoc = {
   finalNotes?: string;
   finalizedAt?: unknown;
   isFinalized?: boolean;
+  requesterId?: string;
+  status?: string;
 
   priorityPreferences?: string[];
 };
@@ -133,8 +140,8 @@ type DetailsPageContentProps = {
 };
 
 export default function DetailsPageContent({ requestId }: DetailsPageContentProps) {
- 
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
 
   const [requestData, setRequestData] = useState<SpotRequestDoc | null>(null);
   const [loading, setLoading] = useState(true);
@@ -197,6 +204,21 @@ export default function DetailsPageContent({ requestId }: DetailsPageContentProp
     let isMounted = true;
 
     async function loadRequest() {
+      if (authLoading) return;
+
+      if (!user) {
+        if (isMounted) {
+          setLoadError("Please sign in to continue. Start a new request after login.");
+          setLoading(false);
+        }
+        router.push(
+          `/login?next=${encodeURIComponent(
+            requestId ? `/request-spot/details?requestId=${requestId}` : "/request-spot"
+          )}`
+        );
+        return;
+      }
+
       if (!requestId) {
         if (isMounted) {
           setLoadError("No request ID was provided.");
@@ -220,18 +242,40 @@ export default function DetailsPageContent({ requestId }: DetailsPageContentProp
         }
 
         const data = snap.data() as SpotRequestDoc;
+        const requesterId = data.requesterId?.trim();
+
+        if (!requesterId) {
+          if (isMounted) {
+            setLoadError(
+              "This request has no verified owner. Please start a new request."
+            );
+            setLoading(false);
+          }
+          return;
+        }
+
+        if (requesterId !== user.uid) {
+          if (isMounted) {
+            setLoadError("You are not authorized to view this request.");
+            setLoading(false);
+          }
+          return;
+        }
+
+        const privateSnap = await getDoc(doc(db, "spotRequestPrivate", requestId));
+        const privateData = privateSnap.exists() ? privateSnap.data() : data;
 
         if (isMounted) {
-          setRequestData(data);
-          setFullName(data.contactName || "");
-          setEmail(data.contactEmail || "");
-          setPhone(data.contactPhone || "");
-          setBestContactMethod(data.bestContactMethod || "Email");
-          setOpenToNearby(Boolean(data.openToNearby));
-          setNotifyMatches(Boolean(data.notifyMatches));
-          setFinalNotes(data.finalNotes || "");
+          setRequestData({ ...data, ...privateData });
+          setFullName(privateData.contactName || "");
+          setEmail(privateData.contactEmail || "");
+          setPhone(privateData.contactPhone || "");
+          setBestContactMethod(privateData.bestContactMethod || "Email");
+          setOpenToNearby(Boolean(privateData.openToNearby));
+          setNotifyMatches(Boolean(privateData.notifyMatches));
+          setFinalNotes(privateData.finalNotes || "");
           setPriorityPreferences(
-            Array.isArray(data.priorityPreferences) ? data.priorityPreferences : []
+            Array.isArray(privateData.priorityPreferences) ? privateData.priorityPreferences : []
           );
           setLoading(false);
         }
@@ -249,7 +293,7 @@ export default function DetailsPageContent({ requestId }: DetailsPageContentProp
     return () => {
       isMounted = false;
     };
-  }, [requestId]);
+  }, [authLoading, requestId, router, user]);
 
   function togglePriority(option: string) {
     setPriorityPreferences((prev) =>
@@ -269,6 +313,18 @@ export default function DetailsPageContent({ requestId }: DetailsPageContentProp
       return;
     }
 
+    if (authLoading || !user) {
+      setSubmitMsg("Please sign in before finalizing this request.");
+      setSubmitMsgType("error");
+      return;
+    }
+
+    if (requestData?.isFinalized) {
+      setSubmitMsg("This request is already finalized.");
+      setSubmitMsgType("neutral");
+      return;
+    }
+
     if (!fullName.trim()) {
       setSubmitMsg("Please enter your full name.");
       setSubmitMsgType("error");
@@ -284,7 +340,19 @@ export default function DetailsPageContent({ requestId }: DetailsPageContentProp
     setSubmitSaving(true);
 
     try {
-      await updateDoc(doc(db, "spotRequests", requestId), {
+      const requestRef = doc(db, "spotRequests", requestId);
+      const publicRef = doc(db, "spotRequestPublic", requestId);
+      const privateRef = doc(db, "spotRequestPrivate", requestId);
+      const finalFields = {
+        publicVersion: 2,
+        status: "open",
+        isFinalized: true,
+        finalizedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      const privateFields = {
+        requestId,
+        requesterId: user.uid,
         contactName: fullName.trim().slice(0, 120),
         contactEmail: email.trim().slice(0, 160),
         contactPhone: phone.trim().slice(0, 40),
@@ -293,22 +361,93 @@ export default function DetailsPageContent({ requestId }: DetailsPageContentProp
         notifyMatches,
         finalNotes: finalNotes.trim().slice(0, 1000),
         priorityPreferences,
-        isFinalized: true,
-        finalizedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      await runTransaction(db, async (transaction) => {
+        const snap = await transaction.get(requestRef);
+        const publicSnap = await transaction.get(publicRef);
+        const privateSnap = await transaction.get(privateRef);
+        if (!snap.exists()) {
+          throw new Error("We couldn't find that request.");
+        }
+
+        const current = snap.data() as SpotRequestDoc;
+        const storedRequesterId = current.requesterId?.trim();
+        if (!storedRequesterId) {
+          throw new Error(
+            "This request has no verified owner. Please start a new request."
+          );
+        }
+        if (storedRequesterId !== user.uid) {
+          throw new Error("You are not authorized to finalize this request.");
+        }
+        if (privateSnap.exists() && privateSnap.data().requesterId !== user.uid) {
+          throw new Error("This request's private details have a different owner.");
+        }
+
+        const status = normalizeSpotRequestStatus(current.status, current.isFinalized);
+        if (status === "closed") {
+          throw new Error("This request is closed and cannot be finalized.");
+        }
+        if (status === "open" && current.isFinalized === true) {
+          throw new Error("This request is already finalized.");
+        }
+        if (status !== "draft" && status !== "open") {
+          throw new Error("This request has an invalid status and cannot be finalized.");
+        }
+
+        const publicFields = Object.fromEntries(
+          Object.entries({
+            requestId,
+            requesterId: storedRequesterId,
+            publicVersion: 2,
+            status: "open",
+            isFinalized: true,
+            createdAt: current.createdAt,
+            updatedAt: serverTimestamp(),
+            finalizedAt: serverTimestamp(),
+            requestType: current.requestType,
+            locationText: current.locationText,
+            city: current.city,
+            state: current.state,
+            startDate: current.startDate,
+            endDate: current.endDate,
+            flexibleDates: current.flexibleDates,
+            employerName: current.employerName,
+            teamName: current.teamName,
+            teamLocation: current.teamLocation,
+            workersCount: current.workersCount,
+            rigsCount: current.rigsCount,
+            spotsNeeded: current.spotsNeeded,
+            stayDurationType: current.stayDurationType,
+            primaryRv: current.primaryRv,
+            moreThanOneRv: current.moreThanOneRv,
+            additionalRvs: current.additionalRvs,
+            hookupsNeeded: current.hookupsNeeded,
+            budgetMax: current.budgetMax,
+            budgetPeriod: current.budgetPeriod,
+            rvDetails: current.rvDetails,
+            note: current.note,
+          }).filter(([, value]) => value !== undefined)
+        );
+
+        transaction.update(requestRef, finalFields);
+        if (publicSnap.exists()) {
+          transaction.update(publicRef, publicFields);
+        } else {
+          transaction.set(publicRef, publicFields);
+        }
+        transaction.set(privateRef, privateFields, { merge: false });
       });
 
       setRequestData((prev) =>
         prev
           ? {
               ...prev,
-              contactName: fullName.trim().slice(0, 120),
-              contactEmail: email.trim().slice(0, 160),
-              contactPhone: phone.trim().slice(0, 40),
-              bestContactMethod,
-              openToNearby,
-              notifyMatches,
-              finalNotes: finalNotes.trim().slice(0, 1000),
-              priorityPreferences,
+              ...privateFields,
+              ...finalFields,
               isFinalized: true,
             }
           : prev
@@ -319,7 +458,11 @@ export default function DetailsPageContent({ requestId }: DetailsPageContentProp
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       console.error(error);
-      setSubmitMsg("Could not finalize request. Please try again.");
+      setSubmitMsg(
+        error instanceof Error
+          ? error.message
+          : "Could not finalize request. Please try again."
+      );
       setSubmitMsgType("error");
     } finally {
       setSubmitSaving(false);

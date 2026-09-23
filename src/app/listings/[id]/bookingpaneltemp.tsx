@@ -1,20 +1,22 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   addDoc,
   collection,
-  getDocs,
-  query,
+  doc,
+  getDoc,
   serverTimestamp,
-  where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/auth-context";
 
 type BookingType = "RV" | "LAND" | "RV_PROVIDED";
 
 type Props = {
   listingId: string;
+  hostId: string;
   nightlyPrice: number;
   priceLabel: string;
 };
@@ -30,23 +32,9 @@ function addDays(yyyyMmDd: string, days: number) {
   return d.toISOString().slice(0, 10);
 }
 
-// Overlap check (treats date ranges as [start, end) )
-function rangesOverlap(aStart: string, aEnd: string, bStart: string, bEnd: string) {
-  const aS = toDateLocal(aStart).getTime();
-  const aE = toDateLocal(aEnd).getTime();
-  const bS = toDateLocal(bStart).getTime();
-  const bE = toDateLocal(bEnd).getTime();
-  return aS < bE && bS < aE;
-}
-
-type BookingDoc = {
-  listingId?: string;
-  checkIn?: string;
-  checkOut?: string;
-  status?: string; // "requested" | "confirmed" | "cancelled" etc.
-};
-
-export default function BookingPanel({ listingId, nightlyPrice, priceLabel }: Props) {
+export default function BookingPanel({ listingId, hostId, nightlyPrice, priceLabel }: Props) {
+  const router = useRouter();
+  const { user } = useAuth();
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [bookingType, setBookingType] = useState<BookingType>("RV");
@@ -84,33 +72,41 @@ export default function BookingPanel({ listingId, nightlyPrice, priceLabel }: Pr
     return addDays(checkIn, 1);
   }, [checkIn, today]);
 
-  async function checkAvailabilityOrThrow(start: string, end: string) {
-    // Pull bookings for this listing and check overlaps in-memory
-    // (safe and avoids complex composite indexing)
-    const q = query(collection(db, "bookings"), where("listingId", "==", listingId));
-    const snap = await getDocs(q);
-
-    const conflicts = snap.docs
-      .map((d) => d.data() as BookingDoc)
-      .filter((b) => {
-        const bStart = (b.checkIn ?? "").toString();
-        const bEnd = (b.checkOut ?? "").toString();
-        if (!bStart || !bEnd) return false;
-
-        // treat cancelled as non-blocking
-        const status = (b.status ?? "").toString().toLowerCase();
-        if (status === "cancelled" || status === "canceled") return false;
-
-        return rangesOverlap(start, end, bStart, bEnd);
-      });
-
-    if (conflicts.length > 0) {
-      throw new Error("Dates not available");
-    }
-  }
-
   async function handleBooking() {
     setMessage("");
+
+    if (!user) {
+      setMessage("Please sign in to request dates for this listing.");
+      router.push(`/login?next=${encodeURIComponent(`/listings/${listingId}`)}`);
+      return;
+    }
+
+    const listingSnap = await getDoc(doc(db, "listings", listingId));
+    if (!listingSnap.exists()) {
+      setMessage("This listing could not be found.");
+      return;
+    }
+
+    const listingOwnerId = (listingSnap.data()?.hostId ?? "").toString().trim();
+    if (!listingOwnerId) {
+      setMessage("This listing is missing a valid host owner.");
+      return;
+    }
+
+    if (user.uid === listingOwnerId) {
+      setMessage("You cannot request dates for your own listing.");
+      return;
+    }
+
+    if (!hostId || hostId.trim() === "") {
+      setMessage("This listing does not have a valid host owner yet.");
+      return;
+    }
+
+    if (hostId !== listingOwnerId) {
+      setMessage("This listing owner no longer matches the current listing.");
+      return;
+    }
 
     if (!listingId) {
       setMessage("Listing id missing. Please refresh.");
@@ -142,34 +138,29 @@ export default function BookingPanel({ listingId, nightlyPrice, priceLabel }: Pr
     setSaving(true);
 
     try {
-      // ✅ Availability / overlap protection (safe)
-      await checkAvailabilityOrThrow(checkIn, checkOut);
-
-      // ✅ DO NOT change booking structure
+      // Pending inquiries do not reserve dates; host approval is authoritative.
       await addDoc(collection(db, "bookings"), {
         listingId,
+        guestId: user.uid,
+        hostId: listingOwnerId,
         checkIn,
         checkOut,
         bookingType,
         nights,
         estimatedTotal,
         note: cleanNote || "",
-        status: "requested",
+        status: "pending",
         createdAt: serverTimestamp(),
       });
 
-      setMessage("✅ Booking request sent!");
+      setMessage("✅ Date inquiry sent. The host must approve it before the stay is confirmed.");
       setCheckIn("");
       setCheckOut("");
       setBookingType("RV");
       setNote("");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      if (String(err?.message || "").includes("Dates not available")) {
-        setMessage("⚠️ Those dates are not available. Please choose different dates.");
-      } else {
-        setMessage("❌ Could not submit booking.");
-      }
+      setMessage("❌ Could not submit date inquiry.");
     } finally {
       setSaving(false);
     }

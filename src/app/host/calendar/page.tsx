@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import type { MutableRefObject } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   collection,
   doc,
@@ -10,26 +12,40 @@ import {
   query,
   serverTimestamp,
   setDoc,
-  updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/auth-context";
+import { approveBooking, declineBooking } from "@/lib/booking-approval";
+import { normalizeBookingStatus } from "@/lib/booking-status";
+import {
+  MAX_RANGE_DAYS,
+  clampRangeEnd,
+  enumerateDatesInclusive,
+  normalizeDateRange,
+} from "../../components/hostDashboardUtils";
+import AuthNav from "../../components/authnav";
+import HostGuard from "../../components/HostGuard";
+import navStyles from "../../components/hostDashboard.module.css";
+import styles from "./hostCalendar.module.css";
 
 type Hookups = "Full" | "Partial" | "None";
 
 type Listing = {
   id: string;
+  hostId: string;
   title: string;
   city: string;
   state: string;
-  pricePerNight: number;
+  price?: number;
+  pricePerNight?: number;
+  pricingType?: string;
   hookups: Hookups;
   maxLengthFt: number;
 };
 
-type BookingStatus = "pending" | "approved" | "declined";
-
-// ✅ NEW: stay type
+type BookingStatus = "pending" | "approved" | "declined" | "cancelled" | "completed" | "unknown";
 type StayType = "rv" | "land";
 
 type Booking = {
@@ -40,8 +56,6 @@ type Booking = {
   status: BookingStatus;
   name?: string;
   email?: string;
-
-  // ✅ NEW: optional for backwards compatibility
   stayType?: StayType;
 };
 
@@ -49,6 +63,7 @@ type DaySignal = "none" | "high" | "maintenance" | "private" | "flex";
 
 type DayMeta = {
   listingId: string;
+  hostId: string;
   date: string; // YYYY-MM-DD
   blocked?: boolean;
   blockReason?: string;
@@ -65,6 +80,13 @@ function toISODate(d: Date) {
 function parseISODate(s: string) {
   const [y, m, d] = s.split("-").map(Number);
   return new Date(y, (m || 1) - 1, d || 1);
+}
+function isValidDateParam(value: string | null | undefined): value is string {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  return toISODate(parseISODate(value)) === value;
+}
+function isValidListingIdParam(value: string | null | undefined): value is string {
+  return typeof value === "string" && value.trim().length > 0;
 }
 function startOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -86,36 +108,44 @@ function clampMidnight(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-/**
- * checkIn included, checkOut excluded
- */
+/** checkIn included, checkOut excluded */
 function bookingCoversDay(b: Booking, day: Date) {
+  const normalizedStatus = normalizeBookingStatus(b.status);
+  if (normalizedStatus !== "pending" && normalizedStatus !== "approved") return false;
+
   const inD = clampMidnight(parseISODate(b.checkIn));
   const outD = clampMidnight(parseISODate(b.checkOut));
   const x = clampMidnight(day);
   return x >= inD && x < outD;
 }
 
-function statusStyle(status: BookingStatus): React.CSSProperties {
+function dayChipClass(status: BookingStatus): string {
+  if (status === "approved") return styles.dayChipApproved;
+  if (status === "pending") return styles.dayChipPending;
+  return "";
+}
+
+function bookingBadgeStyle(status: BookingStatus): { background: string; color: string; border: string } {
   if (status === "approved") {
-    return {
-      border: "1px solid rgba(255,255,255,0.22)",
-      background: "rgba(255,255,255,0.12)",
-      opacity: 0.98,
-    };
+    return { background: "rgba(59,130,246,0.22)", color: "#bfdbfe", border: "1px solid rgba(96,165,250,0.4)" };
   }
   if (status === "pending") {
-    return {
-      border: "1px dashed rgba(255,255,255,0.22)",
-      background: "rgba(255,255,255,0.08)",
-      opacity: 0.92,
-    };
+    return { background: "rgba(250,204,21,0.16)", color: "#fde68a", border: "1px solid rgba(250,204,21,0.35)" };
   }
-  return {
-    border: "1px solid rgba(255,255,255,0.14)",
-    background: "rgba(255,255,255,0.04)",
-    opacity: 0.7,
-  };
+  return { background: "rgba(255,255,255,0.08)", color: "#e5e7eb", border: "1px solid rgba(255,255,255,0.16)" };
+}
+
+function getListingPriceLabel(listing: Listing) {
+  const priceValue = typeof listing.price === "number" ? listing.price : listing.pricePerNight;
+
+  if (typeof priceValue !== "number" || !Number.isFinite(priceValue)) {
+    return { priceText: "Price unavailable", period: "" };
+  }
+
+  const normalizedType = String(listing.pricingType ?? "Night").trim().toLowerCase();
+  if (normalizedType === "weekly") return { priceText: `$${priceValue}`, period: "/week" };
+  if (normalizedType === "monthly") return { priceText: `$${priceValue}`, period: "/month" };
+  return { priceText: `$${priceValue}`, period: "/night" };
 }
 
 function prettyDate(d: Date) {
@@ -146,18 +176,40 @@ function signalLabel(s: DaySignal) {
   }
 }
 
-// ✅ NEW: stay icon helper
 function stayIcon(stayType?: StayType) {
   return (stayType ?? "rv") === "rv" ? "🚐" : "🏕️";
 }
 
-export default function HostCalendarPage() {
+function createdAtOrCheckInMillis(checkIn: string): number {
+  const d = parseISODate(checkIn);
+  return Number.isNaN(d.getTime()) ? 0 : d.getTime();
+}
+
+function HostCalendarContent({
+  initialDateISO,
+  initialListingId,
+  initialStartISO,
+  initialEndISO,
+}: {
+  initialDateISO: string | null;
+  initialListingId: string | null;
+  initialStartISO: string | null;
+  initialEndISO: string | null;
+}) {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [listings, setListings] = useState<Listing[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [error, setError] = useState("");
+  const [dataWarning, setDataWarning] = useState("");
+
+  const [activeListingId, setActiveListingId] = useState<string | null>(null);
 
   const [monthCursor, setMonthCursor] = useState(() => startOfMonth(new Date()));
+  const appliedInitialMonthRef = useRef(false);
+  const appliedInitialListingRef = useRef(false);
+  const appliedInitialInspectorRef = useRef(false);
+  const appliedInitialRangeRef = useRef(false);
 
   // Day Meta (blocked/signal/note)
   const [dayMetaMap, setDayMetaMap] = useState<Record<string, DayMeta>>({});
@@ -175,113 +227,255 @@ export default function HostCalendarPage() {
   const [editSignal, setEditSignal] = useState<DaySignal>("none");
   const [editNote, setEditNote] = useState("");
 
+  // Date-range selection mode
+  const [rangeMode, setRangeMode] = useState(false);
+  const [rangeStart, setRangeStart] = useState<string | null>(null);
+  const [rangeEnd, setRangeEnd] = useState<string | null>(null);
+  const [rangeHoverDate, setRangeHoverDate] = useState<string | null>(null);
+  const [rangeMessage, setRangeMessage] = useState("");
+  const [bulkNote, setBulkNote] = useState("");
+  const [bulkSignal, setBulkSignal] = useState<DaySignal>("none");
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState("");
+
+  const selectedDayButtonRef = useRef<HTMLButtonElement | null>(null);
+  const rangeToggleRef = useRef<HTMLButtonElement | null>(null);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setDrawerOpen(false);
+      if (e.key === "Escape") closeDrawer();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Navigate to the requested month once (validated YYYY-MM-DD; ignored otherwise).
+  useEffect(() => {
+    if (appliedInitialMonthRef.current) return;
+    if (!isValidDateParam(initialDateISO)) return;
+    appliedInitialMonthRef.current = true;
+    setMonthCursor(startOfMonth(parseISODate(initialDateISO)));
+  }, [initialDateISO]);
+
   const monthStart = useMemo(() => startOfMonth(monthCursor), [monthCursor]);
   const monthEnd = useMemo(() => endOfMonth(monthCursor), [monthCursor]);
+
+  function toListingRow(id: string, data: Omit<Listing, "id">): Listing {
+    return { id, ...data };
+  }
 
   // Load listings + bookings once
   useEffect(() => {
     const run = async () => {
       setLoading(true);
       setError("");
+      setDataWarning("");
+
+      if (!user?.uid) {
+        setListings([]);
+        setBookings([]);
+        setLoading(false);
+        return;
+      }
 
       try {
-        const listingsSnap = await getDocs(collection(db, "listings"));
-        const listingsData: Listing[] = listingsSnap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as Omit<Listing, "id">),
-        }));
+        const listingsSnap = await getDocs(
+          query(collection(db, "listings"), where("hostId", "==", user.uid))
+        );
+        const listingsData: Listing[] = listingsSnap.docs.map((d) =>
+          toListingRow(d.id, d.data() as Omit<Listing, "id">)
+        );
         setListings(listingsData);
 
-        const listingIds = listingsData.map((l) => l.id);
-        if (listingIds.length === 0) {
-          setBookings([]);
-          return;
-        }
-
-        const chunks: string[][] = [];
-        for (let i = 0; i < listingIds.length; i += 10) {
-          chunks.push(listingIds.slice(i, i + 10));
-        }
-
-        const all: Booking[] = [];
-        for (const chunk of chunks) {
-          const qy = query(
-            collection(db, "bookings"),
-            where("listingId", "in", chunk),
-            orderBy("checkIn", "asc")
-          );
-          const snap = await getDocs(qy);
-          snap.docs.forEach((d) => {
-            const data = d.data() as any;
-            all.push({
-              id: d.id,
-              ...(data as Omit<Booking, "id">),
-              // ✅ ensure stayType comes through if present
-              stayType: (data.stayType as StayType) ?? undefined,
-            });
-          });
-        }
-
-        all.sort((a, b) => a.checkIn.localeCompare(b.checkIn));
-        setBookings(all);
-      } catch (e: any) {
-        console.error(e);
-        setError(e?.message || "Failed to load calendar data.");
+        await loadBookings();
+      } catch (e: unknown) {
+        const code = (e as { code?: string })?.code ?? "unknown";
+        console.error(`[RVNB] calendar listings query failed (code: ${code})`, e);
+        setError("Calendar information could not be loaded right now. Please try refreshing.");
+        setListings([]);
+        setBookings([]);
       } finally {
         setLoading(false);
       }
     };
 
+    async function loadBookings() {
+      if (!user?.uid) return;
+
+      try {
+        const bookingsSnap = await getDocs(
+          query(
+            collection(db, "bookings"),
+            where("hostId", "==", user.uid),
+            orderBy("checkIn", "asc")
+          )
+        );
+        setBookings(toBookings(bookingsSnap.docs));
+      } catch (e: unknown) {
+        const code = (e as { code?: string })?.code ?? "unknown";
+        console.error(`[RVNB] calendar bookings query failed (code: ${code})`, e);
+
+        // The indexed query needs a composite index (hostId + checkIn). Fall back to an
+        // index-free equality query and sort client-side instead of showing a raw Firebase
+        // error/URL, or worse, silently reporting stale/false availability.
+        try {
+          const fallbackSnap = await getDocs(
+            query(collection(db, "bookings"), where("hostId", "==", user.uid))
+          );
+          setBookings(toBookings(fallbackSnap.docs));
+          setDataWarning(
+            "Calendar data needs additional configuration. Booking order may be approximate until it's completed."
+          );
+        } catch (e2: unknown) {
+          const code2 = (e2 as { code?: string })?.code ?? "unknown";
+          console.error(`[RVNB] calendar bookings fallback query also failed (code: ${code2})`, e2);
+          setError("Calendar information could not be loaded right now. Please try refreshing.");
+          setBookings([]);
+        }
+      }
+    }
+
+    function toBookings(
+      docs: { id: string; data: () => Record<string, unknown> }[]
+    ): Booking[] {
+      const all: Booking[] = docs.map((d) => {
+        const data = d.data() as Partial<Omit<Booking, "id" | "status">> & { status?: unknown };
+        return {
+          id: d.id,
+          ...(data as Omit<Booking, "id">),
+          status: normalizeBookingStatus(typeof data.status === "string" ? data.status : undefined),
+          stayType: (data.stayType as StayType) ?? undefined,
+        };
+      });
+      all.sort((a, b) => createdAtOrCheckInMillis(a.checkIn) - createdAtOrCheckInMillis(b.checkIn));
+      return all;
+    }
+
     run();
-  }, []);
+  }, [user?.uid]);
+
+  // Pick the active listing once listings are ready: an owned ?listingId= wins, otherwise
+  // the first listing. Runs once so manual tab switches afterward are never overridden.
+  useEffect(() => {
+    if (appliedInitialListingRef.current) return;
+    if (loading) return;
+    if (listings.length === 0) return;
+
+    appliedInitialListingRef.current = true;
+
+    const requested =
+      isValidListingIdParam(initialListingId) && listings.some((l) => l.id === initialListingId)
+        ? initialListingId
+        : null;
+
+    setActiveListingId(requested ?? listings[0].id);
+  }, [loading, listings, initialListingId]);
+
+  // Auto-open the Day Inspector only when unambiguous: an explicitly owned listingId was
+  // requested, or the host only has one listing anyway. Skipped when a range was requested.
+  useEffect(() => {
+    if (appliedInitialInspectorRef.current) return;
+    if (loading) return;
+    if (!activeListingId) return;
+    if (isValidDateParam(initialStartISO) && isValidDateParam(initialEndISO)) return;
+    if (!isValidDateParam(initialDateISO)) return;
+
+    const requestedOwnedListingId =
+      isValidListingIdParam(initialListingId) && listings.some((l) => l.id === initialListingId)
+        ? initialListingId
+        : null;
+
+    if (!requestedOwnedListingId && listings.length !== 1) return;
+
+    appliedInitialInspectorRef.current = true;
+    openDayInspector(parseISODate(initialDateISO));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, activeListingId, initialDateISO, initialListingId, initialStartISO, initialEndISO, listings]);
+
+  // Auto-select a range when ?listingId=&start=&end= are all valid and the listingId is owned.
+  useEffect(() => {
+    if (appliedInitialRangeRef.current) return;
+    if (loading) return;
+    if (!activeListingId) return;
+    if (!isValidDateParam(initialStartISO) || !isValidDateParam(initialEndISO)) return;
+
+    const requestedOwnedListingId =
+      isValidListingIdParam(initialListingId) && listings.some((l) => l.id === initialListingId)
+        ? initialListingId
+        : null;
+
+    if (!requestedOwnedListingId) return;
+
+    appliedInitialRangeRef.current = true;
+    const { start, end } = normalizeDateRange(initialStartISO, initialEndISO);
+    const clamped = clampRangeEnd(start, end);
+    setRangeMode(true);
+    setRangeStart(start);
+    setRangeEnd(clamped.end);
+    if (clamped.clamped) setRangeMessage(`Range limited to ${MAX_RANGE_DAYS} days.`);
+  }, [loading, activeListingId, initialStartISO, initialEndISO, initialListingId, listings]);
+
+  async function fetchDayMetaRange(startISO: string, endISO: string): Promise<Record<string, DayMeta>> {
+    const next: Record<string, DayMeta> = {};
+    if (listings.length === 0) return next;
+
+    await Promise.all(
+      listings.map(async (listing) => {
+        const qy = query(
+          collection(db, "dayMeta"),
+          where("listingId", "==", listing.id),
+          where("hostId", "==", listing.hostId),
+          where("date", ">=", startISO),
+          where("date", "<=", endISO),
+          orderBy("date", "asc")
+        );
+        const snap = await getDocs(qy);
+        snap.docs.forEach((d) => {
+          const data = d.data() as DayMeta;
+          next[dayMetaId(data.listingId, data.date)] = data;
+        });
+      })
+    );
+
+    return next;
+  }
 
   // Load dayMeta for the visible month (refresh when month changes)
   useEffect(() => {
     const run = async () => {
       try {
         if (listings.length === 0) return;
-
         const startISO = toISODate(monthStart);
         const endISO = toISODate(monthEnd);
-
-        const listingIds = listings.map((l) => l.id);
-        const chunks: string[][] = [];
-        for (let i = 0; i < listingIds.length; i += 10) chunks.push(listingIds.slice(i, i + 10));
-
-        const next: Record<string, DayMeta> = {};
-
-        for (const chunk of chunks) {
-          const qy = query(
-            collection(db, "dayMeta"),
-            where("listingId", "in", chunk),
-            where("date", ">=", startISO),
-            where("date", "<=", endISO),
-            orderBy("date", "asc")
-          );
-
-          const snap = await getDocs(qy);
-          snap.docs.forEach((d) => {
-            const data = d.data() as DayMeta;
-            next[dayMetaId(data.listingId, data.date)] = data;
-          });
-        }
-
-        setDayMetaMap(next);
-      } catch (e: any) {
-        console.error(e);
+        const next = await fetchDayMetaRange(startISO, endISO);
+        setDayMetaMap((prev) => ({ ...prev, ...next }));
+      } catch (e: unknown) {
+        const code = (e as { code?: string })?.code ?? "unknown";
+        console.error(`[RVNB] calendar dayMeta query failed (code: ${code})`, e);
       }
     };
 
     run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings, monthStart, monthEnd]);
+
+  // On-demand fetch once a range is committed, in case it extends beyond the visible month.
+  useEffect(() => {
+    if (!rangeStart || !rangeEnd) return;
+
+    const run = async () => {
+      try {
+        const next = await fetchDayMetaRange(rangeStart, rangeEnd);
+        setDayMetaMap((prev) => ({ ...prev, ...next }));
+      } catch (e: unknown) {
+        const code = (e as { code?: string })?.code ?? "unknown";
+        console.error(`[RVNB] range dayMeta query failed (code: ${code})`, e);
+      }
+    };
+
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rangeStart, rangeEnd]);
 
   const bookingsByListing = useMemo(() => {
     const map = new Map<string, Booking[]>();
@@ -297,6 +491,8 @@ export default function HostCalendarPage() {
     listings.forEach((l) => map.set(l.id, l));
     return map;
   }, [listings]);
+
+  const activeListing = activeListingId ? listingById.get(activeListingId) ?? null : null;
 
   const days = useMemo(() => {
     const start = new Date(monthStart);
@@ -315,18 +511,234 @@ export default function HostCalendarPage() {
 
   const today = useMemo(() => clampMidnight(new Date()), []);
 
-  function openDayInspector(listingId: string, day: Date) {
+  function selectListing(id: string) {
+    setActiveListingId(id);
+    setDrawerOpen(false);
+    clearRangeSelection();
+  }
+
+  function openDayInspector(day: Date) {
+    if (!activeListingId) return;
+
     const dayISO = toISODate(day);
-    setSelected({ listingId, dayISO });
+    setSelected({ listingId: activeListingId, dayISO });
     setDrawerOpen(true);
 
-    const key = dayMetaId(listingId, dayISO);
+    const key = dayMetaId(activeListingId, dayISO);
     const meta = dayMetaMap[key];
 
     setEditBlocked(!!meta?.blocked);
     setEditReason(meta?.blockReason || "");
     setEditSignal((meta?.signal as DaySignal) || "none");
     setEditNote(meta?.note || "");
+  }
+
+  function closeDrawer() {
+    setDrawerOpen(false);
+    selectedDayButtonRef.current?.focus();
+  }
+
+  // ---------- Range-selection mode ----------
+
+  function toggleRangeMode() {
+    setRangeMode((prev) => {
+      const next = !prev;
+      if (!next) {
+        setRangeStart(null);
+        setRangeEnd(null);
+        setRangeHoverDate(null);
+        setRangeMessage("");
+        setBulkStatus("");
+      } else {
+        setDrawerOpen(false);
+      }
+      return next;
+    });
+  }
+
+  function clearRangeSelection() {
+    setRangeStart(null);
+    setRangeEnd(null);
+    setRangeHoverDate(null);
+    setRangeMessage("");
+    setBulkStatus("");
+    setBulkNote("");
+    setBulkSignal("none");
+  }
+
+  function handleRangeDayClick(day: Date) {
+    const dayISO = toISODate(day);
+
+    if (!rangeStart || rangeEnd) {
+      setRangeStart(dayISO);
+      setRangeEnd(null);
+      setRangeHoverDate(null);
+      setRangeMessage("");
+      setBulkStatus("");
+      return;
+    }
+
+    const { start, end } = normalizeDateRange(rangeStart, dayISO);
+    const clamped = clampRangeEnd(start, end);
+    setRangeStart(start);
+    setRangeEnd(clamped.end);
+    setRangeHoverDate(null);
+    setRangeMessage(clamped.clamped ? `Range limited to ${MAX_RANGE_DAYS} days.` : "");
+  }
+
+  function handleDayActivate(day: Date) {
+    if (rangeMode) {
+      handleRangeDayClick(day);
+    } else {
+      openDayInspector(day);
+    }
+  }
+
+  // Escape cancels the in-progress or completed range selection while range mode is on.
+  useEffect(() => {
+    if (!rangeMode) return;
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && (rangeStart || rangeEnd)) {
+        clearRangeSelection();
+        rangeToggleRef.current?.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [rangeMode, rangeStart, rangeEnd]);
+
+  const rangeDates = useMemo(() => {
+    if (!rangeStart || !rangeEnd) return [];
+    return enumerateDatesInclusive(rangeStart, rangeEnd);
+  }, [rangeStart, rangeEnd]);
+
+  const tentativeRangeDates = useMemo(() => {
+    if (!rangeStart || rangeEnd || !rangeHoverDate) return [];
+    return enumerateDatesInclusive(rangeStart, rangeHoverDate);
+  }, [rangeStart, rangeEnd, rangeHoverDate]);
+
+  const rangeConflicts = useMemo(() => {
+    if (!activeListingId || rangeDates.length === 0) {
+      return { approved: [] as string[], pending: [] as string[], blocked: [] as string[] };
+    }
+
+    const items = bookingsByListing.get(activeListingId) || [];
+    const approved: string[] = [];
+    const pending: string[] = [];
+    const blocked: string[] = [];
+
+    rangeDates.forEach((dISO) => {
+      const day = clampMidnight(parseISODate(dISO));
+      const hits = items.filter((b) => bookingCoversDay(b, day));
+      if (hits.some((b) => b.status === "approved")) approved.push(dISO);
+      if (hits.some((b) => b.status === "pending")) pending.push(dISO);
+      if (dayMetaMap[dayMetaId(activeListingId, dISO)]?.blocked) blocked.push(dISO);
+    });
+
+    return { approved, pending, blocked };
+  }, [activeListingId, rangeDates, bookingsByListing, dayMetaMap]);
+
+  async function runBulkDayMetaWrite(
+    dates: string[],
+    patch: Partial<Pick<DayMeta, "blocked" | "blockReason" | "signal" | "note">>,
+    successMessage: string
+  ) {
+    if (!activeListingId || !activeListing || dates.length === 0) return;
+    // Ownership guard: never write against a listing the authenticated host doesn't own.
+    if (activeListing.hostId !== user?.uid) {
+      setBulkStatus("You don't have permission to manage this listing.");
+      return;
+    }
+
+    setBulkSaving(true);
+    setBulkStatus("");
+
+    try {
+      const batch = writeBatch(db);
+
+      dates.forEach((dISO) => {
+        const id = dayMetaId(activeListingId, dISO);
+        const existing = dayMetaMap[id];
+        const payload: DayMeta = {
+          listingId: activeListingId,
+          hostId: activeListing.hostId,
+          date: dISO,
+          blocked: patch.blocked ?? existing?.blocked ?? false,
+          blockReason: patch.blockReason ?? existing?.blockReason ?? "",
+          signal: patch.signal ?? (existing?.signal as DaySignal) ?? "none",
+          note: patch.note ?? existing?.note ?? "",
+        };
+        batch.set(doc(db, "dayMeta", id), { ...payload, updatedAt: serverTimestamp() }, { merge: true });
+      });
+
+      await batch.commit();
+
+      const refreshed = await fetchDayMetaRange(dates[0], dates[dates.length - 1]);
+      setDayMetaMap((prev) => ({ ...prev, ...refreshed }));
+      setBulkStatus(successMessage);
+    } catch (e: unknown) {
+      const code = (e as { code?: string })?.code ?? "unknown";
+      console.error(`[RVNB] bulk dayMeta write failed (code: ${code})`, e);
+      setBulkStatus("Couldn't save changes for the selected dates. Nothing was changed — please try again.");
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
+  function handleBulkBlock(onlyAvailable: boolean) {
+    if (rangeConflicts.approved.length > 0 && !onlyAvailable) return;
+
+    const targetDates = onlyAvailable
+      ? rangeDates.filter((d) => !rangeConflicts.approved.includes(d))
+      : rangeDates;
+
+    if (onlyAvailable && rangeConflicts.approved.length > 0) {
+      const proceed = window.confirm(
+        `This will skip ${rangeConflicts.approved.length} date(s) with an approved booking: ${rangeConflicts.approved
+          .join(", ")}. Block the remaining ${targetDates.length} date(s)?`
+      );
+      if (!proceed) return;
+    } else {
+      const proceed = window.confirm(`Block ${targetDates.length} selected date(s)?`);
+      if (!proceed) return;
+    }
+
+    runBulkDayMetaWrite(targetDates, { blocked: true }, `Blocked ${targetDates.length} date(s).`);
+  }
+
+  function handleBulkUnblock() {
+    const proceed = window.confirm(`Unblock ${rangeDates.length} selected date(s)?`);
+    if (!proceed) return;
+    runBulkDayMetaWrite(
+      rangeDates,
+      { blocked: false, blockReason: "" },
+      `Unblocked ${rangeDates.length} date(s).`
+    );
+  }
+
+  function handleBulkNote() {
+    const proceed = window.confirm(
+      `Apply this note to all ${rangeDates.length} selected date(s)? This replaces any existing note on each date.`
+    );
+    if (!proceed) return;
+    runBulkDayMetaWrite(rangeDates, { note: bulkNote.trim() }, `Note applied to ${rangeDates.length} date(s).`);
+  }
+
+  function handleBulkSignal(clear: boolean) {
+    const signalToApply: DaySignal = clear ? "none" : bulkSignal;
+    const proceed = window.confirm(
+      clear
+        ? `Clear the signal on ${rangeDates.length} selected date(s)?`
+        : `Apply "${signalLabel(signalToApply)}" to ${rangeDates.length} selected date(s)?`
+    );
+    if (!proceed) return;
+    runBulkDayMetaWrite(
+      rangeDates,
+      { signal: signalToApply },
+      clear ? `Signal cleared on ${rangeDates.length} date(s).` : `Signal applied to ${rangeDates.length} date(s).`
+    );
   }
 
   const inspectorData = useMemo(() => {
@@ -348,11 +760,15 @@ export default function HostCalendarPage() {
   async function setBookingStatus(bookingId: string, status: BookingStatus) {
     try {
       setActionLoading(bookingId);
-      await updateDoc(doc(db, "bookings", bookingId), { status });
+      const result =
+        status === "approved" ? await approveBooking(bookingId) : await declineBooking(bookingId);
+
+      if (!result.ok) {
+        alert(result.message);
+        return;
+      }
+
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, status } : b)));
-    } catch (e: any) {
-      console.error(e);
-      alert(e?.message || "Failed to update booking status.");
     } finally {
       setActionLoading("");
     }
@@ -365,6 +781,7 @@ export default function HostCalendarPage() {
 
       const payload: DayMeta = {
         listingId: selected.listingId,
+        hostId: listingById.get(selected.listingId)?.hostId || "",
         date: selected.dayISO,
         blocked: editBlocked,
         blockReason: editBlocked ? editReason.trim() : "",
@@ -374,306 +791,330 @@ export default function HostCalendarPage() {
 
       const id = dayMetaId(selected.listingId, selected.dayISO);
 
-      await setDoc(
-        doc(db, "dayMeta", id),
-        { ...payload, updatedAt: serverTimestamp() },
-        { merge: true }
-      );
+      await setDoc(doc(db, "dayMeta", id), { ...payload, updatedAt: serverTimestamp() }, { merge: true });
 
       setDayMetaMap((prev) => ({ ...prev, [id]: payload }));
-    } catch (e: any) {
-      console.error(e);
-      alert(e?.message || "Failed to save day settings.");
+    } catch (e: unknown) {
+      const code = (e as { code?: string })?.code ?? "unknown";
+      console.error(`[RVNB] dayMeta save failed (code: ${code})`, e);
+      alert("Couldn't save day settings. Please try again.");
     } finally {
       setMetaSaving(false);
     }
   }
 
-  if (loading) {
-    return (
-      <main style={pageStyle}>
-        <h1 style={h1}>Host Calendar</h1>
-        <div style={card}>Loading…</div>
-      </main>
-    );
-  }
+  const monthLabel = monthStart.toLocaleString(undefined, { month: "long", year: "numeric" });
 
   return (
-    <main style={pageStyle}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <h1 style={h1}>Host Calendar</h1>
-        <Link href="/host" style={linkBtn}>
-          ← Back to Host
-        </Link>
-        <Link href="/listings" style={linkBtn}>
-          View Public Listings
-        </Link>
-      </div>
+    <div className={navStyles.page}>
+      <header className={navStyles.headerBar}>
+        <div className={navStyles.headerInner}>
+          <div className={navStyles.brandGroup}>
+            <Link href="/" className={navStyles.brand} aria-label="Return to RVNB home">
+              <img src="/rvnb-logo-icon.png" alt="RVNB" className={navStyles.brandIcon} />
+              <span className={navStyles.brandTagline}>Explore RVNB</span>
+            </Link>
+            <Link href="/host" className={navStyles.hostCenterLink}>
+              Host Center
+            </Link>
+          </div>
 
-      {error && (
-        <div style={{ ...card, borderColor: "rgba(255,80,80,0.35)" }}>{error}</div>
-      )}
-
-      <section
-        style={{
-          ...card,
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 10,
-          alignItems: "center",
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ fontWeight: 900, fontSize: 18 }}>
-          {monthStart.toLocaleString(undefined, { month: "long", year: "numeric" })}
+          <nav className={navStyles.nav} aria-label="Host account">
+            <span className={`${navStyles.navLink} ${navStyles.navLinkActive}`} aria-current="page">
+              Calendar
+            </span>
+            <AuthNav navLinkClassName={navStyles.navLink} navCtaClassName={navStyles.navCta} navLogoutClassName={navStyles.navLink} />
+          </nav>
         </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button style={btn} onClick={() => setMonthCursor(addMonths(monthCursor, -1))}>
-            ← Prev
-          </button>
-          <button style={btn} onClick={() => setMonthCursor(startOfMonth(new Date()))}>
-            Today
-          </button>
-          <button style={btn} onClick={() => setMonthCursor(addMonths(monthCursor, 1))}>
-            Next →
-          </button>
+      </header>
+
+      <div className={styles.container}>
+        <div className={styles.pageHeader}>
+          <div className={styles.pageHeaderBg} aria-hidden="true" />
+          <img src="/rvnb-logo-icon.png" alt="" aria-hidden="true" className={styles.pageHeaderWatermark} />
+
+          <div className={styles.pageHeaderContent}>
+            <p className={styles.eyebrow}>Host Center</p>
+            <h1 className={styles.pageTitle}>Availability Calendar</h1>
+            <p className={styles.pageSub}>
+              Manage blocked dates, host notes, and demand signals for each of your listings.
+            </p>
+          </div>
+
+          <div className={styles.headerActions}>
+            <Link href="/host" className={styles.btnPrimary}>
+              ← Back to dashboard
+            </Link>
+            <Link href="/listings" className={styles.btnSecondary}>
+              View public listings
+            </Link>
+          </div>
         </div>
-      </section>
 
-      <div style={{ display: "grid", gap: 14, marginTop: 14 }}>
-        {listings.map((l) => {
-          const items = bookingsByListing.get(l.id) || [];
-          const approved = items.filter((b) => b.status === "approved").length;
-          const pending = items.filter((b) => b.status === "pending").length;
-          const declined = items.filter((b) => b.status === "declined").length;
+        {error && <div className={styles.errorBanner}>{error}</div>}
+        {!error && dataWarning && <div className={styles.warningBanner}>{dataWarning}</div>}
 
-          return (
-            <section key={l.id} style={card}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  flexWrap: "wrap",
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: 18, fontWeight: 950 }}>{l.title}</div>
-                  <div style={{ opacity: 0.82 }}>
-                    {l.city}, {l.state} • ${l.pricePerNight}/night • {l.hookups} • Max {l.maxLengthFt}ft
-                  </div>
-                  <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-                    <div style={pill}>Approved: {approved}</div>
-                    <div style={pill}>Pending: {pending}</div>
-                    <div style={pill}>Declined: {declined}</div>
-                  </div>
-                </div>
-                <Link href={`/listings/${l.id}`} style={linkBtn}>
-                  Open Listing →
-                </Link>
+        {loading ? (
+          <div className={styles.emptyState}>
+            <div className={styles.emptyStateTitle}>Loading your calendar…</div>
+          </div>
+        ) : listings.length === 0 ? (
+          <div className={styles.emptyState}>
+            <div className={styles.emptyStateTitle}>You don&apos;t have any listings yet</div>
+            <div className={styles.emptyStateText}>
+              Create a listing to start managing its availability calendar.
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className={styles.selectorWrap}>
+              <div className={styles.tabsRow} role="tablist" aria-label="Select a listing">
+                {listings.map((l) => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={l.id === activeListingId}
+                    className={`${styles.tab} ${l.id === activeListingId ? styles.tabActive : ""}`}
+                    onClick={() => selectListing(l.id)}
+                  >
+                    <span className={styles.tabTitle}>{l.title}</span>
+                    <span className={styles.tabMeta}>
+                      {l.city}, {l.state}
+                    </span>
+                  </button>
+                ))}
               </div>
 
-              <div style={{ marginTop: 14 }}>
-                <div style={dowRow}>
-                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-                    <div key={d} style={dowCell}>
-                      {d}
-                    </div>
+              <div className={styles.dropdownWrap}>
+                <select
+                  className={styles.dropdown}
+                  value={activeListingId ?? ""}
+                  onChange={(e) => selectListing(e.target.value)}
+                  aria-label="Select a listing"
+                >
+                  {listings.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.title} — {l.city}, {l.state}
+                    </option>
                   ))}
-                </div>
-
-                <div style={grid}>
-                  {days.map((day) => {
-                    const inMonth = day.getMonth() === monthStart.getMonth();
-                    const dayISO = toISODate(day);
-
-                    const hits = items.filter((b) => bookingCoversDay(b, day));
-                    const shown = hits.slice(0, 2);
-                    const extra = hits.length - shown.length;
-
-                    const metaKey = dayMetaId(l.id, dayISO);
-                    const meta = dayMetaMap[metaKey];
-                    const isBlocked = !!meta?.blocked;
-                    const sig = (meta?.signal as DaySignal) || "none";
-                    const hasNote = !!meta?.note?.trim();
-
-                    return (
-                      <button
-                        key={`${l.id}-${dayISO}`}
-                        type="button"
-                        onClick={() => openDayInspector(l.id, day)}
-                        style={{
-                          ...cellBtn,
-                          opacity: inMonth ? 1 : 0.45,
-                          outline: sameDay(day, today)
-                            ? "2px solid rgba(255,255,255,0.28)"
-                            : "none",
-                        }}
-                        title={`Inspect ${dayISO}`}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "baseline",
-                          }}
-                        >
-                          <div style={{ fontWeight: 900 }}>{day.getDate()}</div>
-                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                            {hasNote && (
-                              <span title="Has note" style={miniTag}>
-                                📝
-                              </span>
-                            )}
-                            {sig !== "none" && (
-                              <span title={signalLabel(sig)} style={miniTag}>
-                                ⚑
-                              </span>
-                            )}
-                            {isBlocked && (
-                              <span title={meta?.blockReason || "Blocked"} style={miniTag}>
-                                ⛔
-                              </span>
-                            )}
-                            {hits.length > 0 && (
-                              <span
-                                title="Bookings on day"
-                                style={{ fontSize: 12, opacity: 0.75, fontWeight: 900 }}
-                              >
-                                {hits.length}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
-                          {isBlocked && (
-                            <div
-                              style={{
-                                ...chip,
-                                border: "1px solid rgba(255,255,255,0.18)",
-                                background: "rgba(255,255,255,0.06)",
-                                opacity: 0.95,
-                              }}
-                            >
-                              <span style={{ fontWeight: 950, fontSize: 11 }}>BLOCKED</span>
-                              <span style={{ opacity: 0.8, fontSize: 11 }}>
-                                {meta?.blockReason?.trim()
-                                  ? meta.blockReason.trim().slice(0, 14) +
-                                    (meta.blockReason.trim().length > 14 ? "…" : "")
-                                  : ""}
-                              </span>
-                            </div>
-                          )}
-
-                          {/* ✅ UPDATED: show 🚐/🏕️ on chips */}
-                          {shown.map((b) => (
-                            <div key={b.id} style={{ ...chip, ...statusStyle(b.status) }}>
-                              <span style={{ fontWeight: 900, fontSize: 11 }}>
-                                {stayIcon(b.stayType)} {b.status.toUpperCase()}
-                              </span>
-                              <span style={{ opacity: 0.85, fontSize: 11 }}>
-                                {b.checkIn.split("-").slice(1).join("/")}→
-                                {b.checkOut.split("-").slice(1).join("/")}
-                              </span>
-                            </div>
-                          ))}
-
-                          {extra > 0 && (
-                            <div
-                              style={{
-                                ...chip,
-                                border: "1px solid rgba(255,255,255,0.12)",
-                                background: "rgba(255,255,255,0.03)",
-                                opacity: 0.85,
-                              }}
-                            >
-                              +{extra} more
-                            </div>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div style={{ marginTop: 10, opacity: 0.75, fontSize: 13 }}>
-                  Click any day to open the RVNB Day Inspector.
-                </div>
+                </select>
               </div>
-            </section>
-          );
-        })}
+            </div>
+
+            {activeListing && (
+              <ListingCalendar
+                listing={activeListing}
+                bookings={bookingsByListing.get(activeListing.id) || []}
+                dayMetaMap={dayMetaMap}
+                days={days}
+                monthStart={monthStart}
+                monthLabel={monthLabel}
+                today={today}
+                selectedDayISO={selected?.listingId === activeListing.id ? selected.dayISO : null}
+                onPrevMonth={() => setMonthCursor(addMonths(monthCursor, -1))}
+                onToday={() => setMonthCursor(startOfMonth(new Date()))}
+                onNextMonth={() => setMonthCursor(addMonths(monthCursor, 1))}
+                onOpenDay={handleDayActivate}
+                dayButtonRef={selectedDayButtonRef}
+                rangeMode={rangeMode}
+                rangeToggleRef={rangeToggleRef}
+                onToggleRangeMode={toggleRangeMode}
+                rangeStart={rangeStart}
+                rangeEnd={rangeEnd}
+                rangeMessage={rangeMessage}
+                tentativeRangeDates={tentativeRangeDates}
+                onRangeHover={(dISO) => {
+                  if (rangeStart && !rangeEnd) setRangeHoverDate(dISO);
+                }}
+              />
+            )}
+
+            {rangeMode && rangeStart && rangeEnd && activeListing && (
+              <section className={styles.rangePanel} aria-labelledby="range-panel-heading">
+                <div className={styles.rangePanelHeader}>
+                  <div>
+                    <p className={styles.rangePanelEyebrow}>Range management</p>
+                    <h2 id="range-panel-heading" className={styles.rangePanelTitle}>
+                      {activeListing.title} · {rangeStart} → {rangeEnd}
+                    </h2>
+                    <p className={styles.rangePanelSub}>
+                      {rangeDates.length} day{rangeDates.length === 1 ? "" : "s"} selected. Start
+                      and end dates are treated as inclusive.
+                    </p>
+                  </div>
+                  <button type="button" className={styles.drawerClose} onClick={clearRangeSelection} aria-label="Clear range selection">
+                    ✕
+                  </button>
+                </div>
+
+                <div className={styles.rangeChipRow}>
+                  {rangeConflicts.approved.length > 0 && (
+                    <span className={styles.rangeChipConflict}>
+                      {rangeConflicts.approved.length} approved-booking conflict
+                      {rangeConflicts.approved.length === 1 ? "" : "s"}
+                    </span>
+                  )}
+                  {rangeConflicts.pending.length > 0 && (
+                    <span className={styles.rangeChipPending}>
+                      {rangeConflicts.pending.length} pending request{rangeConflicts.pending.length === 1 ? "" : "s"} (warning only)
+                    </span>
+                  )}
+                  {rangeConflicts.blocked.length > 0 && (
+                    <span className={styles.rangeChipBlocked}>
+                      {rangeConflicts.blocked.length} already blocked
+                    </span>
+                  )}
+                  {rangeConflicts.approved.length === 0 &&
+                    rangeConflicts.pending.length === 0 &&
+                    rangeConflicts.blocked.length === 0 && (
+                      <span className={styles.rangeChipAvailable}>No conflicts in this range</span>
+                    )}
+                </div>
+
+                {bulkStatus && <div className={styles.rangeStatus}>{bulkStatus}</div>}
+
+                <div className={styles.rangeActionGroup}>
+                  <div className={styles.fieldLabel}>Block or unblock</div>
+                  <div className={styles.rangeButtonRow}>
+                    <button
+                      type="button"
+                      className={styles.btnStrong}
+                      disabled={bulkSaving || rangeConflicts.approved.length > 0}
+                      onClick={() => handleBulkBlock(false)}
+                      title={
+                        rangeConflicts.approved.length > 0
+                          ? "Resolve approved-booking conflicts first, or apply to available dates only"
+                          : undefined
+                      }
+                    >
+                      {bulkSaving ? "Saving..." : "Block selected dates"}
+                    </button>
+                    {rangeConflicts.approved.length > 0 && (
+                      <button
+                        type="button"
+                        className={styles.btnGhost}
+                        disabled={bulkSaving}
+                        onClick={() => handleBulkBlock(true)}
+                      >
+                        Apply only to available dates
+                      </button>
+                    )}
+                    <button type="button" className={styles.navBtn} disabled={bulkSaving} onClick={handleBulkUnblock}>
+                      Unblock selected dates
+                    </button>
+                  </div>
+                </div>
+
+                <div className={styles.rangeActionGroup}>
+                  <div className={styles.fieldLabel}>Note (replaces existing note on each date)</div>
+                  <textarea
+                    value={bulkNote}
+                    onChange={(e) => setBulkNote(e.target.value)}
+                    placeholder="Gate code, arrival notes, reminders, etc."
+                    rows={3}
+                    className={styles.inputField}
+                    style={{ resize: "vertical" }}
+                  />
+                  <div className={styles.rangeButtonRow}>
+                    <button type="button" className={styles.btnStrong} disabled={bulkSaving} onClick={handleBulkNote}>
+                      Apply note to all selected dates
+                    </button>
+                  </div>
+                </div>
+
+                <div className={styles.rangeActionGroup}>
+                  <div className={styles.fieldLabel}>Signal</div>
+                  <select
+                    value={bulkSignal}
+                    onChange={(e) => setBulkSignal(e.target.value as DaySignal)}
+                    className={styles.inputField}
+                  >
+                    <option value="none">None</option>
+                    <option value="high">High Demand</option>
+                    <option value="maintenance">Maintenance</option>
+                    <option value="private">Private Use</option>
+                    <option value="flex">Flexible</option>
+                  </select>
+                  <div className={styles.rangeButtonRow}>
+                    <button type="button" className={styles.btnStrong} disabled={bulkSaving} onClick={() => handleBulkSignal(false)}>
+                      Apply signal
+                    </button>
+                    <button type="button" className={styles.navBtn} disabled={bulkSaving} onClick={() => handleBulkSignal(true)}>
+                      Clear signal
+                    </button>
+                  </div>
+                </div>
+
+                <div className={styles.rangeButtonRow} style={{ marginTop: 14 }}>
+                  <button type="button" className={styles.navBtn} onClick={clearRangeSelection}>
+                    Cancel without changes
+                  </button>
+                </div>
+              </section>
+            )}
+          </>
+        )}
       </div>
 
-      {drawerOpen && inspectorData && selected && (
+      {!rangeMode && drawerOpen && inspectorData && selected && (
         <>
-          <div onClick={() => setDrawerOpen(false)} style={backdrop} aria-hidden="true" />
-          <aside style={drawer} aria-label="Day Inspector">
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 12,
-                alignItems: "center",
-              }}
-            >
+          <div onClick={closeDrawer} className={styles.backdrop} aria-hidden="true" />
+          <aside className={styles.drawer} aria-label="Day Inspector" role="dialog" aria-modal="true">
+            <div className={styles.drawerHeaderRow}>
               <div>
-                <div style={{ fontWeight: 950, fontSize: 18 }}>Day Inspector</div>
-                <div style={{ opacity: 0.8, marginTop: 4 }}>{prettyDate(inspectorData.day)}</div>
+                <div className={styles.drawerTitle}>Day Inspector</div>
+                <div className={styles.drawerSub}>
+                  {inspectorData.listing?.title ?? "Listing"} · {prettyDate(inspectorData.day)}
+                </div>
               </div>
-              <button style={iconBtn} onClick={() => setDrawerOpen(false)} title="Close">
+              <button className={styles.drawerClose} onClick={closeDrawer} aria-label="Close day inspector">
                 ✕
               </button>
             </div>
 
-            <div style={{ ...miniCard, marginTop: 14 }}>
-              <div style={{ fontWeight: 950, fontSize: 16 }}>
-                {inspectorData.listing?.title || "Listing"}
-              </div>
+            <div className={styles.miniCard} style={{ marginTop: 14 }}>
+              <div style={{ fontWeight: 950, fontSize: 16 }}>{inspectorData.listing?.title || "Listing"}</div>
               {inspectorData.listing && (
-                <div style={{ opacity: 0.78, marginTop: 6 }}>
-                  {inspectorData.listing.city}, {inspectorData.listing.state} • $
-                  {inspectorData.listing.pricePerNight}/night
+                <div style={{ opacity: 0.78, marginTop: 6, fontSize: 13 }}>
+                  {inspectorData.listing.city}, {inspectorData.listing.state} •{" "}
+                  {(() => {
+                    const { priceText, period } = getListingPriceLabel(inspectorData.listing);
+                    return `${priceText}${period || ""}`;
+                  })()}
                 </div>
               )}
-              <Link href={`/listings/${selected.listingId}`} style={{ ...linkBtn, marginTop: 12 }}>
-                Open Listing →
+              <Link href={`/listings/${selected.listingId}`} className={styles.btnSecondary} style={{ marginTop: 12, display: "inline-flex" }}>
+                Open listing →
               </Link>
             </div>
 
-            <div style={{ marginTop: 16, fontWeight: 950, opacity: 0.9 }}>Day Settings</div>
+            <div className={styles.sectionLabel}>Day Settings</div>
 
-            <div style={{ ...miniCard, marginTop: 10 }}>
-              <label style={labelRow}>
-                <input
-                  type="checkbox"
-                  checked={editBlocked}
-                  onChange={(e) => setEditBlocked(e.target.checked)}
-                />
+            <div className={styles.miniCard} style={{ marginTop: 10 }}>
+              <label className={styles.labelRow}>
+                <input type="checkbox" checked={editBlocked} onChange={(e) => setEditBlocked(e.target.checked)} />
                 <span style={{ fontWeight: 900 }}>Block this date</span>
               </label>
 
               {editBlocked && (
                 <div style={{ marginTop: 10 }}>
-                  <div style={{ fontWeight: 900, opacity: 0.85, marginBottom: 6 }}>
-                    Block reason (optional)
-                  </div>
+                  <div className={styles.fieldLabel}>Block reason (optional)</div>
                   <input
                     value={editReason}
                     onChange={(e) => setEditReason(e.target.value)}
                     placeholder="Example: maintenance, private use, no hookups today..."
-                    style={input}
+                    className={styles.inputField}
                   />
                 </div>
               )}
 
               <div style={{ marginTop: 12 }}>
-                <div style={{ fontWeight: 900, opacity: 0.85, marginBottom: 6 }}>Signal</div>
+                <div className={styles.fieldLabel}>Signal</div>
                 <select
                   value={editSignal}
                   onChange={(e) => setEditSignal(e.target.value as DaySignal)}
-                  style={input}
+                  className={styles.inputField}
                 >
                   <option value="none">None</option>
                   <option value="high">High Demand</option>
@@ -684,85 +1125,59 @@ export default function HostCalendarPage() {
               </div>
 
               <div style={{ marginTop: 12 }}>
-                <div style={{ fontWeight: 900, opacity: 0.85, marginBottom: 6 }}>
-                  Host note (internal)
-                </div>
+                <div className={styles.fieldLabel}>Host note (internal)</div>
                 <textarea
                   value={editNote}
                   onChange={(e) => setEditNote(e.target.value)}
                   placeholder="Gate code, arrival notes, reminders, etc."
                   rows={4}
-                  style={{ ...input, resize: "vertical" }}
+                  className={styles.inputField}
+                  style={{ resize: "vertical" }}
                 />
               </div>
 
               <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-                <button style={btnStrong} onClick={saveDayMeta} disabled={metaSaving}>
+                <button className={styles.btnStrong} onClick={saveDayMeta} disabled={metaSaving}>
                   {metaSaving ? "Saving..." : "Save Day Settings"}
                 </button>
               </div>
             </div>
 
-            <div style={{ marginTop: 16, fontWeight: 900, opacity: 0.9 }}>
-              Bookings on this day
-            </div>
+            <div className={styles.sectionLabel}>Bookings on this day</div>
 
             {inspectorData.hits.length === 0 ? (
-              <div style={{ ...miniCard, marginTop: 10, opacity: 0.9 }}>
+              <div className={styles.miniCard} style={{ marginTop: 10, opacity: 0.9 }}>
                 No bookings cover this date.
               </div>
             ) : (
               <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
                 {inspectorData.hits.map((b) => (
-                  <div key={b.id} style={miniCard}>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        gap: 10,
-                        alignItems: "center",
-                      }}
-                    >
+                  <div key={b.id} className={styles.miniCard}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
                       <div style={{ fontWeight: 950 }}>
                         {b.checkIn} → {b.checkOut}
                       </div>
-
-                      {/* ✅ UPDATED: show stay icon here too */}
-                      <div style={{ ...badge, ...statusStyle(b.status) }}>
+                      <div className={styles.bookingBadge} style={bookingBadgeStyle(b.status)}>
                         {stayIcon(b.stayType)} {b.status.toUpperCase()}
                       </div>
                     </div>
 
                     <div style={{ marginTop: 8, opacity: 0.8, fontSize: 13 }}>
-                      {b.name
-                        ? `Guest: ${b.name}`
-                        : b.email
-                        ? `Guest: ${b.email}`
-                        : `Booking ID: ${b.id}`}
+                      {b.name ? `Guest: ${b.name}` : b.email ? `Guest: ${b.email}` : `Booking ID: ${b.id}`}
                     </div>
 
                     <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
                       {b.status === "pending" ? (
                         <>
-                          <button
-                            style={btnStrong}
-                            disabled={actionLoading === b.id}
-                            onClick={() => setBookingStatus(b.id, "approved")}
-                          >
+                          <button className={styles.btnStrong} disabled={actionLoading === b.id} onClick={() => setBookingStatus(b.id, "approved")}>
                             {actionLoading === b.id ? "Updating..." : "Approve"}
                           </button>
-                          <button
-                            style={btnGhost}
-                            disabled={actionLoading === b.id}
-                            onClick={() => setBookingStatus(b.id, "declined")}
-                          >
+                          <button className={styles.btnGhost} disabled={actionLoading === b.id} onClick={() => setBookingStatus(b.id, "declined")}>
                             {actionLoading === b.id ? "Updating..." : "Decline"}
                           </button>
                         </>
                       ) : (
-                        <div style={{ opacity: 0.75, fontSize: 13 }}>
-                          No actions available (already {b.status}).
-                        </div>
+                        <div style={{ opacity: 0.75, fontSize: 13 }}>No actions available (already {b.status}).</div>
                       )}
                     </div>
                   </div>
@@ -776,189 +1191,285 @@ export default function HostCalendarPage() {
           </aside>
         </>
       )}
-    </main>
+    </div>
   );
 }
 
-// Styles
-const pageStyle: React.CSSProperties = { padding: 20, maxWidth: 1100, margin: "0 auto" };
-const h1: React.CSSProperties = { fontSize: 28, fontWeight: 950, margin: 0 };
+function ListingCalendar({
+  listing,
+  bookings,
+  dayMetaMap,
+  days,
+  monthStart,
+  monthLabel,
+  today,
+  selectedDayISO,
+  onPrevMonth,
+  onToday,
+  onNextMonth,
+  onOpenDay,
+  dayButtonRef,
+  rangeMode,
+  rangeToggleRef,
+  onToggleRangeMode,
+  rangeStart,
+  rangeEnd,
+  rangeMessage,
+  tentativeRangeDates,
+  onRangeHover,
+}: {
+  listing: Listing;
+  bookings: Booking[];
+  dayMetaMap: Record<string, DayMeta>;
+  days: Date[];
+  monthStart: Date;
+  monthLabel: string;
+  today: Date;
+  selectedDayISO: string | null;
+  onPrevMonth: () => void;
+  onToday: () => void;
+  onNextMonth: () => void;
+  onOpenDay: (day: Date) => void;
+  dayButtonRef: MutableRefObject<HTMLButtonElement | null>;
+  rangeMode: boolean;
+  rangeToggleRef: MutableRefObject<HTMLButtonElement | null>;
+  onToggleRangeMode: () => void;
+  rangeStart: string | null;
+  rangeEnd: string | null;
+  rangeMessage: string;
+  tentativeRangeDates: string[];
+  onRangeHover: (dateISO: string) => void;
+}) {
+  const approved = bookings.filter((b) => b.status === "approved").length;
+  const pending = bookings.filter((b) => b.status === "pending").length;
+  const declined = bookings.filter((b) => b.status === "declined").length;
 
-const card: React.CSSProperties = {
-  marginTop: 12,
-  padding: 16,
-  borderRadius: 14,
-  border: "1px solid rgba(255,255,255,0.14)",
-  background: "rgba(255,255,255,0.05)",
-};
+  return (
+    <section className={styles.calendarPanel}>
+      <div className={styles.calendarTopRow}>
+        <div>
+          <div className={styles.listingTitle}>{listing.title}</div>
+          <div className={styles.listingMeta}>
+            {listing.city}, {listing.state} •{" "}
+            {(() => {
+              const { priceText, period } = getListingPriceLabel(listing);
+              return `${priceText}${period || ""}`;
+            })()}{" "}
+            • {listing.hookups} • Max {listing.maxLengthFt}ft
+          </div>
 
-const linkBtn: React.CSSProperties = {
-  display: "inline-block",
-  padding: "10px 12px",
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,0.14)",
-  background: "rgba(255,255,255,0.05)",
-  textDecoration: "none",
-  fontWeight: 800,
-  opacity: 0.95,
-  color: "white",
-};
+          <div className={styles.statsRow}>
+            <span className={styles.statPill}>Approved: {approved}</span>
+            <span className={styles.statPill}>Pending: {pending}</span>
+            <span className={styles.statPill}>Declined: {declined}</span>
+          </div>
+        </div>
 
-const btn: React.CSSProperties = {
-  padding: "10px 12px",
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,0.14)",
-  background: "rgba(255,255,255,0.05)",
-  color: "white",
-  fontWeight: 900,
-  cursor: "pointer",
-};
+        <div className={styles.navBtns}>
+          <button type="button" className={styles.navBtn} onClick={onPrevMonth} aria-label="Previous month">
+            ← Prev
+          </button>
+          <span className={styles.monthLabel}>{monthLabel}</span>
+          <button type="button" className={styles.navBtn} onClick={onToday}>
+            Today
+          </button>
+          <button type="button" className={styles.navBtn} onClick={onNextMonth} aria-label="Next month">
+            Next →
+          </button>
+          <button
+            type="button"
+            ref={rangeToggleRef}
+            className={`${styles.navBtn} ${rangeMode ? styles.navBtnActive : ""}`}
+            aria-pressed={rangeMode}
+            onClick={onToggleRangeMode}
+          >
+            📅 Select date range
+          </button>
+        </div>
+      </div>
 
-const btnStrong: React.CSSProperties = {
-  padding: "10px 12px",
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,0.18)",
-  background: "rgba(255,255,255,0.12)",
-  color: "white",
-  fontWeight: 950,
-  cursor: "pointer",
-};
+      {rangeMode && (
+        <div className={styles.rangeGuidanceBar}>
+          {!rangeStart
+            ? "Choose a starting date."
+            : !rangeEnd
+            ? "Now choose an ending date."
+            : "Click another date to start a new range, or manage the selection below."}
+          {rangeMessage && <span> {rangeMessage}</span>}
+        </div>
+      )}
 
-const btnGhost: React.CSSProperties = {
-  padding: "10px 12px",
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,0.12)",
-  background: "rgba(255,255,255,0.04)",
-  color: "white",
-  fontWeight: 950,
-  cursor: "pointer",
-};
+      <div className={styles.legendRow}>
+        <span className={styles.legendItem}>
+          <span className={styles.legendDot} style={{ background: "rgba(255,255,255,0.14)" }} aria-hidden="true" />
+          Available
+        </span>
+        <span className={styles.legendItem}>
+          <span className={styles.legendDot} style={{ background: "rgba(59,130,246,0.55)" }} aria-hidden="true" />
+          Approved
+        </span>
+        <span className={styles.legendItem}>
+          <span className={styles.legendDot} style={{ background: "rgba(250,204,21,0.65)" }} aria-hidden="true" />
+          Pending
+        </span>
+        <span className={styles.legendItem}>
+          <span className={styles.legendDot} style={{ background: "rgba(248,113,113,0.5)" }} aria-hidden="true" />
+          Blocked
+        </span>
+        <span className={styles.legendItem}>
+          <span className={styles.legendDot} style={{ background: "rgba(147,197,253,0.85)" }} aria-hidden="true" />
+          ⚑ Signal
+        </span>
+      </div>
 
-const pill: React.CSSProperties = {
-  padding: "6px 10px",
-  borderRadius: 999,
-  fontSize: 13,
-  fontWeight: 800,
-  border: "1px solid rgba(255,255,255,0.14)",
-  background: "rgba(255,255,255,0.05)",
-};
+      <div className={styles.calendarScroll}>
+        <div className={styles.calendarScrollInner}>
+          <div className={styles.dowRow}>
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+              <div key={d} className={styles.dowCell}>
+                {d}
+              </div>
+            ))}
+          </div>
 
-const dowRow: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(7, 1fr)",
-  gap: 10,
-  marginBottom: 10,
-};
+          <div className={styles.monthGrid}>
+            {days.map((day) => {
+              const inMonth = day.getMonth() === monthStart.getMonth();
+              const dayISO = toISODate(day);
 
-const dowCell: React.CSSProperties = {
-  padding: "8px 10px",
-  borderRadius: 10,
-  border: "1px solid rgba(255,255,255,0.10)",
-  background: "rgba(0,0,0,0.18)",
-  fontWeight: 900,
-  opacity: 0.9,
-  textAlign: "center",
-};
+              const hits = bookings.filter((b) => bookingCoversDay(b, day));
+              const shown = hits.slice(0, 2);
+              const extra = hits.length - shown.length;
 
-const grid: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(7, 1fr)",
-  gap: 10,
-};
+              const metaKey = dayMetaId(listing.id, dayISO);
+              const meta = dayMetaMap[metaKey];
+              const isBlocked = !!meta?.blocked;
+              const sig = (meta?.signal as DaySignal) || "none";
+              const hasNote = !!meta?.note?.trim();
+              const isToday = sameDay(day, today);
+              const isSelected = dayISO === selectedDayISO;
+              const isRangeStart = rangeMode && dayISO === rangeStart;
+              const isRangeEnd = rangeMode && !!rangeEnd && dayISO === rangeEnd;
+              const isCommittedInterior =
+                rangeMode && rangeStart && rangeEnd && dayISO > rangeStart && dayISO < rangeEnd;
+              const isTentative = rangeMode && !rangeEnd && tentativeRangeDates.includes(dayISO);
 
-const cellBtn: React.CSSProperties = {
-  minHeight: 92,
-  padding: 10,
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,0.10)",
-  background: "rgba(0,0,0,0.16)",
-  textAlign: "left",
-  color: "white",
-  cursor: "pointer",
-};
+              const ariaLabel = `${day.toLocaleDateString(undefined, {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}. ${isBlocked ? "Blocked. " : ""}${hits.length} booking${hits.length === 1 ? "" : "s"}.${
+                hasNote ? " Has a note." : ""
+              }${sig !== "none" ? ` Signal: ${signalLabel(sig)}.` : ""}${
+                rangeMode
+                  ? !rangeStart
+                    ? " Select as start date."
+                    : !rangeEnd
+                    ? " Select as end date."
+                    : ""
+                  : " Press Enter to inspect this day."
+              }`;
 
-const chip: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  gap: 8,
-  padding: "6px 8px",
-  borderRadius: 10,
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-};
+              return (
+                <button
+                  key={dayISO}
+                  type="button"
+                  ref={isSelected ? dayButtonRef : undefined}
+                  disabled={!inMonth}
+                  tabIndex={inMonth ? 0 : -1}
+                  onClick={() => inMonth && onOpenDay(day)}
+                  onMouseEnter={() => inMonth && rangeMode && onRangeHover(dayISO)}
+                  aria-label={inMonth ? ariaLabel : undefined}
+                  className={`${styles.dayTile} ${!inMonth ? styles.dayTileMuted : ""} ${
+                    isBlocked ? styles.dayTileBlocked : ""
+                  } ${isToday ? styles.dayTileToday : ""} ${isSelected ? styles.dayTileSelected : ""} ${
+                    isRangeStart ? styles.dayRangeStart : ""
+                  } ${isRangeEnd ? styles.dayRangeEnd : ""} ${
+                    isCommittedInterior ? styles.dayRangeInterior : ""
+                  } ${isTentative ? styles.dayRangeTentative : ""}`}
+                >
+                  <div className={styles.dayTopRow}>
+                    <div className={styles.dayNum}>{day.getDate()}</div>
+                    <div className={styles.dayIcons} aria-hidden="true">
+                      {hasNote && <span title="Has note">📝</span>}
+                      {sig !== "none" && <span title={signalLabel(sig)}>⚑</span>}
+                      {isBlocked && <span title={meta?.blockReason || "Blocked"}>⛔</span>}
+                    </div>
+                  </div>
 
-const miniTag: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  width: 22,
-  height: 22,
-  borderRadius: 8,
-  border: "1px solid rgba(255,255,255,0.12)",
-  background: "rgba(255,255,255,0.04)",
-  fontSize: 12,
-  opacity: 0.9,
-};
+                  <div className={styles.dayChipList}>
+                    {isBlocked && (
+                      <div className={`${styles.dayChip} ${styles.dayChipBlocked}`}>
+                        <span>BLOCKED</span>
+                      </div>
+                    )}
 
-const backdrop: React.CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  background: "rgba(0,0,0,0.55)",
-  zIndex: 50,
-};
+                    {shown.map((b) => (
+                      <div key={b.id} className={`${styles.dayChip} ${dayChipClass(b.status)}`}>
+                        <span>
+                          {stayIcon(b.stayType)} {b.status.toUpperCase()}
+                        </span>
+                      </div>
+                    ))}
 
-const drawer: React.CSSProperties = {
-  position: "fixed",
-  top: 0,
-  right: 0,
-  height: "100vh",
-  width: "min(420px, 92vw)",
-  background: "rgba(10,10,10,0.96)",
-  borderLeft: "1px solid rgba(255,255,255,0.12)",
-  padding: 16,
-  zIndex: 60,
-  overflowY: "auto",
-};
+                    {extra > 0 && <div className={`${styles.dayChip} ${styles.dayChipExtra}`}>+{extra} more</div>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
 
-const iconBtn: React.CSSProperties = {
-  width: 40,
-  height: 40,
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,0.12)",
-  background: "rgba(255,255,255,0.05)",
-  color: "white",
-  fontWeight: 950,
-  cursor: "pointer",
-};
+      <div className={styles.helperText}>Click any day to open the RVNB Day Inspector.</div>
+    </section>
+  );
+}
 
-const miniCard: React.CSSProperties = {
-  padding: 14,
-  borderRadius: 14,
-  border: "1px solid rgba(255,255,255,0.12)",
-  background: "rgba(255,255,255,0.05)",
-};
+function HostCalendarParamReader({
+  onParams,
+}: {
+  onParams: (value: {
+    date: string | null;
+    listingId: string | null;
+    start: string | null;
+    end: string | null;
+  }) => void;
+}) {
+  const searchParams = useSearchParams();
 
-const badge: React.CSSProperties = {
-  padding: "6px 10px",
-  borderRadius: 999,
-  fontSize: 12,
-  fontWeight: 900,
-};
+  useEffect(() => {
+    onParams({
+      date: searchParams.get("date"),
+      listingId: searchParams.get("listingId"),
+      start: searchParams.get("start"),
+      end: searchParams.get("end"),
+    });
+  }, [searchParams, onParams]);
 
-const labelRow: React.CSSProperties = {
-  display: "flex",
-  gap: 10,
-  alignItems: "center",
-};
+  return null;
+}
 
-const input: React.CSSProperties = {
-  width: "100%",
-  padding: 12,
-  borderRadius: 12,
-  border: "1px solid rgba(255,255,255,0.14)",
-  background: "rgba(255,255,255,0.05)",
-  color: "white",
-  fontSize: 14,
-  outline: "none",
-};
+export default function HostCalendarPage() {
+  const [params, setParams] = useState<{
+    date: string | null;
+    listingId: string | null;
+    start: string | null;
+    end: string | null;
+  }>({ date: null, listingId: null, start: null, end: null });
+
+  return (
+    <HostGuard>
+      <Suspense fallback={null}>
+        <HostCalendarParamReader onParams={setParams} />
+      </Suspense>
+      <HostCalendarContent
+        initialDateISO={params.date}
+        initialListingId={params.listingId}
+        initialStartISO={params.start}
+        initialEndISO={params.end}
+      />
+    </HostGuard>
+  );
+}
+

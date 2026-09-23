@@ -1,0 +1,89 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(3, 7, 17, 0.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(96, 165, 250, 0.14);
+}
+
+.inner {
+  width: min(1180px, calc(100% - 36px));
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #f1f5fb;
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+.brandMark {
+  color: #60a5fa;
+  font-size: 1.1rem;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.navLink,
+.navLinkActive {
+  color: rgba(226, 232, 240, 0.75);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 6px 2px;
+  transition: color 140ms ease;
+}
+
+.navLinkActive {
+  color: #60a5fa;
+  border-bottom: 2px solid #60a5fa;
+}
+
+.navLink:hover {
+  color: #ffffff;
+}
+
+.navCta {
+  padding: 8px 16px;
+  border-radius: 9px;
+  background: #60a5fa;
+  color: #04101e;
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.navLink:focus-visible,
+.navLinkActive:focus-visible,
+.navCta:focus-visible,
+.brand:focus-visible {
+  outline: 3px solid rgba(96, 165, 250, 0.7);
+  outline-offset: 2px;
+}
+
+@media (max-width: 620px) {
+  .inner {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .nav {
+    gap: 12px;
+  }
+}

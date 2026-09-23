@@ -6,7 +6,10 @@ import { useEffect, useMemo, useState } from "react";
 import styles from "./listingdetail.module.css";
 
 import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, where } from "firebase/firestore";
+import { summarizeRatings, type ReviewDirection } from "@/lib/reviews";
+import ReviewCard, { type ReviewCardItem } from "@/app/components/ReviewCard";
+import ReviewSummary from "@/app/components/ReviewSummary";
 import BookingPanel from "./bookingpaneltemp";
 
 type Hookups = "Full" | "Partial" | "None";
@@ -16,6 +19,7 @@ type ListingDoc = {
   title?: string;
   city?: string;
   state?: string;
+  hostId?: string;
 
   hookups?: Hookups;
   maxLengthFt?: number;
@@ -41,6 +45,7 @@ type ListingUI = {
   title: string;
   city: string;
   state: string;
+  hostId: string;
 
   hookups: Hookups;
   maxLengthFt: number;
@@ -104,6 +109,7 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
       title: title || "(Untitled Listing)",
       city: city || "(City not set)",
       state: state || "(State)",
+      hostId: (data.hostId ?? "").toString(),
       hookups,
       maxLengthFt,
       displayPriceValue: data.price as number,
@@ -126,6 +132,7 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
     title: title || "(Untitled Listing)",
     city: city || "(City not set)",
     state: state || "(State)",
+      hostId: (data.hostId ?? "").toString(),
     hookups,
     maxLengthFt,
     displayPriceValue: oldPrice,
@@ -206,6 +213,9 @@ export default function ListingDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [listing, setListing] = useState<ListingUI | null>(null);
+  const [reviews, setReviews] = useState<ReviewCardItem[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewsError, setReviewsError] = useState("");
 
   useEffect(() => {
     const run = async () => {
@@ -238,6 +248,114 @@ export default function ListingDetailPage() {
     run();
   }, [listingId]);
 
+  useEffect(() => {
+    async function loadListingReviews() {
+      if (!listingId) {
+        setReviews([]);
+        setReviewsLoading(false);
+        return;
+      }
+
+      setReviewsLoading(true);
+      setReviewsError("");
+
+      try {
+        const snap = await getDocs(
+          query(
+            collection(db, "reviews"),
+            where("listingId", "==", listingId),
+            where("direction", "==", "traveler_to_host"),
+            where("status", "==", "published"),
+            orderBy("createdAt", "desc"),
+            limit(20)
+          )
+        );
+
+        const rows = snap.docs.map((d) => {
+          const data = d.data() as {
+            reviewerId?: string;
+            rating?: number;
+            comment?: string;
+            createdAt?: unknown;
+          };
+          return {
+            id: d.id,
+            reviewerId: data.reviewerId ?? "",
+            rating: typeof data.rating === "number" ? data.rating : 0,
+            direction: "traveler_to_host" as ReviewDirection,
+            comment: typeof data.comment === "string" ? data.comment : "",
+            createdAt: data.createdAt,
+          };
+        });
+
+        const reviewerIds = Array.from(new Set(rows.map((row) => row.reviewerId).filter(Boolean)));
+        const reviewerMap = new Map<string, string>();
+
+        if (reviewerIds.length > 0) {
+          const profileSnaps = await Promise.all(
+            reviewerIds.map(async (reviewerId) => {
+              try {
+                const profileSnap = await getDoc(doc(db, "memberProfiles", reviewerId));
+                if (!profileSnap.exists()) return null;
+                const data = profileSnap.data() as { displayName?: string; visibility?: string };
+                if (data.visibility !== "public") return null;
+                return [reviewerId, (data.displayName ?? "RVNB member").toString()];
+              } catch {
+                return null;
+              }
+            })
+          );
+
+          for (const entry of profileSnaps) {
+            if (entry) reviewerMap.set(entry[0], entry[1]);
+          }
+        }
+
+        const nextReviews: ReviewCardItem[] = rows.map((row) => {
+          const reviewerName = reviewerMap.get(row.reviewerId) ?? "RVNB member";
+          const initials = reviewerName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("") || "R";
+          const createdAtLabel = (() => {
+            const value = row.createdAt;
+            if (value && typeof value === "object" && "toDate" in value && typeof (value as { toDate: () => Date }).toDate === "function") {
+              try {
+                return (value as { toDate: () => Date }).toDate().toLocaleDateString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                });
+              } catch {
+                return "Recent review";
+              }
+            }
+            return "Recent review";
+          })();
+
+          return {
+            id: row.id,
+            reviewerId: row.reviewerId,
+            reviewerName,
+            reviewerInitials: initials,
+            rating: row.rating,
+            direction: "traveler_to_host",
+            comment: row.comment,
+            createdAtLabel,
+            verified: true,
+          };
+        });
+
+        setReviews(nextReviews);
+      } catch (e) {
+        console.error("[RVNB] listing reviews query failed", e);
+        setReviews([]);
+        setReviewsError("We couldn't load reviews right now.");
+      } finally {
+        setReviewsLoading(false);
+      }
+    }
+
+    loadListingReviews();
+  }, [listingId]);
+
   const hasCoords = useMemo(() => {
     return !!listing && typeof listing.lat === "number" && typeof listing.lng === "number";
   }, [listing]);
@@ -247,6 +365,8 @@ export default function ListingDetailPage() {
     if (typeof listing.lat !== "number" || typeof listing.lng !== "number") return "";
     return buildGoogleMapsUrl(listing.lat, listing.lng, listing.placeId);
   }, [listing]);
+
+  const listingReviewSummary = useMemo(() => summarizeRatings(reviews.map((review) => ({ rating: review.rating }))), [reviews]);
 
   if (!listingId) {
     return (
@@ -445,6 +565,31 @@ export default function ListingDetailPage() {
             </div>
 
             <div className={styles.card}>
+              <ReviewSummary
+                title="Ratings & reviews"
+                average={listingReviewSummary.average}
+                count={listingReviewSummary.count}
+                loading={reviewsLoading}
+                error={reviewsError || undefined}
+                emptyText="No verified-stay reviews yet."
+              />
+
+              {reviewsLoading ? (
+                <div className={styles.note} style={{ marginTop: 12 }}>Loading listing reviews…</div>
+              ) : reviewsError ? (
+                <div className={styles.note} style={{ marginTop: 12 }}>{reviewsError}</div>
+              ) : reviews.length === 0 ? (
+                <div className={styles.note} style={{ marginTop: 12 }}>No verified-stay reviews yet.</div>
+              ) : (
+                <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+                  {reviews.map((review) => (
+                    <ReviewCard key={review.id} review={review} />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className={styles.card}>
               <div className={styles.cardTitle}>Why travelers like this spot</div>
 
               <div className={styles.travelList}>
@@ -531,6 +676,7 @@ export default function ListingDetailPage() {
           <div className={styles.rightCol}>
             <BookingPanel
               listingId={listing.id}
+              hostId={listing.hostId}
               nightlyPrice={listing.displayPriceValue}
               priceLabel={listing.displayPriceLabel}
             />

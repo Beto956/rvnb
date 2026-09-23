@@ -468,6 +468,344 @@
   gap: 18px;
 }
 
+/* ================================
+   Phase 1 refinement — two-column layout, honest badges, real trips
+   ================================ */
+
+.bannerWatermark {
+  position: absolute;
+  top: 50%;
+  right: -10px;
+  transform: translateY(-50%);
+  height: 260px;
+  width: auto;
+  opacity: 0.05;
+  pointer-events: none;
+  user-select: none;
+  filter: grayscale(1) brightness(3);
+  z-index: 0;
+}
+
+@media (max-width: 640px) {
+  .bannerWatermark {
+    display: none;
+  }
+}
+
+.roleBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.16);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  color: #dbeafe;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.emailVerifiedBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(74, 222, 128, 0.26);
+  color: #bbf7d0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.layoutGrid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 22px;
+  align-items: start;
+  margin-top: 34px;
+}
+
+@media (max-width: 980px) {
+  .layoutGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mainCol,
+.sideCol {
+  display: grid;
+  gap: 28px;
+  min-width: 0;
+}
+
+.sideCol {
+  gap: 18px;
+}
+
+/* Honest branded placeholder used instead of a fake property/listing photo */
+.placeholderMedia {
+  height: 190px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background:
+    linear-gradient(160deg, rgba(59, 130, 246, 0.28), rgba(6, 11, 20, 0.15)),
+    radial-gradient(140px 90px at 82% 20%, rgba(147, 197, 253, 0.28), transparent 70%),
+    #0c1424;
+  color: rgba(226, 232, 255, 0.6);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.placeholderMediaIcon {
+  font-size: 1.6rem;
+  opacity: 0.7;
+}
+
+.itemActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.itemActionBtn {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f5f7fb;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.itemActionBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.statusPillActive {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  background: rgba(34, 197, 94, 0.16);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  color: #bbf7d0;
+}
+
+/* ---------- Trip tabs ---------- */
+
+.tripTabsRow {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 16px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tripTab {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tripTabActive {
+  background: rgba(59, 130, 246, 0.22);
+  border-color: rgba(96, 165, 250, 0.5);
+  color: #dbeafe;
+}
+
+.tripBadgePending {
+  background: rgba(250, 204, 21, 0.14);
+  border-color: rgba(250, 204, 21, 0.32);
+  color: #fde68a;
+}
+
+.tripBadgeCancelled {
+  background: rgba(248, 113, 113, 0.14);
+  border-color: rgba(248, 113, 113, 0.32);
+  color: #fecaca;
+}
+
+.tripBadgeUpcoming {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(96, 165, 250, 0.34);
+  color: #bfdbfe;
+}
+
+.reviewNotice {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.82rem;
+}
+
+/* ---------- Sidebar cards ---------- */
+
+.sideCard {
+  border-radius: 20px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.2);
+}
+
+.sideCardTitle {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.sideCardSub {
+  margin: 0 0 14px;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.completionBarTrack {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+
+.completionBarFill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  border-radius: 999px;
+}
+
+.completionItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  font-size: 0.88rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.completionItem:first-of-type {
+  border-top: none;
+}
+
+.completionCheck {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 900;
+  border: 1.5px solid rgba(147, 197, 253, 0.4);
+}
+
+.completionCheckDone {
+  background: rgba(34, 197, 94, 0.24);
+  border-color: rgba(74, 222, 128, 0.5);
+  color: #bbf7d0;
+}
+
+.completionLink {
+  margin-left: auto;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #93c5fd;
+  text-decoration: none;
+}
+
+.completionLink:hover {
+  text-decoration: underline;
+}
+
+.completionNote {
+  margin-top: 12px;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.5;
+}
+
+.quickLinkList {
+  display: grid;
+  gap: 8px;
+}
+
+.quickLinkItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f5f7fb;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.quickLinkItem:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.activityList {
+  display: grid;
+  gap: 10px;
+}
+
+.activityItem {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.activityText {
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.activityDate {
+  margin-top: 3px;
+  font-size: 0.76rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.smallEmpty {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cardGrid,
+  .tripGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .formLabel {
   display: flex;
   flex-direction: column;

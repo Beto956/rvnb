@@ -1,0 +1,56 @@
+.page { min-height: 100vh; color: #f8fafc; background: radial-gradient(circle at 10% 0%, rgba(59,130,246,.2), transparent 34rem), linear-gradient(180deg,#030711,#07101d 50%,#030711); }
+.shell { width: min(1040px, calc(100% - 36px)); margin: 0 auto; padding: 48px 0 90px; }
+.backLink { color: #bfdbfe; font-size: .88rem; font-weight: 800; text-decoration: none; }
+.backLink:hover { color: #fff; }
+.header { max-width: 700px; padding: 64px 0 38px; }
+.kicker { margin: 0 0 12px; color: #8eb4ff; font-size: .74rem; font-weight: 900; letter-spacing: .16em; }
+.header h1 { margin: 0 0 18px; font-size: clamp(2.45rem, 6vw, 4.8rem); line-height: .98; letter-spacing: -.05em; }
+.header > p:last-child, .sectionHeading > p:last-child { color: rgba(226,232,240,.7); line-height: 1.65; }
+.progress { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 14px; }
+.progressItem { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid rgba(148,163,184,.16); border-radius: 12px; color: rgba(226,232,240,.58); background: rgba(15,23,42,.5); font: inherit; font-size: .8rem; font-weight: 800; text-align: left; }
+.progressItem span { display: grid; place-items: center; flex: 0 0 28px; width: 28px; height: 28px; border-radius: 50%; color: #bfdbfe; background: rgba(37,99,235,.2); }
+.progressCurrent { border-color: rgba(147,180,255,.55); color: #fff; background: rgba(30,64,175,.3); }
+.progressDone { color: #bfdbfe; cursor: pointer; }
+.progressItem:disabled { cursor: default; }
+.progressItem:focus-visible, .editButton:focus-visible, .primaryButton:focus-visible, .secondaryButton:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid rgba(147,180,255,.65); outline-offset: 2px; }
+.panel, .successPanel { padding: clamp(22px, 4vw, 40px); border: 1px solid rgba(147,180,255,.2); border-radius: 22px; background: linear-gradient(145deg,rgba(15,23,42,.88),rgba(15,23,42,.6)); box-shadow: 0 28px 70px rgba(0,0,0,.28), inset 0 1px rgba(255,255,255,.07); }
+.sectionHeading { max-width: 690px; margin-bottom: 28px; }
+.sectionHeading h2 { margin: 0 0 12px; font-size: clamp(1.7rem, 3vw, 2.5rem); letter-spacing: -.035em; }
+.fieldGrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.field { display: grid; gap: 7px; color: rgba(226,232,240,.82); font-size: .84rem; font-weight: 760; }
+.required { margin-left: 7px; color: #8eb4ff; font-size: .7rem; font-weight: 700; }
+.field input, .field select, .field textarea { width: 100%; padding: 12px; border: 1px solid rgba(148,163,184,.2); border-radius: 10px; color: #f8fafc; background: rgba(2,6,23,.58); font: inherit; }
+.field option { color: #0f172a; }
+.field textarea { resize: vertical; }
+.fieldset { display: grid; gap: 18px; margin: 26px 0 0; padding: 20px; border: 1px solid rgba(148,163,184,.14); border-radius: 14px; }
+.fieldset legend { padding: 0 8px; color: #bfdbfe; font-size: .82rem; font-weight: 850; }
+.choiceField { display: grid; gap: 10px; color: rgba(226,232,240,.82); font-size: .84rem; font-weight: 760; }
+.choiceRow { display: flex; flex-wrap: wrap; gap: 9px; }
+.choiceRow label { display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid rgba(148,163,184,.18); border-radius: 9px; color: rgba(226,232,240,.7); font-size: .78rem; font-weight: 650; }
+.choiceRow input, .confirmations input { accent-color: #60a5fa; }
+.routeGrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
+.locationBlock { padding: 18px; border: 1px solid rgba(148,163,184,.14); border-radius: 16px; background: rgba(2,6,23,.18); }
+.locationBlock h3 { margin: 0 0 16px; font-size: 1.05rem; }
+.locationBlock .fieldGrid { grid-template-columns: 1fr; }
+.reviewList { display: grid; gap: 10px; margin-bottom: 26px; }
+.reviewSection { display: flex; justify-content: space-between; gap: 18px; padding: 16px; border: 1px solid rgba(148,163,184,.15); border-radius: 13px; background: rgba(2,6,23,.25); }
+.reviewSection h3 { margin: 0 0 6px; font-size: .95rem; }
+.reviewSection p { margin: 0; color: rgba(226,232,240,.68); font-size: .84rem; line-height: 1.5; }
+.editButton { align-self: start; border: 0; color: #bfdbfe; background: transparent; font: inherit; font-size: .8rem; font-weight: 850; cursor: pointer; }
+.confirmations { display: grid; gap: 12px; margin-top: 26px; color: rgba(226,232,240,.76); font-size: .84rem; line-height: 1.5; }
+.confirmations label { display: flex; align-items: flex-start; gap: 9px; }
+.formActions { display: flex; align-items: center; gap: 12px; margin-top: 30px; padding-top: 22px; border-top: 1px solid rgba(148,163,184,.14); }
+.actionSpacer { flex: 1; }
+.primaryButton, .secondaryButton { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; padding: 11px 16px; border: 1px solid transparent; border-radius: 10px; font: inherit; font-weight: 850; text-decoration: none; cursor: pointer; }
+.primaryButton { color: #06101d; background: #dbeafe; border-color: #eff6ff; }
+.secondaryButton { color: #dbeafe; background: rgba(37,99,235,.2); border-color: rgba(147,180,255,.34); }
+.primaryButton:hover, .secondaryButton:hover, .backLink:hover { filter: brightness(1.08); }
+.primaryButton:disabled { cursor: wait; opacity: .65; }
+.errorMessage { margin: 20px 0 0; padding: 11px 13px; border: 1px solid rgba(248,113,113,.3); border-radius: 10px; color: #fecaca; background: rgba(127,29,29,.22); }
+.successPanel { text-align: center; }
+.successMark { display: grid; place-items: center; width: 48px; height: 48px; margin: 0 auto 18px; border-radius: 50%; color: #dbeafe; background: rgba(37,99,235,.3); font-size: 1.5rem; }
+.successPanel h2 { margin: 0 0 10px; font-size: 2rem; }
+.successPanel p { margin: 0 auto 24px; max-width: 520px; color: rgba(226,232,240,.7); line-height: 1.6; }
+@media (max-width: 720px) { .shell { width: min(100% - 28px, 620px); padding-top: 30px; } .header { padding: 48px 0 28px; } .progress { grid-template-columns: 1fr; } .progressItem { min-height: 44px; } .routeGrid, .fieldGrid { grid-template-columns: 1fr; } }
+@media (max-width: 420px) { .panel, .successPanel { padding: 18px; border-radius: 17px; } .choiceRow { display: grid; grid-template-columns: 1fr 1fr; } .choiceRow label { min-height: 38px; } .formActions { flex-wrap: wrap; } .actionSpacer { display: none; } .primaryButton, .secondaryButton { flex: 1; } }
+@media (prefers-reduced-motion: reduce) { .page *, .page *::before, .page *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; } }

@@ -1,0 +1,72 @@
+.page {
+  min-height: 100vh;
+  overflow-x: hidden;
+  color: #f8fafc;
+  background: radial-gradient(circle at 12% 0%, rgba(59, 130, 246, 0.2), transparent 32rem), linear-gradient(180deg, #030711, #07101d 50%, #030711);
+}
+
+.page * { box-sizing: border-box; }
+.page a { color: inherit; }
+.hero { position: relative; overflow: hidden; padding: 110px 24px 76px; border-bottom: 1px solid rgba(148, 163, 184, 0.14); }
+.heroGlow { position: absolute; width: 520px; height: 520px; top: -220px; right: 4%; border-radius: 50%; background: rgba(37, 99, 235, 0.22); filter: blur(90px); pointer-events: none; }
+.heroInner, .section, .requestSection, .providerSection, .trustSection { position: relative; width: min(1160px, 100%); margin: 0 auto; }
+.heroInner { display: grid; grid-template-columns: minmax(0, 1fr) minmax(330px, 0.8fr); gap: 64px; align-items: center; }
+.heroCopy { max-width: 680px; }
+.kicker { margin: 0 0 12px; color: #8eb4ff; font-size: 0.74rem; font-weight: 900; letter-spacing: 0.16em; }
+.page h1, .page h2, .page h3, .page p { margin-top: 0; }
+.page h1 { max-width: 680px; margin-bottom: 20px; font-size: clamp(2.5rem, 5vw, 5rem); line-height: 0.98; letter-spacing: -0.045em; }
+.page h2 { margin-bottom: 14px; font-size: clamp(1.8rem, 3vw, 3rem); line-height: 1.05; letter-spacing: -0.035em; }
+.heroLead { max-width: 620px; color: rgba(226, 232, 240, 0.76); font-size: 1.08rem; line-height: 1.65; }
+.heroActions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.primaryButton, .secondaryButton { display: inline-flex; min-height: 46px; align-items: center; justify-content: center; padding: 12px 17px; border: 1px solid transparent; border-radius: 11px; font: inherit; font-weight: 850; text-decoration: none; cursor: pointer; transition: transform 160ms ease, border-color 160ms ease, background 160ms ease; }
+.primaryButton { color: #06101d; background: #dbeafe; border-color: #eff6ff; }
+.secondaryButton { color: #e0ecff; background: rgba(37, 99, 235, 0.2); border-color: rgba(147, 180, 255, 0.34); }
+.primaryButton:hover, .secondaryButton:hover { transform: translateY(-2px); }
+.primaryButton:focus-visible, .secondaryButton:focus-visible, .audienceCard:focus-visible { outline: 3px solid rgba(147, 180, 255, 0.7); outline-offset: 3px; }
+.primaryButton:disabled, .secondaryButton:disabled { cursor: wait; opacity: 0.65; }
+.routePanel { padding: 24px; border: 1px solid rgba(147, 180, 255, 0.28); border-radius: 22px; background: linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.55)); box-shadow: 0 28px 70px rgba(0, 0, 0, 0.32), inset 0 1px rgba(255, 255, 255, 0.09); }
+.routePanelHeader, .routeMeta { display: flex; align-items: center; gap: 9px; color: rgba(226, 232, 240, 0.62); font-size: 0.78rem; }
+.liveIndicator { width: 8px; height: 8px; border-radius: 50%; background: #60a5fa; box-shadow: 0 0 0 5px rgba(96, 165, 250, 0.12); }
+.routeStops { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: center; margin: 44px 0; }
+.routeStops span, .routeMeta { color: rgba(226, 232, 240, 0.56); font-size: 0.72rem; }
+.routeStops strong { display: block; margin-top: 6px; font-size: 1.05rem; }
+.routeTrack { width: 70px; height: 1px; background: rgba(147, 180, 255, 0.5); }
+.routeTrack span { display: block; width: 7px; height: 7px; margin: -3px auto; border-radius: 50%; background: #bfdbfe; }
+.routeMeta { justify-content: space-between; flex-wrap: wrap; padding-top: 16px; border-top: 1px solid rgba(148, 163, 184, 0.14); }
+.audienceSection { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; width: min(1160px, calc(100% - 48px)); margin: -28px auto 0; position: relative; z-index: 2; }
+.audienceCard { display: flex; align-items: center; gap: 14px; min-height: 104px; padding: 18px; border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 16px; background: rgba(15, 23, 42, 0.88); box-shadow: 0 18px 35px rgba(0, 0, 0, 0.25); text-decoration: none; transition: transform 160ms ease, border-color 160ms ease; }
+.audienceCard:hover { transform: translateY(-3px); border-color: rgba(147, 180, 255, 0.45); }
+.iconBox { display: grid; flex: 0 0 40px; place-items: center; width: 40px; height: 40px; border: 1px solid rgba(147, 180, 255, 0.32); border-radius: 12px; color: #bfdbfe; background: rgba(37, 99, 235, 0.16); }
+.iconBox svg { width: 20px; height: 20px; }
+.audienceCard strong, .audienceCard small { display: block; }
+.audienceCard strong { font-size: 1rem; }
+.audienceCard small { margin-top: 5px; color: rgba(226, 232, 240, 0.62); line-height: 1.45; }
+.arrow { margin-left: auto; color: #bfdbfe; font-size: 1.2rem; }
+.section { padding: 104px 24px 0; }
+.sectionIntro { max-width: 650px; }
+.sectionIntro > p:last-child, .requestCopy > p:last-child, .providerCopy > p, .trustSection > p { color: rgba(226, 232, 240, 0.68); line-height: 1.65; }
+.steps, .serviceGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 28px; }
+.step, .serviceCard { min-height: 170px; padding: 22px; border: 1px solid rgba(148, 163, 184, 0.14); border-radius: 16px; background: rgba(15, 23, 42, 0.56); }
+.stepNumber { color: #8eb4ff; font-size: 0.75rem; font-weight: 900; letter-spacing: 0.12em; }
+.step h3, .serviceCard h3 { margin: 28px 0 8px; font-size: 1.05rem; }
+.step p, .serviceCard p { margin-bottom: 0; color: rgba(226, 232, 240, 0.64); line-height: 1.55; }
+.serviceGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.serviceCard { min-height: 150px; }
+.serviceMark { display: block; width: 28px; height: 3px; border-radius: 99px; background: #60a5fa; }
+.requestSection, .providerSection { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 0.78fr); gap: 56px; align-items: start; padding: 104px 24px 0; scroll-margin-top: 24px; }
+.requestCopy, .providerCopy { padding-top: 16px; }
+.formCard { display: grid; gap: 9px; padding: 22px; border: 1px solid rgba(147, 180, 255, 0.2); border-radius: 18px; background: rgba(15, 23, 42, 0.72); box-shadow: 0 22px 50px rgba(0, 0, 0, 0.2); }
+.formCard label { color: rgba(226, 232, 240, 0.78); font-size: 0.82rem; font-weight: 750; }
+.formCard input, .formCard select, .formCard textarea { width: 100%; margin-bottom: 7px; padding: 12px; border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 10px; color: #f8fafc; background: rgba(2, 6, 23, 0.58); font: inherit; }
+.formCard input:focus-visible, .formCard select:focus-visible, .formCard textarea:focus-visible { outline: 3px solid rgba(147, 180, 255, 0.55); outline-offset: 2px; border-color: #8eb4ff; }
+.formCard option { color: #0f172a; }
+.formMessage { margin: 2px 0 0; color: #bfdbfe; font-size: 0.82rem; }
+.providerCtaCard { display: grid; gap: 14px; padding: 28px; border: 1px solid rgba(147, 180, 255, 0.25); border-radius: 18px; background: linear-gradient(145deg, rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0.6)); box-shadow: 0 22px 50px rgba(0, 0, 0, 0.22); }
+.providerCtaBadge { display: inline-flex; width: fit-content; padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(147, 180, 255, 0.35); background: rgba(37, 99, 235, 0.2); color: #bfdbfe; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.providerCtaCard h3 { margin: 0; font-size: 1.25rem; letter-spacing: -0.02em; }
+.providerCtaCard p { margin: 0; color: rgba(226, 232, 240, 0.7); font-size: 0.9rem; line-height: 1.6; }
+.providerCopy ul { display: grid; gap: 9px; margin: 22px 0 0; padding-left: 18px; color: rgba(226, 232, 240, 0.72); }
+.trustSection { display: grid; grid-template-columns: 1fr 0.8fr; gap: 56px; align-items: center; padding: 104px 24px 110px; }
+.trustSection > p { margin: 0; padding: 24px; border-left: 2px solid #60a5fa; background: rgba(15, 23, 42, 0.5); }
+@media (max-width: 900px) { .heroInner, .requestSection, .providerSection, .trustSection { grid-template-columns: 1fr; gap: 28px; } .serviceGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .hero { padding: 80px 18px 64px; } .heroInner { gap: 34px; } .page h1 { font-size: clamp(2.25rem, 12vw, 3.7rem); } .audienceSection { grid-template-columns: 1fr; width: min(100% - 28px, 560px); } .section, .requestSection, .providerSection, .trustSection { padding-left: 18px; padding-right: 18px; } .steps, .serviceGrid { grid-template-columns: 1fr; } .routePanel { padding: 18px; } .routeStops { gap: 8px; margin: 32px 0; } .routeStops strong { font-size: 0.9rem; } .routeTrack { width: 36px; } .trustSection { padding-bottom: 78px; } }

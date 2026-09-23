@@ -5,6 +5,7 @@ import React, { CSSProperties, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/auth-context";
 import styles from "./page.module.css";
 
 type RequestType = "Personal Travel" | "Work Stay" | "Employer / Team Housing";
@@ -250,6 +251,7 @@ const statusBox: CSSProperties = {
 
 export default function RequestSpotPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
 
   const [requestType, setRequestType] =
     useState<RequestType>("Personal Travel");
@@ -328,6 +330,17 @@ export default function RequestSpotPage() {
     e.preventDefault();
     setRequestMsg("");
 
+    if (authLoading) {
+      setRequestMsg("Please wait while we check your login status.");
+      return;
+    }
+
+    if (!user) {
+      setRequestMsg("Please sign in before starting a request.");
+      router.push(`/login?next=${encodeURIComponent("/request-spot")}`);
+      return;
+    }
+
     const cleanLocation = locationText.trim().slice(0, 80);
     const cleanState = normalizeState(stateCode);
     const cleanEmployer = employerName.trim().slice(0, 100);
@@ -389,6 +402,13 @@ export default function RequestSpotPage() {
 
     try {
       const docRef = await addDoc(collection(db, "spotRequests"), {
+        requesterId: user.uid,
+        publicVersion: 2,
+        status: "draft",
+        isFinalized: false,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+
         requestType,
 
         locationText: cleanLocation,
@@ -424,8 +444,6 @@ export default function RequestSpotPage() {
         rvDetails,
         note: cleanNotes,
 
-        status: "open",
-        createdAt: serverTimestamp(),
       });
 
       setRequestMsg("✅ Request submitted successfully.");

@@ -1,0 +1,384 @@
+.page {
+  min-height: 100vh;
+  color: #f1f5fb;
+  background:
+    radial-gradient(circle at 14% 0%, rgba(37, 99, 235, 0.22), transparent 34rem),
+    linear-gradient(180deg, #030711, #071227 50%, #030711);
+}
+
+.page * {
+  box-sizing: border-box;
+}
+
+.page a {
+  color: inherit;
+}
+
+.shell {
+  width: min(820px, calc(100% - 36px));
+  margin: 0 auto;
+  padding: 40px 0 100px;
+}
+
+.topNav {
+  margin-bottom: 24px;
+}
+
+.backLink {
+  color: #93c5fd;
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.backLink:hover {
+  color: #ffffff;
+}
+
+.feedState {
+  padding: 28px;
+  text-align: center;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.5);
+  color: rgba(226, 232, 240, 0.75);
+  font-size: 0.95rem;
+}
+
+/* POST DETAIL */
+.postDetail {
+  padding: 28px;
+  border-radius: 18px;
+  border: 1px solid rgba(96, 165, 250, 0.18);
+  background: rgba(15, 23, 42, 0.58);
+  margin-bottom: 28px;
+}
+
+.removedNote {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.32);
+  color: #fecaca;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.postDetailHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.postCategory {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.2);
+  border: 1px solid rgba(96, 165, 250, 0.32);
+  color: #bfdbfe;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.postDate {
+  color: rgba(226, 232, 240, 0.55);
+  font-size: 0.78rem;
+}
+
+.postDetailTitle {
+  margin: 0 0 12px;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+
+.postMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+  color: rgba(226, 232, 240, 0.6);
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.postMeta span:not(:last-child)::after {
+  content: "·";
+  margin-left: 10px;
+  color: rgba(226, 232, 240, 0.35);
+}
+
+.postDetailBody {
+  margin: 0 0 20px;
+  color: rgba(226, 232, 240, 0.88);
+  font-size: 1rem;
+  line-height: 1.75;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.postActionsRow {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.linkButton {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #93c5fd;
+  font-size: 0.85rem;
+  font-weight: 750;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.linkButton:hover {
+  color: #ffffff;
+}
+
+.linkButton:disabled {
+  cursor: default;
+  opacity: 0.55;
+  text-decoration: none;
+}
+
+/* EDIT FORM */
+.editForm {
+  display: grid;
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: rgba(226, 232, 240, 0.85);
+}
+
+.field input,
+.field select,
+.field textarea {
+  font: inherit;
+  font-weight: 500;
+  color: #f1f5fb;
+  background: rgba(8, 15, 32, 0.6);
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  border-radius: 10px;
+  padding: 11px 12px;
+  resize: vertical;
+}
+
+.editActions {
+  display: flex;
+  gap: 10px;
+}
+
+/* BUTTONS */
+.primaryButton,
+.secondaryButton {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 160ms ease, filter 160ms ease;
+}
+
+.primaryButton {
+  color: #04101e;
+  background: #60a5fa;
+  border-color: #93c5fd;
+}
+
+.secondaryButton {
+  color: #dbeafe;
+  background: rgba(37, 99, 235, 0.2);
+  border-color: rgba(96, 165, 250, 0.45);
+}
+
+.primaryButton:hover,
+.secondaryButton:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  cursor: wait;
+  opacity: 0.6;
+  transform: none;
+}
+
+.primaryButton:focus-visible,
+.secondaryButton:focus-visible,
+.backLink:focus-visible,
+.linkButton:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(96, 165, 250, 0.7);
+  outline-offset: 2px;
+}
+
+.errorMessage {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: #fecaca;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+/* REPLIES */
+.repliesSection h2 {
+  margin: 0 0 16px;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+}
+
+.noReplies {
+  color: rgba(226, 232, 240, 0.6);
+  font-size: 0.92rem;
+  margin: 0 0 20px;
+}
+
+.replyList {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.replyCard {
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(96, 165, 250, 0.14);
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.replyHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.replyAuthor {
+  font-weight: 750;
+  font-size: 0.88rem;
+}
+
+.replyBody {
+  margin: 0 0 12px;
+  color: rgba(226, 232, 240, 0.85);
+  font-size: 0.92rem;
+  line-height: 1.65;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.loadMoreRow {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.replyForm {
+  padding: 20px;
+  border-radius: 14px;
+  border: 1px solid rgba(96, 165, 250, 0.18);
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.formActions {
+  margin-top: 12px;
+  display: flex;
+}
+
+.signInPrompt {
+  padding: 20px;
+  text-align: center;
+  border-radius: 14px;
+  border: 1px solid rgba(96, 165, 250, 0.18);
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.signInPrompt p {
+  margin: 0 0 14px;
+  color: rgba(226, 232, 240, 0.78);
+}
+
+/* REPORT MODAL */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2, 6, 23, 0.72);
+  z-index: 50;
+}
+
+.modalCard {
+  width: min(440px, 100%);
+  padding: 26px;
+  border-radius: 16px;
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  background: #0b1324;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5);
+  display: grid;
+  gap: 14px;
+}
+
+.modalCard h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.modalNote {
+  margin: 0;
+  color: rgba(226, 232, 240, 0.7);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primaryButton,
+  .secondaryButton {
+    transition: none !important;
+  }
+}
+
+@media (max-width: 620px) {
+  .postDetail {
+    padding: 20px;
+  }
+
+  .editActions {
+    flex-direction: column;
+  }
+}

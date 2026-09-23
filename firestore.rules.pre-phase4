@@ -1,0 +1,242 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc(userId) {
+      return get(/databases/$(database)/documents/users/$(userId));
+    }
+
+    function isHost() {
+      return signedIn()
+        && userDoc(request.auth.uid).data.role == 'host';
+    }
+
+    function listingExists(listingId) {
+      return exists(/databases/$(database)/documents/listings/$(listingId));
+    }
+
+    function listingHost(listingId) {
+      return get(/databases/$(database)/documents/listings/$(listingId)).data.hostId;
+    }
+
+    function ownsListing(listingId) {
+      return signedIn() && listingExists(listingId) && listingHost(listingId) == request.auth.uid;
+    }
+
+    function bookingListingIsValid(data) {
+      return data.listingId is string
+        && data.listingId.size() > 0
+        && listingExists(data.listingId)
+        && data.hostId is string
+        && data.hostId.size() > 0
+        && data.hostId == listingHost(data.listingId);
+    }
+
+    function bookingGuest(data) {
+      return data.guestId is string && data.guestId.size() > 0;
+    }
+
+    function legacyGuestMatches(data, guestId) {
+      return (data.userId is string && data.userId == guestId)
+        || (data.renterId is string && data.renterId == guestId)
+        || (data.travelerId is string && data.travelerId == guestId)
+        || (data.uid is string && data.uid == guestId);
+    }
+
+    function bookingStatus(data) {
+      return data.status is string;
+    }
+
+    function isOpenSpotRequest(data) {
+      return data.status == 'open' || data.isFinalized == true;
+    }
+
+    function safePublicSpotRequest(data) {
+      return data.publicVersion == 2
+        && data.keys().hasOnly([
+          'requesterId', 'publicVersion', 'status', 'isFinalized',
+          'createdAt', 'updatedAt', 'finalizedAt', 'requestType',
+          'locationText', 'city', 'state', 'startDate', 'endDate',
+          'flexibleDates', 'employerName', 'teamName', 'teamLocation',
+          'workersCount', 'rigsCount', 'spotsNeeded', 'stayDurationType',
+          'primaryRv', 'moreThanOneRv', 'additionalRvs', 'hookupsNeeded',
+          'budgetMax', 'budgetPeriod', 'rvDetails', 'note'
+        ]);
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.role in ['guest', 'host'];
+      allow update: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'displayName', 'city', 'state', 'role'
+        ])
+        && request.resource.data.role in ['guest', 'host']
+        && (resource.data.role == request.resource.data.role
+          || (resource.data.role == 'guest' && request.resource.data.role == 'host'));
+      allow delete: if false;
+    }
+
+    match /listings/{listingId} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.hostId == request.auth.uid;
+      allow update, delete: if signedIn()
+        && resource.data.hostId == request.auth.uid
+        && request.resource.data.hostId == resource.data.hostId;
+    }
+
+    match /bookings/{bookingId} {
+      allow create: if signedIn()
+        && bookingListingIsValid(request.resource.data)
+        && bookingGuest(request.resource.data)
+        && request.resource.data.guestId == request.auth.uid
+        && request.resource.data.guestId != request.resource.data.hostId
+        && bookingStatus(request.resource.data)
+        && request.resource.data.status == 'pending';
+
+      allow read: if signedIn()
+        && (resource.data.guestId == request.auth.uid
+          || resource.data.hostId == request.auth.uid
+          || (resource.data.listingId is string
+            && listingExists(resource.data.listingId)
+            && listingHost(resource.data.listingId) == request.auth.uid));
+
+      allow update: if signedIn()
+        && resource.data.listingId is string
+        && listingExists(resource.data.listingId)
+        && listingHost(resource.data.listingId) == request.auth.uid
+        && request.resource.data.listingId == resource.data.listingId
+        && (request.resource.data.hostId == resource.data.hostId
+          || (!resource.data.keys().hasAny(['hostId'])
+            && request.resource.data.hostId == request.auth.uid))
+        && (request.resource.data.guestId == resource.data.guestId
+          || (!resource.data.keys().hasAny(['guestId'])
+            && legacyGuestMatches(resource.data, request.resource.data.guestId)))
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'approvedAt', 'declinedAt', 'hostId', 'guestId'
+        ])
+        && resource.data.status in ['pending', 'requested']
+        && request.resource.data.status in ['approved', 'declined'];
+
+      allow delete: if false;
+    }
+
+    match /listingReservations/{listingId} {
+      allow read: if ownsListing(listingId)
+        && (!exists(/databases/$(database)/documents/listingReservations/$(listingId))
+          || (resource.data.listingId == listingId
+            && resource.data.hostId == request.auth.uid));
+      allow create: if ownsListing(listingId)
+        && request.resource.data.listingId == listingId
+        && request.resource.data.hostId == request.auth.uid;
+      allow update: if ownsListing(listingId)
+        && resource.data.listingId == listingId
+        && resource.data.hostId == request.auth.uid
+        && request.resource.data.listingId == listingId
+        && request.resource.data.hostId == request.auth.uid;
+      allow delete: if false;
+    }
+
+    match /dayMeta/{docId} {
+      allow read: if signedIn()
+        && resource.data.listingId is string
+        && resource.data.hostId == request.auth.uid
+        && ownsListing(resource.data.listingId);
+      allow delete: if signedIn()
+        && resource.data.listingId is string
+        && resource.data.date is string
+        && resource.data.hostId == request.auth.uid
+        && ownsListing(resource.data.listingId)
+        && docId == resource.data.listingId + '__' + resource.data.date;
+      allow create: if signedIn()
+        && request.resource.data.listingId is string
+        && request.resource.data.hostId == request.auth.uid
+        && request.resource.data.date is string
+        && docId == request.resource.data.listingId + '__' + request.resource.data.date
+        && ownsListing(request.resource.data.listingId);
+      allow update: if signedIn()
+        && resource.data.listingId is string
+        && resource.data.hostId == request.auth.uid
+        && ownsListing(resource.data.listingId)
+        && request.resource.data.listingId == resource.data.listingId
+        && request.resource.data.hostId == resource.data.hostId
+        && request.resource.data.date == resource.data.date
+        && docId == request.resource.data.listingId + '__' + request.resource.data.date;
+    }
+
+    match /spotRequests/{requestId} {
+      allow create: if signedIn()
+        && request.resource.data.requesterId == request.auth.uid
+        && safePublicSpotRequest(request.resource.data)
+        && request.resource.data.status == 'draft'
+        && request.resource.data.isFinalized == false;
+      allow read: if signedIn()
+        && (resource.data.requesterId == request.auth.uid
+          || (isHost() && resource.data.publicVersion == 2
+            && isOpenSpotRequest(resource.data)));
+      allow update: if signedIn()
+        && resource.data.requesterId == request.auth.uid
+        && request.resource.data.requesterId == resource.data.requesterId
+        && safePublicSpotRequest(request.resource.data)
+        && (
+          (resource.data.isFinalized == false
+            && request.resource.data.isFinalized == false
+            && request.resource.data.status == 'draft')
+          || (resource.data.isFinalized == false
+            && request.resource.data.isFinalized == true
+            && request.resource.data.status == 'open')
+        );
+      allow delete: if false;
+    }
+
+    match /spotRequestPrivate/{requestId} {
+      allow create: if signedIn()
+        && requestId == request.resource.data.requestId
+        && request.resource.data.requesterId == request.auth.uid
+        && get(/databases/$(database)/documents/spotRequests/$(requestId)).data.requesterId == request.auth.uid;
+      allow read: if signedIn()
+        && ((!exists(/databases/$(database)/documents/spotRequestPrivate/$(requestId))
+          && get(/databases/$(database)/documents/spotRequests/$(requestId)).data.requesterId == request.auth.uid)
+          || (resource.data.requesterId == request.auth.uid
+            && resource.data.requestId == requestId));
+      allow update: if signedIn()
+        && resource.data.requesterId == request.auth.uid
+        && resource.data.requestId == requestId
+        && request.resource.data.requesterId == resource.data.requesterId
+        && request.resource.data.requestId == requestId;
+      allow delete: if false;
+    }
+
+    match /hostOpportunities/{docId} {
+      allow create: if (
+          !request.resource.data.keys().hasAny(['requestId', 'hostId', 'requesterId'])
+          && request.resource.data.keys().hasAny(['submissionType', 'sourceType'])
+        ) || (
+          signedIn()
+          && isHost()
+          && request.resource.data.requestId is string
+          && request.resource.data.hostId == request.auth.uid
+          && request.resource.data.requesterId == get(/databases/$(database)/documents/spotRequests/$(request.resource.data.requestId)).data.requesterId
+          && get(/databases/$(database)/documents/spotRequests/$(request.resource.data.requestId)).data.status == 'open'
+          && get(/databases/$(database)/documents/spotRequests/$(request.resource.data.requestId)).data.isFinalized == true
+          && get(/databases/$(database)/documents/spotRequests/$(request.resource.data.requestId)).data.publicVersion == 2
+          && docId == request.resource.data.requestId + '__' + request.auth.uid
+        );
+      allow read: if signedIn()
+        && (
+          (resource.data.hostId == request.auth.uid)
+          || (resource.data.requesterId == request.auth.uid)
+        );
+      allow update, delete: if false;
+    }
+  }
+}

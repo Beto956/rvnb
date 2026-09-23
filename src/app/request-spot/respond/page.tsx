@@ -1,9 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  runTransaction,
+  serverTimestamp,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/auth-context";
+import {
+  createLinkedResponseId,
+  isFinalizedOpenRequest,
+  readNonEmptyString,
+} from "@/lib/request-spot-contract";
 import styles from "./page.module.css";
 
 type TimeFrameOption =
@@ -37,6 +51,12 @@ type HostingReadinessOption =
   | "Partial setup available"
   | "Fully rig-ready spot";
 
+type LinkedRequestState = {
+  requesterId: string;
+  status?: string;
+  isFinalized?: boolean;
+};
+
 function normalizeStateRegion(value: string) {
   const raw = value.trim();
   if (!raw) return "";
@@ -54,7 +74,16 @@ function parseRvSpotsCount(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export default function RespondToRequestPage() {
+function RespondToRequestContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestId = searchParams.get("requestId")?.trim() || "";
+  const { user, loading: authLoading } = useAuth();
+
+  const [linkedRequest, setLinkedRequest] = useState<LinkedRequestState | null>(null);
+  const [linkedRequestLoading, setLinkedRequestLoading] = useState(Boolean(requestId));
+  const [linkedRequestMsg, setLinkedRequestMsg] = useState("");
+
   const [hostingReadiness, setHostingReadiness] =
     useState<HostingReadinessOption>("Exploring potential");
 
@@ -89,10 +118,94 @@ export default function RespondToRequestPage() {
 
   const notesCount = useMemo(() => extraNotes.length, [extraNotes]);
 
+  useEffect(() => {
+    if (!requestId) {
+      setLinkedRequest(null);
+      setLinkedRequestLoading(false);
+      setLinkedRequestMsg("");
+      return;
+    }
+
+    if (authLoading) return;
+
+    if (!user) {
+      setLinkedRequestLoading(false);
+      setLinkedRequestMsg("Please sign in as a host to respond to this request.");
+      router.push(
+        `/login?next=${encodeURIComponent(`/request-spot/respond?requestId=${requestId}`)}`
+      );
+      return;
+    }
+
+    const currentUser = user;
+
+    let active = true;
+    setLinkedRequestLoading(true);
+    setLinkedRequestMsg("");
+
+    async function loadLinkedRequest() {
+      try {
+        const snap = await getDoc(doc(db, "spotRequestPublic", requestId));
+        const userSnap = await getDoc(doc(db, "users", currentUser.uid));
+        if (!active) return;
+
+        if (!userSnap.exists() || userSnap.data()?.role !== "host") {
+          setLinkedRequest(null);
+          setLinkedRequestMsg("Host access is required to respond to this request.");
+          return;
+        }
+
+        if (!snap.exists()) {
+          setLinkedRequest(null);
+          setLinkedRequestMsg("We couldn't find that request. No response was submitted.");
+          return;
+        }
+
+        const data = snap.data() as LinkedRequestState;
+        const requesterId = readNonEmptyString(data.requesterId);
+        if (!requesterId) {
+          setLinkedRequest(null);
+          setLinkedRequestMsg("This request has no verified owner and cannot receive a linked response.");
+          return;
+        }
+        if (requesterId === currentUser.uid) {
+          setLinkedRequest(null);
+          setLinkedRequestMsg("You cannot respond to your own request as a host.");
+          return;
+        }
+        if (!isFinalizedOpenRequest(data)) {
+          setLinkedRequest(null);
+          setLinkedRequestMsg("This request is not open for host responses.");
+          return;
+        }
+
+        setLinkedRequest({ requesterId, status: data.status, isFinalized: data.isFinalized });
+      } catch (error) {
+        console.error(error);
+        if (active) {
+          setLinkedRequest(null);
+          setLinkedRequestMsg("We couldn't verify that request. No response was submitted.");
+        }
+      } finally {
+        if (active) setLinkedRequestLoading(false);
+      }
+    }
+
+    loadLinkedRequest();
+    return () => {
+      active = false;
+    };
+  }, [authLoading, requestId, router, user]);
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSubmitAttempted(true);
     setSubmitMsg("");
+
+    if (requestId && (!user || !linkedRequest)) {
+      setSubmitMsg(linkedRequestMsg || "This request is not ready for a linked response.");
+      return;
+    }
 
     const cleanCityLocation = cityLocation.trim().slice(0, 120);
     const cleanStateRegion = normalizeStateRegion(stateRegion);
@@ -131,7 +244,7 @@ export default function RespondToRequestPage() {
     setSubmitSaving(true);
 
     try {
-      const docRef = await addDoc(collection(db, "hostOpportunities"), {
+      const sharedFields = {
         submissionType: "respond_to_request",
         sourceType: "host_opportunity",
         sourcePage: "request-spot/respond",
@@ -167,11 +280,59 @@ export default function RespondToRequestPage() {
         email: cleanEmail,
         phone: cleanPhone,
         openToCall,
+      };
 
-        createdAt: serverTimestamp(),
-      });
+      if (requestId) {
+        const safeResponseId = createLinkedResponseId(requestId, user?.uid);
+        if (!safeResponseId || !user || !linkedRequest) {
+          throw new Error("This linked response is missing verified ownership information.");
+        }
 
-      setSubmittedOpportunityId(docRef.id);
+        const requestRef = doc(db, "spotRequestPublic", requestId);
+        const responseRef = doc(db, "hostOpportunities", safeResponseId);
+        await runTransaction(db, async (transaction) => {
+          const requestSnap = await transaction.get(requestRef);
+          const responseSnap = await transaction.get(responseRef);
+
+          if (responseSnap.exists()) {
+            throw new Error("You already responded to this request.");
+          }
+          if (!requestSnap.exists()) {
+            throw new Error("We couldn't find that request. No response was submitted.");
+          }
+
+          const request = requestSnap.data() as LinkedRequestState;
+          const requesterId = readNonEmptyString(request.requesterId);
+          if (!requesterId) {
+            throw new Error("This request has no verified owner and cannot receive a linked response.");
+          }
+          if (requesterId === user.uid) {
+            throw new Error("You cannot respond to your own request as a host.");
+          }
+          if (!isFinalizedOpenRequest(request)) {
+            throw new Error("This request is not open for host responses.");
+          }
+
+          transaction.set(responseRef, {
+            ...sharedFields,
+            requestId,
+            hostId: user.uid,
+            requesterId,
+            status: "new",
+            reviewStage: "submitted",
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+        });
+
+        setSubmittedOpportunityId(safeResponseId);
+      } else {
+        const docRef = await addDoc(collection(db, "hostOpportunities"), {
+          ...sharedFields,
+          createdAt: serverTimestamp(),
+        });
+        setSubmittedOpportunityId(docRef.id);
+      }
       setSubmissionComplete(true);
       setSubmitMsg("");
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -256,6 +417,10 @@ export default function RespondToRequestPage() {
               to real local demand and opportunity. This intake helps us
               understand if — and how — your space could work as a host site.
             </p>
+
+            {requestId && linkedRequestMsg ? (
+              <div className={styles.statusMessage}>{linkedRequestMsg}</div>
+            ) : null}
           </section>
 
           <section className={styles.formShell}>
@@ -627,8 +792,17 @@ export default function RespondToRequestPage() {
                   <button
                     type="submit"
                     className={styles.submitButton}
-                    disabled={submitSaving}
-                    style={{ opacity: submitSaving ? 0.75 : 1 }}
+                    disabled={
+                      submitSaving ||
+                      linkedRequestLoading ||
+                      (!!requestId && !linkedRequest)
+                    }
+                    style={{
+                      opacity:
+                        submitSaving || linkedRequestLoading || (!!requestId && !linkedRequest)
+                          ? 0.75
+                          : 1,
+                    }}
                   >
                     {submitSaving ? "Submitting..." : "Submit to RVNB"}
                   </button>
@@ -652,5 +826,13 @@ export default function RespondToRequestPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function RespondToRequestPage() {
+  return (
+    <Suspense fallback={<main className={styles.page} />}>
+      <RespondToRequestContent />
+    </Suspense>
   );
 }

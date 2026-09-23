@@ -2,12 +2,18 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { collection, getDocs, orderBy, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/lib/auth-context";
+import HostGuard from "../../components/HostGuard";
 import styles from "./page.module.css";
 
 type Opportunity = {
   id: string;
+  requestId?: string;
+  hostId?: string;
+  requesterId?: string;
+  submissionType?: string;
   city?: string;
   state?: string;
   spots?: number;
@@ -17,30 +23,34 @@ type Opportunity = {
   sewer?: boolean;
   wifi?: boolean;
   pets?: boolean;
-  createdAt?: any;
+  createdAt?: { seconds?: number };
 };
 
-export default function HostOpportunitiesPage() {
+function HostOpportunitiesContent() {
+  const { user } = useAuth();
   const [data, setData] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
+      if (!user?.uid) {
+        setData([]);
+        setLoading(false);
+        return;
+      }
+
       try {
-        const q = query(collection(db, "hostOpportunities"));
+        const q = query(
+          collection(db, "hostOpportunities"),
+          where("hostId", "==", user.uid),
+          orderBy("createdAt", "desc")
+        );
         const snap = await getDocs(q);
 
         const items: Opportunity[] = snap.docs.map((doc) => ({
+          ...(doc.data() as Omit<Opportunity, "id">),
           id: doc.id,
-          ...(doc.data() as any),
         }));
-
-        // newest first (fallback if no timestamp yet)
-        items.sort((a, b) => {
-          const aTime = a.createdAt?.seconds || 0;
-          const bTime = b.createdAt?.seconds || 0;
-          return bTime - aTime;
-        });
 
         setData(items);
       } catch (err) {
@@ -51,7 +61,7 @@ export default function HostOpportunitiesPage() {
     };
 
     load();
-  }, []);
+  }, [user?.uid]);
 
   return (
     <main className={styles.page}>
@@ -78,9 +88,16 @@ export default function HostOpportunitiesPage() {
                     {item.city || "Unknown"}, {item.state || "--"}
                   </h3>
                   <span className={styles.badge}>
-                    {item.readiness || "unknown"}
+                    {item.requestId ? "Response" : item.readiness || "unknown"}
                   </span>
                 </div>
+
+                {item.requestId ? (
+                  <div className={styles.row}>
+                    <span>Request:</span>
+                    <strong>{item.requestId}</strong>
+                  </div>
+                ) : null}
 
                 <div className={styles.row}>
                   <span>Spots:</span>
@@ -131,5 +148,13 @@ export default function HostOpportunitiesPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function HostOpportunitiesPage() {
+  return (
+    <HostGuard>
+      <HostOpportunitiesContent />
+    </HostGuard>
   );
 }
