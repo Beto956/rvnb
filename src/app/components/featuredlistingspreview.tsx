@@ -70,9 +70,9 @@ export default function FeaturedListingsPreview({ limitCount = 3 }: { limitCount
 
         if (!alive) return;
         setItems(rows);
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!alive) return;
-        setError(e?.message || "Failed to load featured listings.");
+        setError((e as { message?: string } | null)?.message || "Failed to load featured listings.");
       } finally {
         if (!alive) return;
         setLoading(false);
