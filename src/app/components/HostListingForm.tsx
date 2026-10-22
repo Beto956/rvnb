@@ -248,13 +248,28 @@ export function buildLocationFields(
   return null;
 }
 
+/** Amenity fields stored as a single string on the listing doc. */
+export type AmenityField = "power" | "water" | "sewer" | "laundry";
+
+/** Which stored amenity fields the host actually interacted with in this form session. */
+export type AmenityTouches = Record<AmenityField, boolean>;
+
 type HostListingFormProps = {
   initialValues: ListingFormValues;
   saving: boolean;
   status: string;
   submitLabel: string;
   savingLabel: string;
-  onSubmit: (values: ListingFormValues) => void;
+  onSubmit: (values: ListingFormValues, touched: AmenityTouches) => void;
+  /** Stored amenity values that did not map to any checkbox (edit flow only), shown as hints. */
+  legacyAmenityHints?: Partial<Record<AmenityField, string>>;
+};
+
+const AMENITY_LABELS: Record<AmenityField, string> = {
+  power: "Power",
+  water: "Water",
+  sewer: "Sewer",
+  laundry: "Laundry",
 };
 
 export default function HostListingForm({
@@ -264,6 +279,7 @@ export default function HostListingForm({
   submitLabel,
   savingLabel,
   onSubmit,
+  legacyAmenityHints,
 }: HostListingFormProps) {
   const [title, setTitle] = useState(initialValues.title);
   const [city, setCity] = useState(initialValues.city);
@@ -287,6 +303,19 @@ export default function HostListingForm({
 
   const [laundry, setLaundry] = useState(initialValues.laundry);
   const [washFold, setWashFold] = useState(initialValues.washFold);
+
+  const [touched, setTouched] = useState<AmenityTouches>({
+    power: false,
+    water: false,
+    sewer: false,
+    laundry: false,
+  });
+  function touch(field: AmenityField, set: (v: boolean) => void) {
+    return (v: boolean) => {
+      setTouched((t) => (t[field] ? t : { ...t, [field]: true }));
+      set(v);
+    };
+  }
 
   const [wifi, setWifi] = useState(initialValues.wifi);
   const [petsAllowed, setPetsAllowed] = useState(initialValues.petsAllowed);
@@ -391,7 +420,7 @@ export default function HostListingForm({
   );
 
   function handleSubmit() {
-    onSubmit(values);
+    onSubmit(values, touched);
   }
 
   return (
@@ -589,18 +618,36 @@ export default function HostListingForm({
 
       <div style={divider} />
 
+      {legacyAmenityHints &&
+        (Object.keys(AMENITY_LABELS) as AmenityField[])
+          .filter((f) => legacyAmenityHints[f] && !touched[f])
+          .map((f) => (
+            <div key={f} style={{ ...tinyHelp, marginBottom: 6 }}>
+              {AMENITY_LABELS[f]} — current saved value: &quot;{legacyAmenityHints[f]}&quot;
+              (doesn&apos;t match a checkbox; kept as-is unless you change this field).
+            </div>
+          ))}
+
       <div style={amenityWrap}>
         <AmenitySection title="RV Infrastructure">
-          <Checkbox label="🔌 30 Amp Power" checked={power30} onChange={setPower30} />
-          <Checkbox label="🔌 50 Amp Power" checked={power50} onChange={setPower50} />
-          <Checkbox label="💧 Water Hookup" checked={water} onChange={setWater} />
-          <Checkbox label="🚽 Full Sewer Hookup" checked={sewer} onChange={setSewer} />
-          <Checkbox label="♻️ Dump Station Onsite" checked={dump} onChange={setDump} />
+          <Checkbox label="🔌 30 Amp Power" checked={power30} onChange={touch("power", setPower30)} />
+          <Checkbox label="🔌 50 Amp Power" checked={power50} onChange={touch("power", setPower50)} />
+          <Checkbox label="💧 Water Hookup" checked={water} onChange={touch("water", setWater)} />
+          <Checkbox label="🚽 Full Sewer Hookup" checked={sewer} onChange={touch("sewer", setSewer)} />
+          <Checkbox label="♻️ Dump Station Onsite" checked={dump} onChange={touch("sewer", setDump)} />
         </AmenitySection>
 
         <AmenitySection title="Laundry">
-          <Checkbox label="🧺 Washer/Dryer Onsite" checked={laundry} onChange={setLaundry} />
-          <Checkbox label="🧼 Wash & Fold Service" checked={washFold} onChange={setWashFold} />
+          <Checkbox
+            label="🧺 Washer/Dryer Onsite"
+            checked={laundry}
+            onChange={touch("laundry", setLaundry)}
+          />
+          <Checkbox
+            label="🧼 Wash & Fold Service"
+            checked={washFold}
+            onChange={touch("laundry", setWashFold)}
+          />
         </AmenitySection>
 
         <AmenitySection title="Facilities">
