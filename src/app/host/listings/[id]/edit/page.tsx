@@ -9,6 +9,8 @@ import { useAuth } from "@/lib/auth-context";
 
 import HostGuard from "../../../../components/HostGuard";
 import HostListingForm, {
+  AmenityField,
+  AmenityTouches,
   GeocodeResult,
   Hookups,
   ListingFormValues,
@@ -35,6 +37,8 @@ type LoadState =
       hadAutoCoords: boolean;
       /** Raw amenity strings as stored, so untouched legacy values are written back unchanged. */
       rawAmenities: RawAmenities;
+      /** Stored amenity values that did not map to any checkbox (shown to the host). */
+      legacyHints: Partial<Record<AmenityField, string>>;
     };
 
 type RawAmenities = { power: string; water: string; sewer: string; laundry: string };
@@ -59,6 +63,31 @@ function sameLocationText(a: string, b: string): boolean {
  * matched by substring ("30A" or "30" / "50A" or "50"), so legacy values like "30/50 amp"
  * prefill the same way search treats them.
  */
+/** Trimmed, case-insensitive match against known stored values. */
+function isOneOf(value: string, ...options: string[]): boolean {
+  const v = value.trim().toLowerCase();
+  return options.some((o) => o.toLowerCase() === v);
+}
+
+/** Stored amenity strings that don't map to any checkbox state (so the host can see them). */
+function unrecognizedAmenities(raw: RawAmenities): Partial<Record<AmenityField, string>> {
+  const hints: Partial<Record<AmenityField, string>> = {};
+  if (
+    raw.power &&
+    !isOneOf(raw.power, "None") &&
+    !powerIncludes(raw.power, "30") &&
+    !powerIncludes(raw.power, "50")
+  ) {
+    hints.power = raw.power;
+  }
+  if (raw.water && !isOneOf(raw.water, "Yes", "None")) hints.water = raw.water;
+  if (raw.sewer && !isOneOf(raw.sewer, "Yes", "Dump station", "None")) hints.sewer = raw.sewer;
+  if (raw.laundry && !isOneOf(raw.laundry, "Washer/Dryer", "Wash & Fold", "Both", "None")) {
+    hints.laundry = raw.laundry;
+  }
+  return hints;
+}
+
 function powerIncludes(power: string, amps: "30" | "50"): boolean {
   const p = (power || "").toUpperCase();
   return p.includes(`${amps}A`) || p.includes(amps);
@@ -101,14 +130,14 @@ function listingToFormValues(data: ListingDoc): ListingFormValues {
 
     power30: power ? powerIncludes(power, "30") : legacyAmenities.power30 === true,
     power50: power ? powerIncludes(power, "50") : legacyAmenities.power50 === true,
-    water: water ? water === "Yes" : legacyAmenities.water === true,
-    sewer: sewer ? sewer === "Yes" : legacyAmenities.sewer === true,
-    dump: sewer ? sewer === "Dump station" : legacyAmenities.dump === true,
+    water: water ? isOneOf(water, "Yes") : legacyAmenities.water === true,
+    sewer: sewer ? isOneOf(sewer, "Yes") : legacyAmenities.sewer === true,
+    dump: sewer ? isOneOf(sewer, "Dump station") : legacyAmenities.dump === true,
     laundry: laundry
-      ? laundry === "Washer/Dryer" || laundry === "Both"
+      ? isOneOf(laundry, "Washer/Dryer", "Both")
       : legacyAmenities.laundry === true,
     washFold: laundry
-      ? laundry === "Wash & Fold" || laundry === "Both"
+      ? isOneOf(laundry, "Wash & Fold", "Both")
       : legacyAmenities.washFold === true,
 
     wifi: data.wifi === true,
@@ -194,7 +223,13 @@ function EditListingContent() {
           sewer: readString(data.sewer),
           laundry: readString(data.laundry),
         };
-        setLoadState({ kind: "ready", values, hadAutoCoords, rawAmenities });
+        setLoadState({
+          kind: "ready",
+          values,
+          hadAutoCoords,
+          rawAmenities,
+          legacyHints: unrecognizedAmenities(rawAmenities),
+        });
       } catch (e) {
         console.error(e);
         if (!cancelled) {
@@ -208,7 +243,7 @@ function EditListingContent() {
     };
   }, [authLoading, userUid, listingId]);
 
-  async function handleSave(values: ListingFormValues) {
+  async function handleSave(values: ListingFormValues, touched: AmenityTouches) {
     if (loadState.kind !== "ready") return;
 
     setStatus("");
@@ -241,26 +276,14 @@ function EditListingContent() {
       // Owner field (hostId) and createdAt are intentionally never written here.
       const updates: Record<string, unknown> = buildListingFields(values);
 
-      // If the host did not touch a stored amenity field, write its original string back
-      // instead of the re-derived value, so legacy values (e.g. "30/50 amp") are never
-      // silently downgraded to "None".
+      // If the host never interacted with a stored amenity field, write its original string
+      // back instead of the re-derived value, so legacy values (e.g. "30/50 amp") are never
+      // silently downgraded to "None". Any real interaction (including clearing every box)
+      // saves the new value.
       const raw = loadState.rawAmenities;
-      if (raw.power && values.power30 === initial.power30 && values.power50 === initial.power50) {
-        updates.power = raw.power;
-      }
-      if (raw.water && values.water === initial.water) {
-        updates.water = raw.water;
-      }
-      if (raw.sewer && values.sewer === initial.sewer && values.dump === initial.dump) {
-        updates.sewer = raw.sewer;
-      }
-      if (
-        raw.laundry &&
-        values.laundry === initial.laundry &&
-        values.washFold === initial.washFold
-      ) {
-        updates.laundry = raw.laundry;
-      }
+      (["power", "water", "sewer", "laundry"] as const).forEach((field) => {
+        if (raw[field] && !touched[field]) updates[field] = raw[field];
+      });
 
       if (!locationUnchanged) {
         let geo: GeocodeResult | null = null;
@@ -325,6 +348,7 @@ function EditListingContent() {
           submitLabel="Save Changes"
           savingLabel="Saving..."
           onSubmit={handleSave}
+          legacyAmenityHints={loadState.legacyHints}
         />
       ) : (
         <section style={stateCard}>
