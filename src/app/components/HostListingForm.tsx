@@ -159,6 +159,11 @@ export function toLaundryValue(laundry: boolean, washFold: boolean): string {
   return "None";
 }
 
+/** Case/whitespace-insensitive comparison used to detect a city/state change. */
+function sameLocationText(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
 export function validateListingForm(values: ListingFormValues): string | null {
   const t = values.title.trim();
   const c = values.city.trim();
@@ -301,6 +306,22 @@ export default function HostListingForm({
   const [manualLat, setManualLat] = useState<number | null>(initialValues.manualLat);
   const [manualLng, setManualLng] = useState<number | null>(initialValues.manualLng);
 
+  // A pin loaded with the listing (edit flow) belongs to the original city/state. If the host
+  // changes city/state and has not placed a new pin since, that old pin must not override the
+  // new location: it is hidden and the form submits without it, so the save geocodes the new
+  // location. New listings never start with a pin, so the create flow is unaffected.
+  const [initialPinUntouched, setInitialPinUntouched] = useState(true);
+  const hadInitialPin =
+    initialValues.manualLocationEnabled &&
+    initialValues.manualLat !== null &&
+    initialValues.manualLng !== null;
+  const initialPinStale =
+    hadInitialPin &&
+    initialPinUntouched &&
+    manualLocationEnabled &&
+    (!sameLocationText(city, initialValues.city) ||
+      !sameLocationText(stateCode, initialValues.stateCode));
+
   const showDollar = isPriceFocused || price > 0;
 
   const values = useMemo<ListingFormValues>(
@@ -331,9 +352,9 @@ export default function HostListingForm({
       gym,
       bathrooms,
       showers,
-      manualLocationEnabled,
-      manualLat,
-      manualLng,
+      manualLocationEnabled: initialPinStale ? false : manualLocationEnabled,
+      manualLat: initialPinStale ? null : manualLat,
+      manualLng: initialPinStale ? null : manualLng,
     }),
     [
       title,
@@ -365,6 +386,7 @@ export default function HostListingForm({
       manualLocationEnabled,
       manualLat,
       manualLng,
+      initialPinStale,
     ]
   );
 
@@ -416,6 +438,7 @@ export default function HostListingForm({
             checked={manualLocationEnabled}
             onChange={(e) => {
               const on = e.target.checked;
+              setInitialPinUntouched(false);
               setManualLocationEnabled(on);
               if (!on) {
                 setManualLat(null);
@@ -434,16 +457,24 @@ export default function HostListingForm({
           </div>
         </label>
 
+        {initialPinStale && (
+          <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color: "#fbbf24" }}>
+            📍 City/state changed, so your previous map pin was cleared. We&apos;ll auto-locate
+            the new location when you save — drop a new pin below if you want an exact spot.
+          </div>
+        )}
+
         {manualLocationEnabled && (
           <div style={{ marginTop: 12 }}>
             <HostLocationPicker
               height={320}
               initialValue={
-                manualLat !== null && manualLng !== null
+                !initialPinStale && manualLat !== null && manualLng !== null
                   ? { lat: manualLat, lng: manualLng }
                   : null
               }
               onChange={(v: { lat: number; lng: number } | null) => {
+                setInitialPinUntouched(false);
                 setManualLat(v?.lat ?? null);
                 setManualLng(v?.lng ?? null);
               }}
