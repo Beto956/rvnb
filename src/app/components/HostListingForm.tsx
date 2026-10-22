@@ -620,13 +620,20 @@ export default function HostListingForm({
 
       {legacyAmenityHints &&
         (Object.keys(AMENITY_LABELS) as AmenityField[])
-          .filter((f) => legacyAmenityHints[f] && !touched[f])
-          .map((f) => (
-            <div key={f} style={{ ...tinyHelp, marginBottom: 6 }}>
-              {AMENITY_LABELS[f]} — current saved value: &quot;{legacyAmenityHints[f]}&quot;
-              (doesn&apos;t match a checkbox; kept as-is unless you change this field).
-            </div>
-          ))}
+          .filter((f) => legacyAmenityHints[f])
+          .map((f) =>
+            touched[f] ? (
+              <div key={f} style={{ ...tinyHelp, marginBottom: 6 }}>
+                {AMENITY_LABELS[f]} — previously saved: &quot;{legacyAmenityHints[f]}&quot; — will
+                be replaced by your selection when you save.
+              </div>
+            ) : (
+              <div key={f} style={{ ...tinyHelp, marginBottom: 6 }}>
+                {AMENITY_LABELS[f]} — current saved value: &quot;{legacyAmenityHints[f]}&quot;
+                (doesn&apos;t match a checkbox; kept as-is unless you change this field).
+              </div>
+            )
+          )}
 
       <div style={amenityWrap}>
         <AmenitySection title="RV Infrastructure">

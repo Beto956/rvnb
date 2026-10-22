@@ -286,7 +286,13 @@ function EditListingContent() {
       // saves the new value.
       const raw = loadState.rawAmenities;
       (["power", "water", "sewer", "laundry"] as const).forEach((field) => {
-        if (raw[field] && !touched[field]) updates[field] = raw[field];
+        if (!raw[field] || touched[field]) return;
+        // Untouched water/sewer/laundry values that recognizably map to a checkbox state
+        // (e.g. "yes", " both ") keep the canonical value from buildListingFields ("Yes",
+        // "Both", ...), which is the exact form search/page.tsx filters on. Power always keeps
+        // its stored text (search matches it by substring), as do unrecognized values.
+        const recognized = field !== "power" && !loadState.legacyHints[field];
+        if (!recognized) updates[field] = raw[field];
       });
 
       if (!locationUnchanged) {
