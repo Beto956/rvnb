@@ -29,7 +29,15 @@ type LoadState =
   | { kind: "not-found" }
   | { kind: "not-authorized" }
   | { kind: "error"; message: string }
-  | { kind: "ready"; values: ListingFormValues; hadAutoCoords: boolean };
+  | {
+      kind: "ready";
+      values: ListingFormValues;
+      hadAutoCoords: boolean;
+      /** Raw amenity strings as stored, so untouched legacy values are written back unchanged. */
+      rawAmenities: RawAmenities;
+    };
+
+type RawAmenities = { power: string; water: string; sewer: string; laundry: string };
 
 type ListingDoc = Record<string, unknown>;
 
@@ -39,6 +47,21 @@ function readString(v: unknown): string {
 
 function readNumber(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/** Case/whitespace-insensitive comparison for city/state "did the location change" checks. */
+function sameLocationText(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+/**
+ * Mirrors the power filter in src/app/search/page.tsx: the stored value is upper-cased and
+ * matched by substring ("30A" or "30" / "50A" or "50"), so legacy values like "30/50 amp"
+ * prefill the same way search treats them.
+ */
+function powerIncludes(power: string, amps: "30" | "50"): boolean {
+  const p = (power || "").toUpperCase();
+  return p.includes(`${amps}A`) || p.includes(amps);
 }
 
 function safeHookups(v: unknown): Hookups {
@@ -76,12 +99,8 @@ function listingToFormValues(data: ListingDoc): ListingFormValues {
     description: readString(data.description),
     nearbyAttractions: readString(data.nearbyAttractions),
 
-    power30: power
-      ? power === "30A" || power === "30A/50A"
-      : legacyAmenities.power30 === true,
-    power50: power
-      ? power === "50A" || power === "30A/50A"
-      : legacyAmenities.power50 === true,
+    power30: power ? powerIncludes(power, "30") : legacyAmenities.power30 === true,
+    power50: power ? powerIncludes(power, "50") : legacyAmenities.power50 === true,
     water: water ? water === "Yes" : legacyAmenities.water === true,
     sewer: sewer ? sewer === "Yes" : legacyAmenities.sewer === true,
     dump: sewer ? sewer === "Dump station" : legacyAmenities.dump === true,
@@ -157,7 +176,13 @@ function EditListingContent() {
           !values.manualLocationEnabled &&
           readNumber(data.lat) !== null &&
           readNumber(data.lng) !== null;
-        setLoadState({ kind: "ready", values, hadAutoCoords });
+        const rawAmenities: RawAmenities = {
+          power: readString(data.power),
+          water: readString(data.water),
+          sewer: readString(data.sewer),
+          laundry: readString(data.laundry),
+        };
+        setLoadState({ kind: "ready", values, hadAutoCoords, rawAmenities });
       } catch (e) {
         console.error(e);
         if (!cancelled) {
@@ -194,13 +219,36 @@ function EditListingContent() {
     const locationUnchanged =
       !values.manualLocationEnabled &&
       loadState.hadAutoCoords &&
-      c === initial.city.trim() &&
-      s === initial.stateCode.trim().toUpperCase();
+      sameLocationText(c, initial.city) &&
+      sameLocationText(s, initial.stateCode);
+
+    let geocodeWarning = "";
 
     setSaving(true);
     try {
       // Owner field (hostId) and createdAt are intentionally never written here.
       const updates: Record<string, unknown> = buildListingFields(values);
+
+      // If the host did not touch a stored amenity field, write its original string back
+      // instead of the re-derived value, so legacy values (e.g. "30/50 amp") are never
+      // silently downgraded to "None".
+      const raw = loadState.rawAmenities;
+      if (raw.power && values.power30 === initial.power30 && values.power50 === initial.power50) {
+        updates.power = raw.power;
+      }
+      if (raw.water && values.water === initial.water) {
+        updates.water = raw.water;
+      }
+      if (raw.sewer && values.sewer === initial.sewer && values.dump === initial.dump) {
+        updates.sewer = raw.sewer;
+      }
+      if (
+        raw.laundry &&
+        values.laundry === initial.laundry &&
+        values.washFold === initial.washFold
+      ) {
+        updates.laundry = raw.laundry;
+      }
 
       if (!locationUnchanged) {
         let geo: GeocodeResult | null = null;
@@ -210,16 +258,27 @@ function EditListingContent() {
         const location = buildLocationFields(values, geo);
         if (location) {
           Object.assign(updates, location);
-        } else {
-          // Same outcome as create when no location can be resolved: no stale pin is kept.
+        } else if (geo && geo.ok === false && geo.status === "ZERO_RESULTS") {
+          // The geocoder genuinely found no match for the new location: clear the old pin
+          // (same outcome as create when no location can be resolved).
           updates.lat = deleteField();
           updates.lng = deleteField();
           updates.placeId = deleteField();
           updates.geocodeAddress = deleteField();
+        } else {
+          // Network error, non-OK response, or any other geocoder status: keep the existing
+          // coordinates untouched and warn the host instead of wiping them.
+          geocodeWarning = `⚠️ Changes saved, but we couldn't look up the map location for ${c}, ${s} right now. Any existing map location was kept — try saving again later, or set a manual pin.`;
         }
       }
 
       await updateDoc(doc(db, "listings", listingId), updates);
+
+      if (geocodeWarning) {
+        // Stay on the page so the warning is visible.
+        setStatus(geocodeWarning);
+        return;
+      }
 
       router.push("/host");
     } catch (e) {
