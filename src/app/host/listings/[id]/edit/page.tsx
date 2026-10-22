@@ -35,6 +35,8 @@ type LoadState =
       kind: "ready";
       values: ListingFormValues;
       hadAutoCoords: boolean;
+      /** Listing had any stored lat/lng (auto-geocoded or manual pin) when loaded. */
+      hadCoords: boolean;
       /** Raw amenity strings as stored, so untouched legacy values are written back unchanged. */
       rawAmenities: RawAmenities;
       /** Stored amenity values that did not map to any checkbox (shown to the host). */
@@ -213,10 +215,11 @@ function EditListingContent() {
           return;
         }
         const values = listingToFormValues(data);
+        const hadCoords = readNumber(data.lat) !== null && readNumber(data.lng) !== null;
+        // An empty-string geocodeAddress marks coordinates kept after a failed geocode for a
+        // changed location (see handleSave); treat them as needing a fresh geocode next save.
         const hadAutoCoords =
-          !values.manualLocationEnabled &&
-          readNumber(data.lat) !== null &&
-          readNumber(data.lng) !== null;
+          !values.manualLocationEnabled && hadCoords && data.geocodeAddress !== "";
         const rawAmenities: RawAmenities = {
           power: readString(data.power),
           water: readString(data.water),
@@ -227,6 +230,7 @@ function EditListingContent() {
           kind: "ready",
           values,
           hadAutoCoords,
+          hadCoords,
           rawAmenities,
           legacyHints: unrecognizedAmenities(rawAmenities),
         });
@@ -300,10 +304,16 @@ function EditListingContent() {
           updates.lng = deleteField();
           updates.placeId = deleteField();
           updates.geocodeAddress = deleteField();
-        } else {
+        } else if (loadState.hadCoords) {
           // Network error, non-OK response, or any other geocoder status: keep the existing
-          // coordinates untouched and warn the host instead of wiping them.
-          geocodeWarning = `⚠️ Changes saved, but we couldn't look up the map location for ${c}, ${s} right now. Any existing map location was kept — try saving again later, or set a manual pin.`;
+          // lat/lng/placeId instead of wiping them, and warn the host. geocodeAddress is set to
+          // "" so a previous MANUAL_PIN the host turned off (or that went stale) is not restored
+          // as a manual pin on next load, and the next save retries geocoding.
+          updates.geocodeAddress = "";
+          geocodeWarning = `⚠️ Changes saved, but we couldn't look up the map location for ${c}, ${s} right now. The previous map location was kept for now — try saving again later, or set a manual pin.`;
+        } else {
+          // Same failure, but the listing never had coordinates: nothing to keep.
+          geocodeWarning = `⚠️ Changes saved, but we couldn't look up the map location for ${c}, ${s} right now, so this listing has no map location yet — try saving again later, or set a manual pin.`;
         }
       }
 
