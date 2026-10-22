@@ -149,6 +149,18 @@ function EditListingContent() {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string>("");
 
+  // When the signed-in user (or listing id) changes, drop the previous user's listing data
+  // immediately and show the loading state until the effect below re-fetches the listing and
+  // re-checks ownership for the new user. Resetting during render (not in an effect) means the
+  // old form is never painted for a different user.
+  const loadKey = `${userUid}:${listingId}`;
+  const [loadedKey, setLoadedKey] = useState(loadKey);
+  if (loadedKey !== loadKey) {
+    setLoadedKey(loadKey);
+    setLoadState({ kind: "loading" });
+    setStatus("");
+  }
+
   useEffect(() => {
     if (authLoading || !userUid) return;
     let cancelled = false;
@@ -306,6 +318,7 @@ function EditListingContent() {
 
       {loadState.kind === "ready" ? (
         <HostListingForm
+          key={loadKey}
           initialValues={loadState.values}
           saving={saving}
           status={status}
