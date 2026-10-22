@@ -452,7 +452,7 @@ async function finalizeRequestInTransaction(db, requestId, requesterId = users.g
 
 test.before(async () => {
   testEnv = await initializeTestEnvironment({
-    projectId: "rvnb-phase4-rules-test",
+    projectId: "demo-rvnb-rules-test",
     firestore: { rules: require("node:fs").readFileSync("firestore.rules", "utf8") },
   });
 });
