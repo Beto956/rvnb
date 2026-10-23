@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useJsApiLoader } from "@react-google-maps/api";
 
 type MapListing = {
   id: string;
@@ -41,29 +42,35 @@ function escapeHtml(value: string) {
 }
 
 export default function ListingsMapPanel({ listings }: Props) {
-  const mapRef = useRef<HTMLDivElement | null>(null);
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+  const { isLoaded, loadError } = useJsApiLoader({
+    id: "rvnb-google-maps",
+    googleMapsApiKey: apiKey,
+  });
+
+  const [mapNode, setMapNode] = useState<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<GoogleMapInstance | null>(null);
   const markersRef = useRef<GoogleMarkerInstance[]>([]);
   const infoWindowRef = useRef<GoogleInfoWindowInstance | null>(null);
-
-  const [mapReady, setMapReady] = useState(false);
 
   const mappableListings = useMemo(() => {
     return listings.filter(hasValidCoords);
   }, [listings]);
 
+  const mapReady = Boolean(apiKey) && isLoaded && !loadError;
+
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!mapRef.current) return;
+    if (!isLoaded) return;
+    if (!mapNode) return;
 
     const googleMaps = window.google?.maps;
     if (!googleMaps) {
-      setMapReady(false);
       return;
     }
 
     if (!mapInstanceRef.current) {
-      mapInstanceRef.current = new googleMaps.Map(mapRef.current, {
+      mapInstanceRef.current = new googleMaps.Map(mapNode, {
         center: { lat: 31.9686, lng: -99.9018 }, // Texas-centered fallback
         zoom: 5,
         mapTypeControl: false,
@@ -75,9 +82,7 @@ export default function ListingsMapPanel({ listings }: Props) {
 
       infoWindowRef.current = new googleMaps.InfoWindow();
     }
-
-    setMapReady(true);
-  }, []);
+  }, [isLoaded, mapNode]);
 
   useEffect(() => {
     const googleMaps = window.google?.maps;
@@ -178,11 +183,25 @@ export default function ListingsMapPanel({ listings }: Props) {
         </div>
       </div>
 
-      {!mapReady ? (
+      {!apiKey ? (
         <div style={fallbackBox}>
-          <div style={fallbackTitle}>Map not ready yet</div>
+          <div style={fallbackTitle}>Map key missing</div>
           <div style={fallbackText}>
-            This panel is waiting for Google Maps to load. Your listing cards still work normally.
+            Listing cards are available. Add a Google Maps API key to enable the map preview.
+          </div>
+        </div>
+      ) : loadError ? (
+        <div style={fallbackBox}>
+          <div style={fallbackTitle}>Map unavailable</div>
+          <div style={fallbackText}>
+            Google Maps could not load. Listing cards are still available below.
+          </div>
+        </div>
+      ) : !mapReady ? (
+        <div style={fallbackBox}>
+          <div style={fallbackTitle}>Loading map</div>
+          <div style={fallbackText}>
+            Preparing the location preview for mapped listings.
           </div>
         </div>
       ) : null}
@@ -197,7 +216,7 @@ export default function ListingsMapPanel({ listings }: Props) {
       ) : null}
 
       <div
-        ref={mapRef}
+        ref={setMapNode}
         style={{
           ...mapBox,
           display: mapReady && mappableListings.length > 0 ? "block" : "none",
@@ -213,12 +232,13 @@ export default function ListingsMapPanel({ listings }: Props) {
 
 const wrap: React.CSSProperties = {
   position: "sticky",
-  top: 20,
-  borderRadius: 18,
-  border: "1px solid rgba(255,255,255,0.10)",
-  background: "rgba(255,255,255,0.04)",
-  boxShadow: "0 12px 30px rgba(0,0,0,0.22)",
-  padding: 14,
+  top: 92,
+  borderRadius: 10,
+  border: "1px solid rgba(180,205,255,0.16)",
+  background: "linear-gradient(180deg, rgba(7,13,28,0.88), rgba(7,13,28,0.68))",
+  boxShadow: "0 18px 44px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08)",
+  padding: 12,
+  backdropFilter: "blur(12px)",
 };
 
 const topRow: React.CSSProperties = {
@@ -231,8 +251,10 @@ const topRow: React.CSSProperties = {
 
 const eyebrow: React.CSSProperties = {
   fontSize: 12,
-  opacity: 0.75,
-  fontWeight: 700,
+  color: "rgba(169,200,255,0.9)",
+  fontWeight: 950,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
 };
 
 const title: React.CSSProperties = {
@@ -242,28 +264,28 @@ const title: React.CSSProperties = {
 };
 
 const metaPill: React.CSSProperties = {
-  padding: "8px 10px",
-  borderRadius: 999,
-  border: "1px solid rgba(255,255,255,0.12)",
-  background: "rgba(255,255,255,0.06)",
+  padding: "7px 9px",
+  borderRadius: 8,
+  border: "1px solid rgba(180,205,255,0.16)",
+  background: "rgba(255,255,255,0.07)",
   fontSize: 12,
-  fontWeight: 800,
+  fontWeight: 900,
   whiteSpace: "nowrap",
 };
 
 const mapBox: React.CSSProperties = {
   width: "100%",
-  height: 560,
-  borderRadius: 14,
+  height: 420,
+  borderRadius: 10,
   overflow: "hidden",
   background: "rgba(0,0,0,0.18)",
 };
 
 const fallbackBox: React.CSSProperties = {
   minHeight: 220,
-  borderRadius: 14,
-  border: "1px solid rgba(255,255,255,0.10)",
-  background: "rgba(0,0,0,0.18)",
+  borderRadius: 10,
+  border: "1px solid rgba(180,205,255,0.14)",
+  background: "rgba(0,0,0,0.22)",
   padding: 18,
   display: "flex",
   flexDirection: "column",

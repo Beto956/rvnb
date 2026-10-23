@@ -23,7 +23,21 @@ type ListingDoc = {
   // New pricing format (supported):
   price?: number;
   pricingType?: string; // e.g. "night", "day", "week", etc.
+
+  imageUrl?: string;
+  photoURL?: string;
+  photos?: string[];
 };
+
+function firstListingPhoto(listing: ListingDoc): string | null {
+  if (typeof listing.imageUrl === "string" && listing.imageUrl.trim()) return listing.imageUrl.trim();
+  if (typeof listing.photoURL === "string" && listing.photoURL.trim()) return listing.photoURL.trim();
+  if (Array.isArray(listing.photos)) {
+    const first = listing.photos.find((value) => typeof value === "string" && value.trim());
+    return first?.trim() ?? null;
+  }
+  return null;
+}
 
 function formatPrice(listing: ListingDoc): { label: string; value: string } {
   // Backward compatible:
@@ -70,9 +84,9 @@ export default function FeaturedListingsPreview({ limitCount = 3 }: { limitCount
 
         if (!alive) return;
         setItems(rows);
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!alive) return;
-        setError(e?.message || "Failed to load featured listings.");
+        setError(e instanceof Error ? e.message : "Failed to load featured listings.");
       } finally {
         if (!alive) return;
         setLoading(false);
@@ -116,10 +130,28 @@ export default function FeaturedListingsPreview({ limitCount = 3 }: { limitCount
     <div className={styles.previewGrid}>
       {items.map((l) => {
         const price = formatPrice(l);
+        const photo = firstListingPhoto(l);
 
         return (
           <Link key={l.id} href={`/listings/${l.id}`} className={styles.previewCardLink}>
             <article className={styles.previewCard}>
+              <div className={styles.previewMedia}>
+                {photo ? (
+                  <span
+                    className={styles.previewPhoto}
+                    style={{ backgroundImage: `url(${photo})` }}
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <div className={styles.previewFallbackMedia} aria-hidden="true">
+                    <span className={styles.previewFallbackMark}>RVNB</span>
+                  </div>
+                )}
+                <span className={styles.previewMediaBadge}>
+                  {photo ? "Host photo" : "Photos not added"}
+                </span>
+              </div>
+
               <div className={styles.previewCardTop}>
                 <h3 className={styles.previewTitle}>{l.title || "Untitled Spot"}</h3>
                 <div className={styles.previewPrice}>

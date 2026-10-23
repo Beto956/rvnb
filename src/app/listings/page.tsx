@@ -1,7 +1,9 @@
 import Link from "next/link";
+import Image from "next/image";
 import styles from "./listings.module.css";
 
 import ListingsMapPanel from "../components/ListingsMapPanel";
+import AuthNav from "../components/authnav";
 
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
@@ -27,6 +29,10 @@ type ListingDoc = {
   // NEW
   price?: number;
   pricingType?: PricingType;
+
+  imageUrl?: string;
+  photoURL?: string;
+  photos?: string[];
 };
 
 type ListingUI = {
@@ -44,7 +50,19 @@ type ListingUI = {
 
   displayPriceValue: number;
   displayPriceLabel: string;
+  photoUrl: string | null;
+  hasCoords: boolean;
 };
+
+function firstListingPhoto(data: ListingDoc): string | null {
+  if (typeof data.imageUrl === "string" && data.imageUrl.trim()) return data.imageUrl.trim();
+  if (typeof data.photoURL === "string" && data.photoURL.trim()) return data.photoURL.trim();
+  if (Array.isArray(data.photos)) {
+    const first = data.photos.find((value) => typeof value === "string" && value.trim());
+    return first?.trim() ?? null;
+  }
+  return null;
+}
 
 function normalizePricingLabel(pricingType: PricingType): string {
   if (pricingType === "Night") return "night";
@@ -63,6 +81,8 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
 
   const lat = typeof data.lat === "number" ? data.lat : undefined;
   const lng = typeof data.lng === "number" ? data.lng : undefined;
+  const photoUrl = firstListingPhoto(data);
+  const hasCoords = typeof lat === "number" && typeof lng === "number";
 
   const hasNewPrice = typeof data.price === "number";
   const hasNewPricingType =
@@ -82,6 +102,8 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
       lng,
       displayPriceValue: data.price as number,
       displayPriceLabel: normalizePricingLabel(data.pricingType as PricingType),
+      photoUrl,
+      hasCoords,
     };
   }
 
@@ -99,6 +121,8 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
     lng,
     displayPriceValue: oldPrice,
     displayPriceLabel: "night",
+    photoUrl,
+    hasCoords,
   };
 }
 
@@ -189,8 +213,26 @@ export default async function ListingsPage({
     listings.sort((a, b) => a.title.localeCompare(b.title));
   }
 
+  const mappedCount = listings.filter((listing) => listing.hasCoords).length;
+  const activeFilterCount = [selectedState, selectedHookups !== "Any", selectedMaxPrice !== null].filter(Boolean).length;
+
   return (
     <div className={styles.page}>
+      <header className={styles.headerBar}>
+        <div className={styles.headerInner}>
+          <Link href="/" className={styles.brand} aria-label="RVNB Home">
+            <Image src="/rvnb-logo-icon.png" alt="RVNB" className={styles.brandIcon} width={180} height={72} />
+            <span className={styles.brandText}>RVNB</span>
+          </Link>
+
+          <nav className={styles.nav} aria-label="Listings navigation">
+            <Link href="/search" className={styles.navLink}>Search</Link>
+            <Link href="/request-spot" className={styles.navLink}>Request a Spot</Link>
+            <AuthNav navLinkClassName={styles.navLink} navCtaClassName={styles.navCta} navLogoutClassName={styles.navLink} />
+          </nav>
+        </div>
+      </header>
+
       <div className={styles.container}>
         <div className={styles.breadcrumb}>
           <Link href="/" className={styles.breadcrumbLink}>
@@ -201,25 +243,47 @@ export default async function ListingsPage({
         </div>
 
         <div className={styles.heroCard}>
-          <h1 className={styles.h1}>RVNB Listings</h1>
-          <p className={styles.sub}>
-            Discover RV spots across the country — clean, host-backed, and built
-            for real RV life.
-          </p>
+          <div className={styles.heroCopy}>
+            <p className={styles.eyebrow}>RVNB stays marketplace</p>
+            <h1 className={styles.h1}>Find a road-ready place to park, settle, and stay.</h1>
+            <p className={styles.sub}>
+              Browse RV-ready listings with practical details up front: location, hookups,
+              rig length, price, and map coverage when hosts have saved coordinates.
+            </p>
+          </div>
 
-          <div className={styles.countLine}>
-            Showing <strong>{listings.length}</strong> spot
-            {listings.length === 1 ? "" : "s"}
+          <div className={styles.heroStats} aria-label="Listings results summary">
+            <div className={styles.statBlock}>
+              <span className={styles.statValue}>{listings.length}</span>
+              <span className={styles.statLabel}>matching spot{listings.length === 1 ? "" : "s"}</span>
+            </div>
+            <div className={styles.statBlock}>
+              <span className={styles.statValue}>{mappedCount}</span>
+              <span className={styles.statLabel}>mapped</span>
+            </div>
+            <div className={styles.statBlock}>
+              <span className={styles.statValue}>{activeFilterCount}</span>
+              <span className={styles.statLabel}>active filter{activeFilterCount === 1 ? "" : "s"}</span>
+            </div>
           </div>
         </div>
 
-        <div className={styles.sectionDivider} />
-
         <form className={styles.filtersCard} method="get" action="/listings">
+          <div className={styles.filtersTop}>
+            <div>
+              <div className={styles.filtersTitle}>Refine stays</div>
+              <div className={styles.filtersHint}>Filter by state, budget, hookups, then sort the visible cards.</div>
+            </div>
+            <Link href="/listings" className={activeFilterCount > 0 ? styles.clearAll : styles.clearAllDisabled} aria-disabled={activeFilterCount === 0}>
+              Clear filters
+            </Link>
+          </div>
+
           <div className={styles.filtersGrid}>
             <div className={styles.filtersField}>
-              <label className={styles.filtersLabel}>State</label>
+              <label className={styles.filtersLabel} htmlFor="listing-state-filter">State</label>
               <input
+                id="listing-state-filter"
                 name="state"
                 className={styles.filtersControl}
                 defaultValue={selectedState}
@@ -227,8 +291,9 @@ export default async function ListingsPage({
             </div>
 
             <div className={styles.filtersField}>
-              <label className={styles.filtersLabel}>Max Price</label>
+              <label className={styles.filtersLabel} htmlFor="listing-max-price-filter">Max Price</label>
               <input
+                id="listing-max-price-filter"
                 name="maxPrice"
                 className={styles.filtersControl}
                 defaultValue={selectedMaxPrice ?? ""}
@@ -236,8 +301,9 @@ export default async function ListingsPage({
             </div>
 
             <div className={styles.filtersField}>
-              <label className={styles.filtersLabel}>Hookups</label>
+              <label className={styles.filtersLabel} htmlFor="listing-hookups-filter">Hookups</label>
               <select
+                id="listing-hookups-filter"
                 name="hookups"
                 className={styles.filtersControl}
                 defaultValue={
@@ -252,8 +318,9 @@ export default async function ListingsPage({
             </div>
 
             <div className={styles.filtersField}>
-              <label className={styles.filtersLabel}>Sort</label>
+              <label className={styles.filtersLabel} htmlFor="listing-sort-filter">Sort</label>
               <select
+                id="listing-sort-filter"
                 name="sort"
                 className={styles.filtersControl}
                 defaultValue={selectedSort}
@@ -273,6 +340,15 @@ export default async function ListingsPage({
           </div>
         </form>
 
+        <div className={styles.resultsBar}>
+          <div className={styles.resultsLeft}>
+            <span className={styles.resultsCount}>{listings.length} stay{listings.length === 1 ? "" : "s"} shown</span>
+            <span className={styles.resultsDot}>•</span>
+            <span className={styles.resultsMeta}>{mappedCount} on the map</span>
+          </div>
+          <Link href="/request-spot" className={styles.resultsRequestLink}>Need something specific?</Link>
+        </div>
+
         <div className={styles.resultsLayout}>
           <div className={styles.mapCol}>
             <ListingsMapPanel listings={listings} />
@@ -286,6 +362,21 @@ export default async function ListingsPage({
                   href={`/listings/${l.id}`}
                   className={styles.card}
                 >
+                  <div className={styles.photoArea}>
+                    {l.photoUrl ? (
+                      <span
+                        className={styles.cardPhoto}
+                        style={{ backgroundImage: `url(${l.photoUrl})` }}
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <span className={styles.cardFallbackPhoto} aria-hidden="true">
+                        <span className={styles.fallbackWordmark}>RVNB</span>
+                      </span>
+                    )}
+                    <span className={styles.photoBadge}>{l.photoUrl ? "Host photo" : "Photos not added"}</span>
+                  </div>
+
                   <div className={styles.cardTop}>
                     <div className={styles.cardTitle}>{l.title}</div>
                     <div className={styles.price}>
@@ -305,6 +396,9 @@ export default async function ListingsPage({
                     <span className={styles.pill}>{l.hookups} hookups</span>
                     <span className={styles.pill}>
                       Max {l.maxLengthFt} ft
+                    </span>
+                    <span className={l.hasCoords ? styles.pillMapped : styles.pillMuted}>
+                      {l.hasCoords ? "Mapped" : "Map pending"}
                     </span>
                   </div>
 

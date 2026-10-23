@@ -1,36 +1,82 @@
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import Image from "next/image";
 import styles from "./page.module.css";
 import HomeQuickSearchBar from "./components/homequicksearchbar";
 import FeaturedListingsPreview from "./components/featuredlistingspreview";
 import AuthNav from "./components/authnav";
 import EcosystemNav from "./components/ecosystemnav";
 
+const journeyCards = [
+  {
+    title: "Find a stay",
+    text: "Search RV-ready spots by location, hookups, rig fit, and price.",
+    href: "/search",
+    cta: "Start searching",
+    tone: "blue",
+  },
+  {
+    title: "Request a spot",
+    text: "Tell RVNB what you need when the right stay is not listed yet.",
+    href: "/request-spot",
+    cta: "Create request",
+    tone: "cyan",
+  },
+  {
+    title: "List a property",
+    text: "Open your land, driveway, or RV space to real traveler demand.",
+    href: "/host",
+    cta: "Host on RVNB",
+    tone: "gold",
+  },
+] as const;
+
+const platformCards = [
+  {
+    title: "Open RV demand",
+    label: "Live",
+    href: "/requests",
+    text: "Hosts can review traveler requests, work stays, team housing needs, and location-based RV demand.",
+    meta: "Traveler requests and host opportunities",
+  },
+  {
+    title: "Transport network",
+    label: "Live intake",
+    href: "/transport",
+    text: "RV owners and transport providers can submit requests or join the early transport network.",
+    meta: "Move RVs, trailers, and equipment",
+  },
+  {
+    title: "Insurance coverage",
+    label: "Guides and intake",
+    href: "/insurance",
+    text: "Explore RV coverage considerations and submit information for future provider follow-up as the directory develops.",
+    meta: "Coverage exploration now, matching still developing",
+  },
+] as const;
+
 export default function Home() {
   return (
     <main className={styles.page}>
-      {/* Top Navigation */}
       <header className={styles.header}>
         <div className={styles.headerInner}>
           <Link href="/" className={styles.brand} aria-label="RVNB Home">
-            <img
+            <Image
               src="/rvnb-logo-icon.png"
               alt="RVNB"
               className={styles.brandIcon}
               width={180}
               height={72}
             />
+            <span className={styles.brandText}>RVNB</span>
           </Link>
 
           <nav className={styles.nav} aria-label="Primary">
             <Link className={styles.navLink} href="/listings">
               Listings
             </Link>
-
             <Link className={styles.navLink} href="/requests">
               Open Requests
             </Link>
-
             <AuthNav
               navLinkClassName={styles.navLink}
               navCtaClassName={styles.navCta}
@@ -40,242 +86,150 @@ export default function Home() {
         </div>
       </header>
 
-      {/* 1) HERO */}
-      <section
-        className={styles.hero}
-        style={
-          {
-            "--hero-bg-url": "url('/rvnb-home-bg.png')",
-          } as CSSProperties
-        }
-      >
+      <section className={styles.hero} aria-labelledby="home-hero-title">
         <div className={styles.heroBg} aria-hidden="true" />
-        <div className={styles.heroOverlay} aria-hidden="true" />
+        <div className={styles.heroShade} aria-hidden="true" />
 
         <div className={styles.heroInner}>
-          <p className={styles.heroBadge}>
-            Nationwide RV stays • Built for real RV life
-          </p>
+          <div className={styles.heroCopy}>
+            <p className={styles.kicker}>RV stays, host land, and road-life services</p>
+            <h1 id="home-hero-title" className={styles.title}>
+              Find your next RV stay. Share a place for someone else&apos;s.
+            </h1>
+            <p className={styles.subtitle}>
+              RVNB connects travelers looking for practical RV stays with hosts who have usable space, plus a growing hub for requests, transport, insurance guidance, and community.
+            </p>
 
-          <h1 className={styles.title}>
-            More Than Parking.
-            <span className={styles.titleHighlight}>It’s a Lifestyle.</span>
-          </h1>
-
-          <p className={styles.subtitle}>
-            Find safe, host-backed RV spots across the country — or request
-            exactly what you need and let the RVNB ecosystem help connect the
-            road.
-          </p>
-
-          <div className={styles.ctaRow}>
-            <Link href="/search" className={styles.primaryCta}>
-              Find RV Spots
-            </Link>
-
-            <Link href="/request-spot" className={styles.secondaryCta}>
-              Request a Spot
-            </Link>
-
-            <Link href="/host" className={styles.tertiaryCta}>
-              List Your Spot
-            </Link>
+            <div className={styles.heroActions} aria-label="Primary RVNB actions">
+              <Link href="/search" className={styles.primaryCta}>
+                Find a stay
+              </Link>
+              <Link href="/request-spot" className={styles.secondaryCta}>
+                Request a spot
+              </Link>
+              <Link href="/host" className={styles.tertiaryCta}>
+                List a property
+              </Link>
+            </div>
           </div>
 
-          <p className={styles.heroNote}>
-            Search available spots, request custom stays, and connect with RV
-            services built around the journey.
-          </p>
+          <aside className={styles.heroPanel} aria-label="RVNB quick paths">
+            <div className={styles.panelTopline}>Choose your next step</div>
+            <div className={styles.journeyGrid}>
+              {journeyCards.map((card) => (
+                <Link
+                  key={card.href}
+                  href={card.href}
+                  className={`${styles.journeyCard} ${styles[card.tone]}`}
+                >
+                  <span className={styles.journeyTitle}>{card.title}</span>
+                  <span className={styles.journeyText}>{card.text}</span>
+                  <span className={styles.journeyCta}>{card.cta} -&gt;</span>
+                </Link>
+              ))}
+            </div>
+          </aside>
         </div>
       </section>
 
-      {/* 2–5) SUNLIGHT BAND */}
-      <div className={styles.sunWrap} role="region" aria-label="Sunlight band">
-        <section className={styles.quickSearchSection} aria-label="Quick search">
-          <div className={styles.quickSearchBubble}>
+      <section className={styles.searchBand} aria-label="Quick RV stay search">
+        <div className={styles.container}>
+          <div className={styles.quickSearchShell}>
             <HomeQuickSearchBar />
           </div>
-        </section>
+        </div>
+      </section>
 
-        <EcosystemNav />
+      <EcosystemNav />
 
-        <section className={styles.section} aria-label="Featured listings">
-          <div className={styles.container}>
-            <div className={styles.sectionHeader}>
-              <div>
-                <h2 className={styles.sectionTitle}>Featured Spots</h2>
-                <p className={styles.sectionSub}>
-                  A few places to start — or browse open traveler demand if you
-                  are a host looking for opportunities.
-                </p>
-              </div>
-
-              <Link href="/listings" className={styles.sectionAction}>
-                View All Listings
-              </Link>
-            </div>
-
-            <FeaturedListingsPreview limitCount={3} />
-          </div>
-        </section>
-
-        <section className={styles.section} aria-label="Ecosystem expansion">
-          <div className={styles.container}>
-            <div className={styles.sectionHeader}>
-              <div>
-                <h2 className={styles.sectionTitle}>
-                  Built to Become an Ecosystem
-                </h2>
-                <p className={styles.sectionSub}>
-                  RVNB is positioned to support the entire RV lifestyle — not
-                  just parking.
-                </p>
-              </div>
-            </div>
-
-            <div className={styles.cardGrid}>
-              <Link href="/requests" className={styles.cardLink}>
-                <div className={`${styles.card} ${styles.serviceCardLive}`}>
-                  <div className={styles.cardTop}>
-                    <h3 className={styles.cardTitle}>📍 Open RV Demand</h3>
-                    <span className={styles.badge}>Live</span>
-                  </div>
-                  <p className={styles.cardBody}>
-                    Hosts can view real traveler needs, work stays, team housing
-                    demand, and location-based RV opportunities.
-                  </p>
-                  <span className={styles.cardMuted}>
-                    Travelers • Workers • Team housing
-                  </span>
-                </div>
-              </Link>
-
-              <Link href="/transport" className={styles.ecosystemCard}>
-                <div className={`${styles.card} ${styles.serviceCardBlue}`}>
-                  <div className={styles.cardTop}>
-                    <h3 className={styles.cardTitle}>🚛 Transport Network</h3>
-                    <span className={styles.badge}>Live</span>
-                  </div>
-                  <p className={styles.cardBody}>
-                    Move RVs, trailers, and rigs with trusted drivers and
-                    route-based logistics.
-                  </p>
-                  <span className={styles.cardMuted}>
-                    Driver relocation • Route scheduling • Verified partners
-                  </span>
-                </div>
-              </Link>
-
-              <Link href="/insurance" className={styles.cardLink}>
-                <div className={`${styles.card} ${styles.serviceCardGold}`}>
-                  <div className={styles.cardTop}>
-                    <h3 className={styles.cardTitle}>🛡 Insurance Directory</h3>
-                    <span className={styles.badge}>Coming Soon</span>
-                  </div>
-                  <p className={styles.cardBody}>
-                    Compare RV insurance options, coverage types, and trusted
-                    providers built for RV life.
-                  </p>
-                  <span className={styles.cardMuted}>
-                    Plan comparisons • Coverage guidance • Verified providers
-                  </span>
-                </div>
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        <section className={styles.section} aria-label="How it works">
-          <div className={styles.container}>
-            <div className={styles.sectionHeader}>
-              <div>
-                <h2 className={styles.sectionTitle}>How It Works</h2>
-                <p className={styles.sectionSub}>
-                  Simple, familiar, and built for both direct bookings and
-                  demand-based RV stays.
-                </p>
-              </div>
-            </div>
-
-            <div className={styles.stepsGrid}>
-              <div className={styles.step}>
-                <div className={styles.stepNum}>1</div>
-                <h3 className={styles.stepTitle}>Search the Platform</h3>
-                <p className={styles.stepBody}>
-                  Browse available spots, search by location, and explore the
-                  RVNB ecosystem from one connected homepage.
-                </p>
-              </div>
-
-              <div className={styles.step}>
-                <div className={styles.stepNum}>2</div>
-                <h3 className={styles.stepTitle}>Connect with Hosts</h3>
-                <p className={styles.stepBody}>
-                  Travelers find available stays, while hosts can view open
-                  demand and discover real opportunities in their area.
-                </p>
-              </div>
-
-              <div className={styles.step}>
-                <div className={styles.stepNum}>3</div>
-                <h3 className={styles.stepTitle}>Park &amp; Enjoy</h3>
-                <p className={styles.stepBody}>
-                  Arrive, park, and live the RV life with a platform designed to
-                  grow around the full journey.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <section className={styles.strip} aria-label="Community positioning">
+      <section className={styles.section} aria-labelledby="featured-heading">
         <div className={styles.container}>
-          <div className={styles.stripInner}>
+          <div className={styles.sectionHeader}>
             <div>
-              <h2 className={styles.stripTitle}>
-                Built for Hosts. Built for Travelers. Built for Growth.
-              </h2>
-              <p className={styles.stripBody}>
-                RVNB is designed to expand into listings, open demand,
-                transport, insurance, community, reviews, and maps — without
-                rebuilding the foundation.
-              </p>
+              <p className={styles.sectionKicker}>Browse available listings</p>
+              <h2 id="featured-heading" className={styles.sectionTitle}>Featured RV stays</h2>
             </div>
+            <Link href="/listings" className={styles.sectionAction}>View all listings</Link>
+          </div>
+          <FeaturedListingsPreview limitCount={3} />
+        </div>
+      </section>
 
-            <div className={styles.stripCtas}>
-              <Link href="/requests" className={styles.stripBtnPrimary}>
-                Browse Open Requests
-              </Link>
+      <section className={styles.platformSection} aria-labelledby="platform-heading">
+        <div className={styles.container}>
+          <div className={styles.platformIntro}>
+            <p className={styles.sectionKicker}>One RVNB platform</p>
+            <h2 id="platform-heading" className={styles.sectionTitle}>More than a listing board</h2>
+            <p className={styles.sectionSub}>
+              RVNB keeps the stay workflow central while building adjacent tools around how RV travelers and hosts actually plan, move, insure, and connect.
+            </p>
+          </div>
 
-              <Link href="/host" className={styles.stripBtnSecondary}>
-                Become a Host
+          <div className={styles.platformGrid}>
+            {platformCards.map((card) => (
+              <Link key={card.href} href={card.href} className={styles.platformCard}>
+                <span className={styles.platformLabel}>{card.label}</span>
+                <span className={styles.platformTitle}>{card.title}</span>
+                <span className={styles.platformText}>{card.text}</span>
+                <span className={styles.platformMeta}>{card.meta}</span>
               </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className={styles.howSection} aria-labelledby="how-heading">
+        <div className={styles.container}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <p className={styles.sectionKicker}>How RVNB works</p>
+              <h2 id="how-heading" className={styles.sectionTitle}>Simple paths for travelers and hosts</h2>
+            </div>
+          </div>
+
+          <div className={styles.stepsGrid}>
+            <article className={styles.step}>
+              <span className={styles.stepNum}>01</span>
+              <h3 className={styles.stepTitle}>Search or request</h3>
+              <p className={styles.stepBody}>Travelers can browse available listings or submit a request when they need a specific location, date range, or setup.</p>
+            </article>
+            <article className={styles.step}>
+              <span className={styles.stepNum}>02</span>
+              <h3 className={styles.stepTitle}>Hosts review demand</h3>
+              <p className={styles.stepBody}>Hosts can create listings, review incoming booking requests, and use open demand to understand where travelers need space.</p>
+            </article>
+            <article className={styles.step}>
+              <span className={styles.stepNum}>03</span>
+              <h3 className={styles.stepTitle}>Build around the stay</h3>
+              <p className={styles.stepBody}>Transport, coverage guidance, community, reviews, and maps stay connected to the core RV stay experience.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section className={styles.finalBand} aria-label="Start using RVNB">
+        <div className={styles.container}>
+          <div className={styles.finalInner}>
+            <div>
+              <p className={styles.sectionKicker}>Ready when you are</p>
+              <h2 className={styles.finalTitle}>Start with a stay. Grow into the road-life hub.</h2>
+            </div>
+            <div className={styles.finalActions}>
+              <Link href="/search" className={styles.primaryCta}>Find a stay</Link>
+              <Link href="/host" className={styles.secondaryCta}>Become a host</Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 7) FOOTER */}
       <footer className={styles.footer}>
         <div className={styles.container}>
-          <div className={styles.footerTop}>
-            <div className={styles.footerBrand}>
+          <div className={styles.footerInner}>
+            <div>
               <div className={styles.footerBrandMark}>RVNB</div>
-              <div className={styles.footerBrandSub}>
-                Recreational Vehicle Nationwide Booking
-              </div>
-              <div className={styles.footerMeta}>
-                Built with Next.js + Firebase
-              </div>
+              <div className={styles.footerBrandSub}>Recreational Vehicle Nationwide Booking</div>
             </div>
-          </div>
-
-          <div className={styles.footerBottom}>
-            <span>© {new Date().getFullYear()} RVNB</span>
-            <span className={styles.footerBottomMuted}>
-              Routes stay stable as features expand.
-            </span>
+            <div className={styles.footerMeta}>© {new Date().getFullYear()} RVNB - Built for travelers, hosts, and the road ahead.</div>
           </div>
         </div>
       </footer>

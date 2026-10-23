@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import React, { CSSProperties, useMemo, useState } from "react";
+import React, { CSSProperties, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -30,6 +30,7 @@ type HookupsPref =
 type PullThroughPref = "Any" | "Yes" | "Preferred" | "No";
 type LaundryPref = "Any" | "Preferred" | "Required" | "No";
 type BudgetPeriod = "Night" | "Week" | "Month";
+type YesNo = "Yes" | "No";
 
 type AdditionalRv = {
   id: string;
@@ -66,6 +67,19 @@ const pullThroughOptions: PullThroughPref[] = ["Any", "Yes", "Preferred", "No"];
 const laundryOptions: LaundryPref[] = ["Any", "Preferred", "Required", "No"];
 const budgetPeriodOptions: BudgetPeriod[] = ["Night", "Week", "Month"];
 const rigLengthOptions = ["20", "24", "28", "30", "32", "35", "38", "40", "45"];
+const yesNoOptions: YesNo[] = ["Yes", "No"];
+
+const requestTypeDescriptions: Record<RequestType, string> = {
+  "Personal Travel": "An individual or family looking for an RV stay.",
+  "Work Stay": "A worker arranging spots for themselves and coworkers.",
+  "Employer / Team Housing": "A company representative coordinating RV housing for a crew.",
+};
+
+const requestTypeHints: Record<RequestType, string> = {
+  "Personal Travel": "Use this when you are planning your own stay and need a practical place for one primary RV.",
+  "Work Stay": "Use this when you are part of the group and booking for yourself plus a few coworkers coming into town for a job.",
+  "Employer / Team Housing": "Use this when you represent the company or crew. RVNB does not currently promise company billing, contracts, or guaranteed placement.",
+};
 
 function createAdditionalRv(idSeed: number): AdditionalRv {
   return {
@@ -140,23 +154,6 @@ const heroMetaPill: CSSProperties = {
   boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
 };
 
-const introGrid: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1.15fr 1fr 1fr",
-  gap: 16,
-  marginBottom: 26,
-};
-
-const introCard: CSSProperties = {
-  borderRadius: 22,
-  border: "1px solid rgba(255,255,255,0.09)",
-  background:
-    "linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%)",
-  padding: 18,
-  boxShadow:
-    "inset 0 1px 0 rgba(255,255,255,0.04), 0 10px 30px rgba(0,0,0,0.12)",
-};
-
 const introEyebrow: CSSProperties = {
   margin: 0,
   fontSize: 12,
@@ -166,77 +163,10 @@ const introEyebrow: CSSProperties = {
   color: "rgba(255,255,255,0.58)",
 };
 
-const introTitle: CSSProperties = {
-  margin: "8px 0 10px",
-  fontSize: "1.08rem",
-  fontWeight: 900,
-  color: "#ffffff",
-  letterSpacing: "-0.02em",
-};
-
-const introText: CSSProperties = {
-  margin: 0,
-  color: "rgba(255,255,255,0.76)",
-  lineHeight: 1.65,
-  fontSize: "0.95rem",
-};
-
 const sectionNote: CSSProperties = {
   margin: "0 0 4px",
   color: "rgba(255,255,255,0.62)",
   fontSize: "0.92rem",
-  lineHeight: 1.6,
-};
-
-const requestFlowCard: CSSProperties = {
-  marginBottom: 24,
-  borderRadius: 22,
-  border: "1px solid rgba(255,255,255,0.08)",
-  background:
-    "linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.025) 100%)",
-  padding: 18,
-  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
-};
-
-const requestFlowGrid: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-  gap: 14,
-};
-
-const flowStep: CSSProperties = {
-  borderRadius: 18,
-  border: "1px solid rgba(255,255,255,0.08)",
-  background: "rgba(255,255,255,0.03)",
-  padding: 14,
-};
-
-const flowStepNumber: CSSProperties = {
-  width: 28,
-  height: 28,
-  borderRadius: 999,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontWeight: 900,
-  fontSize: "0.9rem",
-  marginBottom: 10,
-  background:
-    "linear-gradient(180deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.08) 100%)",
-  border: "1px solid rgba(255,255,255,0.14)",
-};
-
-const flowStepTitle: CSSProperties = {
-  margin: "0 0 6px",
-  fontSize: "1rem",
-  fontWeight: 900,
-  color: "#ffffff",
-};
-
-const flowStepText: CSSProperties = {
-  margin: 0,
-  fontSize: "0.92rem",
-  color: "rgba(255,255,255,0.74)",
   lineHeight: 1.6,
 };
 
@@ -249,6 +179,142 @@ const statusBox: CSSProperties = {
   fontWeight: 800,
 };
 
+function SelectMenu<T extends string>({
+  ariaLabel,
+  value,
+  options,
+  onChange,
+  formatOption = (option) => option,
+}: {
+  ariaLabel: string;
+  value: T;
+  options: readonly T[];
+  onChange: (value: T) => void;
+  formatOption?: (option: T) => string;
+}) {
+  const id = useId();
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [open, setOpen] = useState(false);
+  const selectedIndex = Math.max(0, options.indexOf(value));
+  const [activeIndex, setActiveIndex] = useState(selectedIndex);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) setActiveIndex(selectedIndex);
+  }, [open, selectedIndex]);
+
+  function choose(index: number) {
+    const next = options[index];
+    if (!next) return;
+    onChange(next);
+    setOpen(false);
+  }
+
+  function moveActive(delta: number) {
+    setActiveIndex((current) => {
+      const next = current + delta;
+      if (next < 0) return options.length - 1;
+      if (next >= options.length) return 0;
+      return next;
+    });
+  }
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      if (!open) setOpen(true);
+      else moveActive(1);
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (!open) setOpen(true);
+      else moveActive(-1);
+      return;
+    }
+
+    if (event.key === "Home") {
+      event.preventDefault();
+      setOpen(true);
+      setActiveIndex(0);
+      return;
+    }
+
+    if (event.key === "End") {
+      event.preventDefault();
+      setOpen(true);
+      setActiveIndex(options.length - 1);
+      return;
+    }
+
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      if (open) choose(activeIndex);
+      else setOpen(true);
+      return;
+    }
+
+    if (event.key === "Escape") {
+      setOpen(false);
+    }
+  }
+
+  return (
+    <div className={styles.selectMenu} ref={rootRef}>
+      <button
+        type="button"
+        className={styles.selectButton}
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={`${id}-listbox`}
+        onClick={() => setOpen((current) => !current)}
+        onKeyDown={handleKeyDown}
+      >
+        <span>{formatOption(value)}</span>
+        <span className={styles.selectChevron} aria-hidden="true">⌄</span>
+      </button>
+
+      {open ? (
+        <ul id={`${id}-listbox`} className={styles.selectListbox} role="listbox" aria-label={ariaLabel}>
+          {options.map((option, index) => {
+            const selected = option === value;
+            const active = index === activeIndex;
+
+            return (
+              <li
+                id={`${id}-option-${index}`}
+                key={option}
+                role="option"
+                aria-selected={selected}
+                className={`${styles.selectOption} ${selected ? styles.selectOptionSelected : ""} ${active ? styles.selectOptionActive : ""}`}
+                onMouseEnter={() => setActiveIndex(index)}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => choose(index)}
+              >
+                {formatOption(option)}
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 export default function RequestSpotPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -256,18 +322,23 @@ export default function RequestSpotPage() {
   const [requestType, setRequestType] =
     useState<RequestType>("Personal Travel");
 
-  const [locationText, setLocationText] = useState("Pecos");
-  const [stateCode, setStateCode] = useState("TX");
-  const [arrivalDate, setArrivalDate] = useState("2024-04-30");
-  const [departureDate, setDepartureDate] = useState("2024-06-14");
+  const [locationText, setLocationText] = useState("");
+  const [stateCode, setStateCode] = useState("");
+  const [arrivalDate, setArrivalDate] = useState("");
+  const [departureDate, setDepartureDate] = useState("");
   const [flexibleDates, setFlexibleDates] = useState(true);
 
   const [employerName, setEmployerName] = useState("");
-  const [teamName, setTeamName] = useState("");
-  const [teamLocation, setTeamLocation] = useState("");
+  const [workGroupName, setWorkGroupName] = useState("");
+  const [workLocation, setWorkLocation] = useState("");
+  const [employerProjectName, setEmployerProjectName] = useState("");
+  const [employerJobsiteArea, setEmployerJobsiteArea] = useState("");
+  const [representativeRole, setRepresentativeRole] = useState("");
   const [workersCount, setWorkersCount] = useState("4");
   const [rigsCount, setRigsCount] = useState("3");
   const [spotsNeeded, setSpotsNeeded] = useState("3");
+  const [separateSpotsNeeded, setSeparateSpotsNeeded] = useState<YesNo>("Yes");
+  const [singleCoordinator, setSingleCoordinator] = useState<YesNo>("Yes");
   const [stayDurationType, setStayDurationType] =
     useState<StayDurationType>("Long-term");
 
@@ -283,7 +354,7 @@ export default function RequestSpotPage() {
   const [moreThanOneRv, setMoreThanOneRv] = useState(false);
   const [additionalRvs, setAdditionalRvs] = useState<AdditionalRv[]>([]);
 
-  const [budgetAmount, setBudgetAmount] = useState("4000");
+  const [budgetAmount, setBudgetAmount] = useState("");
   const [budgetPeriod, setBudgetPeriod] = useState<BudgetPeriod>("Month");
 
   const [notes, setNotes] = useState("");
@@ -295,6 +366,7 @@ export default function RequestSpotPage() {
 
   const showWorkFields =
     requestType === "Work Stay" || requestType === "Employer / Team Housing";
+  const showEmployerFields = requestType === "Employer / Team Housing";
 
   function handleToggleMoreThanOneRv(checked: boolean) {
     setMoreThanOneRv(checked);
@@ -330,22 +402,12 @@ export default function RequestSpotPage() {
     e.preventDefault();
     setRequestMsg("");
 
-    if (authLoading) {
-      setRequestMsg("Please wait while we check your login status.");
-      return;
-    }
-
-    if (!user) {
-      setRequestMsg("Please sign in before starting a request.");
-      router.push(`/login?next=${encodeURIComponent("/request-spot")}`);
-      return;
-    }
-
     const cleanLocation = locationText.trim().slice(0, 80);
     const cleanState = normalizeState(stateCode);
     const cleanEmployer = employerName.trim().slice(0, 100);
-    const cleanTeamName = teamName.trim().slice(0, 100);
-    const cleanTeamLocation = teamLocation.trim().slice(0, 120);
+    const cleanTeamName = (showEmployerFields ? employerProjectName : workGroupName).trim().slice(0, 100);
+    const cleanTeamLocation = (showEmployerFields ? employerJobsiteArea : workLocation).trim().slice(0, 120);
+    const cleanRepresentativeRole = representativeRole.trim().slice(0, 80);
     const cleanBudget = Math.max(0, Number(budgetAmount) || 0);
     const cleanNotes = notes.trim().slice(0, 500);
 
@@ -368,10 +430,31 @@ export default function RequestSpotPage() {
       return;
     }
 
-    if (showWorkFields && !cleanTeamName) {
+    if (showWorkFields && !cleanTeamLocation) {
       setRequestMsg(
-        "⚠️ Please enter a Team Name so this request stays grouped together."
+        "⚠️ Please add the work location or jobsite area for this request."
       );
+      return;
+    }
+
+    if (showEmployerFields && !cleanEmployer) {
+      setRequestMsg("⚠️ Please enter the company or employer name.");
+      return;
+    }
+
+    if (showEmployerFields && !cleanRepresentativeRole) {
+      setRequestMsg("⚠️ Please enter your representative or contact role.");
+      return;
+    }
+
+    if (authLoading) {
+      setRequestMsg("Please wait while we check your login status.");
+      return;
+    }
+
+    if (!user) {
+      setRequestMsg("Please sign in before starting a request.");
+      router.push(`/login?next=${encodeURIComponent("/request-spot")}`);
       return;
     }
 
@@ -421,9 +504,12 @@ export default function RequestSpotPage() {
         employerName: cleanEmployer,
         teamName: cleanTeamName,
         teamLocation: cleanTeamLocation,
+        representativeRole: cleanRepresentativeRole,
         workersCount: Number(workersCount) || 0,
         rigsCount: Number(rigsCount) || 0,
         spotsNeeded: Number(spotsNeeded) || 0,
+        separateSpotsNeeded: separateSpotsNeeded === "Yes",
+        singleCoordinator: singleCoordinator === "Yes",
         stayDurationType,
 
         primaryRv,
@@ -457,11 +543,16 @@ export default function RequestSpotPage() {
       setFlexibleDates(true);
 
       setEmployerName("");
-      setTeamName("");
-      setTeamLocation("");
+      setWorkGroupName("");
+      setWorkLocation("");
+      setEmployerProjectName("");
+      setEmployerJobsiteArea("");
+      setRepresentativeRole("");
       setWorkersCount("4");
       setRigsCount("3");
       setSpotsNeeded("3");
+      setSeparateSpotsNeeded("Yes");
+      setSingleCoordinator("Yes");
       setStayDurationType("Long-term");
 
       setRigType("5th Wheel");
@@ -486,11 +577,7 @@ export default function RequestSpotPage() {
   }
 
   const requestTypeHelper =
-    requestType === "Personal Travel"
-      ? "Best for individual travelers, couples, families, and standard one-rig stays."
-      : requestType === "Work Stay"
-      ? "Built for workers traveling to active jobsites who need a dependable setup near work."
-      : "Designed for companies and team coordinators needing multiple RV spaces grouped under one request.";
+    requestTypeHints[requestType];
 
   return (
     <main className={styles.page}>
@@ -533,109 +620,15 @@ export default function RequestSpotPage() {
           <header className={styles.hero}>
             <h1 className={styles.title}>Request a Road-Ready RV Spot</h1>
             <p className={styles.subtitle}>
-              Submit a request to let RVNB know what you need. We&apos;re here
-              to help you find the right spot whether you&apos;re traveling
-              personally, staying for work, or coordinating for a team.
+              Tell RVNB where you need to stay, what your rig needs, and whether this is personal travel, a work stay, or team housing. Start with location and dates, then continue to the next step to refine follow-up details.
             </p>
 
             <div style={heroMetaRow}>
-              <span style={heroMetaPill}>Built for real RV life</span>
-              <span style={heroMetaPill}>Team and work-ready</span>
-              <span style={heroMetaPill}>Match-driven request flow</span>
+              <span style={heroMetaPill}>Traveler-first request</span>
+              <span style={heroMetaPill}>Work stays and teams supported</span>
+              <span style={heroMetaPill}>Next step: contact preferences</span>
             </div>
           </header>
-
-          <section style={introGrid}>
-            <div style={introCard}>
-              <p style={introEyebrow}>Why request through RVNB</p>
-              <h3 style={introTitle}>Not just a form — a better matching path</h3>
-              <p style={introText}>
-                This request helps RVNB understand your stay, your setup, and
-                your must-haves so we can guide you toward stronger host fits,
-                team-ready options, and future support tools.
-              </p>
-            </div>
-
-            <div style={introCard}>
-              <p style={introEyebrow}>How it works</p>
-              <h3 style={introTitle}>Step 1 of 2</h3>
-              <p style={introText}>
-                Start here by submitting your request details. In the next step,
-                you&apos;ll refine contact preferences and help us complete your
-                matching profile.
-              </p>
-            </div>
-
-            <div style={introCard}>
-              <p style={introEyebrow}>Best for</p>
-              <h3 style={introTitle}>Travelers, workers, and teams</h3>
-              <p style={introText}>
-                From solo rigs to employer housing requests, RVNB is being
-                shaped to support flexible stays, multiple RVs, and jobsite-side
-                coordination.
-              </p>
-            </div>
-          </section>
-
-          <section style={requestFlowCard}>
-            <p style={introEyebrow}>Request Journey</p>
-            <div style={requestFlowGrid}>
-              <div style={flowStep}>
-                <div style={flowStepNumber}>1</div>
-                <h4 style={flowStepTitle}>Build your request</h4>
-                <p style={flowStepText}>
-                  Tell RVNB where you need to stay, what kind of RV setup you
-                  have, and whether this is personal travel or a work-related
-                  stay.
-                </p>
-              </div>
-
-              <div style={flowStep}>
-                <div style={flowStepNumber}>2</div>
-                <h4 style={flowStepTitle}>Refine your details</h4>
-                <p style={flowStepText}>
-                  On the next screen, you&apos;ll confirm contact preferences and
-                  complete your matching profile before final submission.
-                </p>
-              </div>
-
-              <div style={flowStep}>
-                <div style={flowStepNumber}>3</div>
-                <h4 style={flowStepTitle}>Move toward matching</h4>
-                <p style={flowStepText}>
-                  RVNB can then use your request details to support matching,
-                  future host responses, and the next layer of our request hub
-                  workflow.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <section className={styles.offerSpaceSection}>
-            <div className={styles.offerSpaceCard}>
-              <div className={styles.offerSpaceContent}>
-                <div className={styles.offerSpaceTextWrap}>
-                  <h4 className={styles.offerSpaceTitle}>
-                    Have space near high-demand areas?
-                  </h4>
-                  <p className={styles.offerSpaceText}>
-                    If you live near job sites, refineries, or travel-heavy
-                    areas, you may be able to offer temporary RV space and earn
-                    extra income. RVNB connects real requests with nearby
-                    opportunities — even if your property isn&apos;t a full RV
-                    setup.
-                  </p>
-                </div>
-
-                <Link
-                  href="/request-spot/respond"
-                  className={styles.offerSpaceBtn}
-                >
-                  Offer Space →
-                </Link>
-              </div>
-            </div>
-          </section>
 
           <form className={styles.formShell} onSubmit={handleSubmit}>
             <section className={styles.section}>
@@ -666,7 +659,8 @@ export default function RequestSpotPage() {
                     }
                     onClick={() => setRequestType(type)}
                   >
-                    {type}
+                    <span className={styles.segmentTitle}>{type}</span>
+                    <span className={styles.segmentDescription}>{requestTypeDescriptions[type]}</span>
                   </button>
                 ))}
               </div>
@@ -691,6 +685,7 @@ export default function RequestSpotPage() {
                   <label className={styles.label}>City/Location (quick)</label>
                   <input
                     className={styles.input}
+                    aria-label="City or location"
                     value={locationText}
                     onChange={(e) => setLocationText(e.target.value)}
                     placeholder="Pecos"
@@ -701,6 +696,7 @@ export default function RequestSpotPage() {
                   <label className={styles.label}>State</label>
                   <input
                     className={styles.input}
+                    aria-label="State"
                     value={stateCode}
                     onChange={(e) =>
                       setStateCode(e.target.value.toUpperCase().slice(0, 2))
@@ -715,6 +711,7 @@ export default function RequestSpotPage() {
                   <input
                     className={styles.input}
                     type="date"
+                    aria-label="Arrival date"
                     value={arrivalDate}
                     onChange={(e) => setArrivalDate(e.target.value)}
                   />
@@ -725,6 +722,7 @@ export default function RequestSpotPage() {
                   <input
                     className={styles.input}
                     type="date"
+                    aria-label="Departure date"
                     value={departureDate}
                     onChange={(e) => setDepartureDate(e.target.value)}
                   />
@@ -747,91 +745,168 @@ export default function RequestSpotPage() {
 
                 <section className={styles.section}>
                   <div className={styles.sectionHeader}>
-                    <h2 className={styles.sectionTitle}>Team Details</h2>
+                    <h2 className={styles.sectionTitle}>
+                      {showEmployerFields ? "Employer / Team Housing Details" : "Work Stay Details"}
+                    </h2>
                   </div>
 
                   <p style={sectionNote}>
-                    These details stay grouped together in one request so teams,
-                    workers, and multiple RV spaces can be coordinated under the
-                    same request profile.
+                    {showEmployerFields
+                      ? "For company representatives coordinating RV housing for a crew. These details help RVNB understand the group and jobsite context without promising company billing, contracts, or guaranteed placement."
+                      : "For a worker arranging RV spots for themselves and a few coworkers coming into town for a job. Keep it practical: headcount, RV count, jobsite area, and whether separate spots are needed."}
                   </p>
+
+                  {showEmployerFields ? (
+                    <div className={styles.gridThree}>
+                      <div className={styles.field}>
+                        <label className={styles.label}>Company / Employer Name</label>
+                        <input
+                          className={styles.input}
+                          value={employerName}
+                          onChange={(e) => setEmployerName(e.target.value)}
+                          placeholder="Company name"
+                        />
+                      </div>
+
+                      <div className={styles.field}>
+                        <label className={styles.label}>Your Role</label>
+                        <input
+                          className={styles.input}
+                          value={representativeRole}
+                          onChange={(e) => setRepresentativeRole(e.target.value)}
+                          placeholder="HR, operations, crew lead..."
+                        />
+                      </div>
+
+                      <div className={styles.field}>
+                        <label className={styles.label}>Crew / Project Name</label>
+                        <input
+                          className={styles.input}
+                          value={employerProjectName}
+                          onChange={(e) => setEmployerProjectName(e.target.value)}
+                          placeholder="Optional project or crew name"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={styles.gridTwo}>
+                      <div className={styles.field}>
+                        <label className={styles.label}>Coworker / Crew Label</label>
+                        <input
+                          className={styles.input}
+                          value={workGroupName}
+                          onChange={(e) => setWorkGroupName(e.target.value)}
+                          placeholder="Optional: West Crew A"
+                        />
+                      </div>
+
+                      <div className={styles.field}>
+                        <label className={styles.label}>Work Location / Jobsite Area</label>
+                        <input
+                          className={styles.input}
+                          value={workLocation}
+                          onChange={(e) => setWorkLocation(e.target.value)}
+                          placeholder="Jobsite, refinery, project area..."
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {showEmployerFields ? (
+                    <div className={styles.gridTwo}>
+                      <div className={styles.field}>
+                        <label className={styles.label}>Jobsite Area</label>
+                        <input
+                          className={styles.input}
+                          value={employerJobsiteArea}
+                          onChange={(e) => setEmployerJobsiteArea(e.target.value)}
+                          placeholder="City, facility, project area..."
+                        />
+                      </div>
+
+                      <div className={styles.field}>
+                        <label className={styles.label}>One person coordinating?</label>
+                        <SelectMenu
+                          ariaLabel="One person coordinating"
+                          value={singleCoordinator}
+                          options={yesNoOptions}
+                          onChange={setSingleCoordinator}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
 
                   <div className={styles.gridThree}>
                     <div className={styles.field}>
-                      <label className={styles.label}>Employer/Company</label>
-                      <input
-                        className={styles.input}
-                        value={employerName}
-                        onChange={(e) => setEmployerName(e.target.value)}
-                        placeholder="Company name"
+                      <label className={styles.label}>{showEmployerFields ? "Expected Crew Count" : "Workers Coming"}</label>
+                      <SelectMenu
+                        ariaLabel="Workers count"
+                        value={workersCount}
+                        options={["1", "2", "3", "4", "5", "6", "8", "10+"]}
+                        onChange={setWorkersCount}
                       />
                     </div>
 
                     <div className={styles.field}>
-                      <label className={styles.label}>Team Name</label>
-                      <input
-                        className={styles.input}
-                        value={teamName}
-                        onChange={(e) => setTeamName(e.target.value)}
-                        placeholder="Example: West Crew A"
+                      <label className={styles.label}>{showEmployerFields ? "Expected RV Count" : "RVs Coming"}</label>
+                      <SelectMenu
+                        ariaLabel="Rigs count"
+                        value={rigsCount}
+                        options={["1", "2", "3", "4", "5", "6", "8+"]}
+                        onChange={setRigsCount}
+                        formatOption={(value) => `${value} RVs`}
                       />
                     </div>
 
                     <div className={styles.field}>
-                      <label className={styles.label}>Team/Jobsite Location</label>
-                      <input
-                        className={styles.input}
-                        value={teamLocation}
-                        onChange={(e) => setTeamLocation(e.target.value)}
-                        placeholder="Jobsite or area"
+                      <label className={styles.label}>Separate spots needed?</label>
+                      <SelectMenu
+                        ariaLabel="Separate spots needed"
+                        value={separateSpotsNeeded}
+                        options={yesNoOptions}
+                        onChange={setSeparateSpotsNeeded}
                       />
                     </div>
                   </div>
 
-                  <div className={styles.gridThree}>
+                  <div className={styles.gridTwo}>
                     <div className={styles.field}>
-                      <label className={styles.label}>Workers Count</label>
-                      <select
-                        className={styles.select}
-                        value={workersCount}
-                        onChange={(e) => setWorkersCount(e.target.value)}
-                      >
-                        {["1", "2", "3", "4", "5", "6", "8", "10+"].map((value) => (
-                          <option key={value} value={value}>
-                            {value}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className={styles.field}>
-                      <label className={styles.label}>Rigs Count</label>
-                      <select
-                        className={styles.select}
-                        value={rigsCount}
-                        onChange={(e) => setRigsCount(e.target.value)}
-                      >
-                        {["1", "2", "3", "4", "5", "6", "8+"].map((value) => (
-                          <option key={value} value={value}>
-                            {value} RVs
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className={styles.field}>
-                      <label className={styles.label}>Spots Needed</label>
-                      <select
-                        className={styles.select}
+                      <label className={styles.label}>Approximate RV spots needed</label>
+                      <SelectMenu
+                        ariaLabel="Spots needed"
                         value={spotsNeeded}
-                        onChange={(e) => setSpotsNeeded(e.target.value)}
-                      >
-                        {["1", "2", "3", "4", "5", "6", "8+"].map((value) => (
-                          <option key={value} value={value}>
-                            {value} spots
-                          </option>
-                        ))}
-                      </select>
+                        options={["1", "2", "3", "4", "5", "6", "8+"]}
+                        onChange={setSpotsNeeded}
+                        formatOption={(value) => `${value} spots`}
+                      />
+                    </div>
+
+                    <div className={styles.field}>
+                      <label className={styles.label}>Stay length expectation</label>
+                      <div className={styles.durationRow}>
+                        <button
+                          type="button"
+                          className={
+                            stayDurationType === "Short-term"
+                              ? styles.durationButtonActive
+                              : styles.durationButton
+                          }
+                          onClick={() => setStayDurationType("Short-term")}
+                        >
+                          Short-term
+                        </button>
+                        <button
+                          type="button"
+                          className={
+                            stayDurationType === "Long-term"
+                              ? styles.durationButtonActive
+                              : styles.durationButton
+                          }
+                          onClick={() => setStayDurationType("Long-term")}
+                        >
+                          Long-term
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </section>
@@ -855,113 +930,85 @@ export default function RequestSpotPage() {
               <div className={styles.gridThree}>
                 <div className={styles.field}>
                   <label className={styles.label}>RV type</label>
-                  <select
-                    className={styles.select}
+                  <SelectMenu
+                    ariaLabel="RV type"
                     value={rigType}
-                    onChange={(e) => setRigType(e.target.value as RigType)}
-                  >
-                    {rigTypeOptions.map((value) => (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </select>
+                    options={rigTypeOptions}
+                    onChange={setRigType}
+                  />
                 </div>
 
                 <div className={styles.field}>
                   <label className={styles.label}>Rig length</label>
-                  <select
-                    className={styles.select}
+                  <SelectMenu
+                    ariaLabel="Rig length"
                     value={rigLength}
-                    onChange={(e) => setRigLength(e.target.value)}
-                  >
-                    {rigLengthOptions.map((value) => (
-                      <option key={value} value={value}>
-                        {value} ft.
-                      </option>
-                    ))}
-                  </select>
+                    options={rigLengthOptions}
+                    onChange={setRigLength}
+                    formatOption={(value) => `${value} ft.`}
+                  />
                 </div>
 
                 <div className={styles.field}>
                   <label className={styles.label}>Hookups</label>
-                  <select
-                    className={styles.select}
+                  <SelectMenu
+                    ariaLabel="Hookups"
                     value={hookupsPreference}
-                    onChange={(e) =>
-                      setHookupsPreference(e.target.value as HookupsPref)
-                    }
-                  >
-                    {hookupsOptions.map((value) => (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </select>
+                    options={hookupsOptions}
+                    onChange={setHookupsPreference}
+                  />
                 </div>
               </div>
 
               <div className={styles.gridThree}>
-                <div className={styles.field}>
-                  <label className={styles.label}>Duration</label>
-                  <div className={styles.durationRow}>
-                    <button
-                      type="button"
-                      className={
-                        stayDurationType === "Short-term"
-                          ? styles.durationButtonActive
-                          : styles.durationButton
-                      }
-                      onClick={() => setStayDurationType("Short-term")}
-                    >
-                      Short-term
-                    </button>
-                    <button
-                      type="button"
-                      className={
-                        stayDurationType === "Long-term"
-                          ? styles.durationButtonActive
-                          : styles.durationButton
-                      }
-                      onClick={() => setStayDurationType("Long-term")}
-                    >
-                      Long-term
-                    </button>
+                {!showWorkFields ? (
+                  <div className={styles.field}>
+                    <label className={styles.label}>Duration</label>
+                    <div className={styles.durationRow}>
+                      <button
+                        type="button"
+                        className={
+                          stayDurationType === "Short-term"
+                            ? styles.durationButtonActive
+                            : styles.durationButton
+                        }
+                        onClick={() => setStayDurationType("Short-term")}
+                      >
+                        Short-term
+                      </button>
+                      <button
+                        type="button"
+                        className={
+                          stayDurationType === "Long-term"
+                            ? styles.durationButtonActive
+                            : styles.durationButton
+                        }
+                        onClick={() => setStayDurationType("Long-term")}
+                      >
+                        Long-term
+                      </button>
+                    </div>
                   </div>
-                </div>
+                ) : null}
 
                 <div className={styles.field}>
                   <label className={styles.label}>Pull-through</label>
-                  <select
-                    className={styles.select}
+                  <SelectMenu
+                    ariaLabel="Pull-through"
                     value={pullThroughPreference}
-                    onChange={(e) =>
-                      setPullThroughPreference(
-                        e.target.value as PullThroughPref
-                      )
-                    }
-                  >
-                    {pullThroughOptions.map((value) => (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </select>
+                    options={pullThroughOptions}
+                    onChange={setPullThroughPreference}
+                  />
                 </div>
 
                 <div className={styles.field}>
                   <label className={styles.label}>Laundry Area</label>
-                  <select
-                    className={styles.select}
+                  <SelectMenu
+                    ariaLabel="Laundry area"
                     value={laundryNeed}
-                    onChange={(e) => setLaundryNeed(e.target.value as LaundryPref)}
-                  >
-                    {laundryOptions.map((value) => (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </select>
+                    options={laundryOptions}
+                    onChange={setLaundryNeed}
+                  />
                 </div>
               </div>
 
@@ -1018,105 +1065,55 @@ export default function RequestSpotPage() {
                         <div className={styles.gridThree}>
                           <div className={styles.field}>
                             <label className={styles.label}>RV type</label>
-                            <select
-                              className={styles.select}
+                            <SelectMenu
+                              ariaLabel={`Additional RV ${index + 1} type`}
                               value={rv.rigType}
-                              onChange={(e) =>
-                                updateAdditionalRv(
-                                  rv.id,
-                                  "rigType",
-                                  e.target.value as RigType
-                                )
-                              }
-                            >
-                              {rigTypeOptions.map((value) => (
-                                <option key={value} value={value}>
-                                  {value}
-                                </option>
-                              ))}
-                            </select>
+                              options={rigTypeOptions}
+                              onChange={(value) => updateAdditionalRv(rv.id, "rigType", value)}
+                            />
                           </div>
 
                           <div className={styles.field}>
                             <label className={styles.label}>Rig length</label>
-                            <select
-                              className={styles.select}
+                            <SelectMenu
+                              ariaLabel={`Additional RV ${index + 1} rig length`}
                               value={rv.rigLength}
-                              onChange={(e) =>
-                                updateAdditionalRv(rv.id, "rigLength", e.target.value)
-                              }
-                            >
-                              {rigLengthOptions.map((value) => (
-                                <option key={value} value={value}>
-                                  {value} ft.
-                                </option>
-                              ))}
-                            </select>
+                              options={rigLengthOptions}
+                              onChange={(value) => updateAdditionalRv(rv.id, "rigLength", value)}
+                              formatOption={(value) => `${value} ft.`}
+                            />
                           </div>
 
                           <div className={styles.field}>
                             <label className={styles.label}>Hookups</label>
-                            <select
-                              className={styles.select}
+                            <SelectMenu
+                              ariaLabel={`Additional RV ${index + 1} hookups`}
                               value={rv.hookupsPreference}
-                              onChange={(e) =>
-                                updateAdditionalRv(
-                                  rv.id,
-                                  "hookupsPreference",
-                                  e.target.value as HookupsPref
-                                )
-                              }
-                            >
-                              {hookupsOptions.map((value) => (
-                                <option key={value} value={value}>
-                                  {value}
-                                </option>
-                              ))}
-                            </select>
+                              options={hookupsOptions}
+                              onChange={(value) => updateAdditionalRv(rv.id, "hookupsPreference", value)}
+                            />
                           </div>
                         </div>
 
                         <div className={styles.gridThree}>
                           <div className={styles.field}>
                             <label className={styles.label}>Pull-through</label>
-                            <select
-                              className={styles.select}
+                            <SelectMenu
+                              ariaLabel={`Additional RV ${index + 1} pull-through`}
                               value={rv.pullThroughPreference}
-                              onChange={(e) =>
-                                updateAdditionalRv(
-                                  rv.id,
-                                  "pullThroughPreference",
-                                  e.target.value as PullThroughPref
-                                )
-                              }
-                            >
-                              {pullThroughOptions.map((value) => (
-                                <option key={value} value={value}>
-                                  {value}
-                                </option>
-                              ))}
-                            </select>
+                              options={pullThroughOptions}
+                              onChange={(value) => updateAdditionalRv(rv.id, "pullThroughPreference", value)}
+                            />
                           </div>
 
                           <div className={styles.field}>
                             <label className={styles.label}>Laundry Area</label>
-                            <select
-                              className={styles.select}
+                            <SelectMenu
+                              ariaLabel={`Additional RV ${index + 1} laundry area`}
                               value={rv.laundryNeed}
-                              onChange={(e) =>
-                                updateAdditionalRv(
-                                  rv.id,
-                                  "laundryNeed",
-                                  e.target.value as LaundryPref
-                                )
-                              }
-                            >
-                              {laundryOptions.map((value) => (
-                                <option key={value} value={value}>
-                                  {value}
-                                </option>
-                              ))}
-                            </select>
+                              options={laundryOptions}
+                              onChange={(value) => updateAdditionalRv(rv.id, "laundryNeed", value)}
+                            />
                           </div>
 
                           <div className={styles.field}>
@@ -1163,6 +1160,7 @@ export default function RequestSpotPage() {
                     className={styles.input}
                     type="number"
                     min={0}
+                    aria-label="Budget amount"
                     value={budgetAmount}
                     onChange={(e) => setBudgetAmount(e.target.value)}
                     placeholder="4000"
@@ -1171,19 +1169,13 @@ export default function RequestSpotPage() {
 
                 <div className={styles.field}>
                   <label className={styles.label}>Budget period</label>
-                  <select
-                    className={styles.select}
+                  <SelectMenu
+                    ariaLabel="Budget period"
                     value={budgetPeriod}
-                    onChange={(e) =>
-                      setBudgetPeriod(e.target.value as BudgetPeriod)
-                    }
-                  >
-                    {budgetPeriodOptions.map((value) => (
-                      <option key={value} value={value}>
-                        / {value}
-                      </option>
-                    ))}
-                  </select>
+                    options={budgetPeriodOptions}
+                    onChange={setBudgetPeriod}
+                    formatOption={(value) => `/ ${value}`}
+                  />
                 </div>
               </div>
             </section>
@@ -1204,6 +1196,7 @@ export default function RequestSpotPage() {
               <div className={styles.field}>
                 <textarea
                   className={styles.textarea}
+                  aria-label="Additional notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value.slice(0, 500))}
                   placeholder="Describe any specific requirements, jobsite details, access needs, or preferences."
@@ -1227,12 +1220,28 @@ export default function RequestSpotPage() {
               </button>
 
               <p className={styles.submitNote}>
-                After continuing, we&apos;ll take you to the next step so you can
-                refine your request, confirm your follow-up details, and help us
-                move this request toward the matching stage.
+                After continuing, you&apos;ll go to the next step to confirm follow-up details and finalize the request profile. This does not guarantee a match yet; it gives RVNB the information needed to support matching and host response workflows.
               </p>
             </div>
           </form>
+
+          <section className={styles.offerSpaceSection}>
+            <div className={styles.offerSpaceCard}>
+              <div className={styles.offerSpaceContent}>
+                <div className={styles.offerSpaceTextWrap}>
+                  <p style={introEyebrow}>For hosts</p>
+                  <h4 className={styles.offerSpaceTitle}>Have space near traveler demand?</h4>
+                  <p className={styles.offerSpaceText}>
+                    If you have RV-friendly space near job sites, travel corridors, or high-demand areas, you can respond from the host side without interrupting this traveler request form.
+                  </p>
+                </div>
+
+                <Link href="/request-spot/respond" className={styles.offerSpaceBtn}>
+                  Offer Space →
+                </Link>
+              </div>
+            </div>
+          </section>
         </section>
       </div>
     </main>

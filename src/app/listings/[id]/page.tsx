@@ -461,13 +461,13 @@ export default function ListingDetailPage() {
           <div className={styles.photoHero}>
             <div className={styles.photoOverlayContent}>
               <div className={styles.photoEyebrow}>RVNB Listing Preview</div>
-              <div className={styles.photoHeadline}>A cleaner, richer listing experience starts here.</div>
+              <div className={styles.photoHeadline}>Host photos have not been added yet.</div>
               <div className={styles.photoCaption}>
-                Photos can be added later without changing the page structure.
+                Review the details below and message the host with any arrival questions before booking.
               </div>
               <div className={styles.photoBadge}>
                 <CameraIcon />
-                Photos coming soon
+                Photos not available
               </div>
             </div>
           </div>
@@ -555,7 +555,7 @@ export default function ListingDetailPage() {
               </div>
 
               <div className={styles.note}>
-                Tip: When photos are added later, this page won’t change — only the photo area fills in.
+                Ask the host for approach, parking, and hookup details if you need extra arrival context.
               </div>
             </div>
 

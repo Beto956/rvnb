@@ -129,7 +129,8 @@ service cloud.firestore {
           'createdAt', 'updatedAt', 'finalizedAt', 'requestType',
           'locationText', 'city', 'state', 'startDate', 'endDate',
           'flexibleDates', 'employerName', 'teamName', 'teamLocation',
-          'workersCount', 'rigsCount', 'spotsNeeded', 'stayDurationType',
+          'representativeRole', 'workersCount', 'rigsCount', 'spotsNeeded',
+          'separateSpotsNeeded', 'singleCoordinator', 'stayDurationType',
           'primaryRv', 'moreThanOneRv', 'additionalRvs', 'hookupsNeeded',
           'budgetMax', 'budgetPeriod', 'rvDetails', 'note'
         ]);
@@ -144,8 +145,9 @@ service cloud.firestore {
           'requestId', 'requesterId', 'publicVersion', 'status', 'isFinalized',
           'createdAt', 'updatedAt', 'finalizedAt', 'requestType', 'locationText',
           'city', 'state', 'startDate', 'endDate', 'flexibleDates', 'employerName',
-          'teamName', 'teamLocation', 'workersCount', 'rigsCount', 'spotsNeeded',
-          'stayDurationType', 'primaryRv', 'moreThanOneRv', 'additionalRvs',
+          'teamName', 'teamLocation', 'representativeRole', 'workersCount', 'rigsCount',
+          'spotsNeeded', 'separateSpotsNeeded', 'singleCoordinator', 'stayDurationType',
+          'primaryRv', 'moreThanOneRv', 'additionalRvs',
           'hookupsNeeded', 'budgetMax', 'budgetPeriod', 'rvDetails', 'note'
         ]);
     }

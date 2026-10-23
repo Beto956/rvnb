@@ -159,7 +159,7 @@ export default function HomeQuickSearchBar() {
       </div>
 
       <div className={styles.qsHint}>
-        This only builds query params — your existing /search page stays in control.
+        Jump into search with the basics filled in, then refine by rig fit, utilities, and amenities.
       </div>
     </form>
   );

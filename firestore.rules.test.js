@@ -292,7 +292,8 @@ const safePublicRequestKeys = new Set([
   "requestId", "requesterId", "publicVersion", "status", "isFinalized", "createdAt", "updatedAt",
   "finalizedAt", "requestType", "locationText", "city", "state", "startDate", "endDate",
   "flexibleDates", "employerName", "teamName", "teamLocation", "workersCount", "rigsCount",
-  "spotsNeeded", "stayDurationType", "primaryRv", "moreThanOneRv", "additionalRvs",
+  "spotsNeeded", "representativeRole", "separateSpotsNeeded", "singleCoordinator",
+  "stayDurationType", "primaryRv", "moreThanOneRv", "additionalRvs",
   "hookupsNeeded", "budgetMax", "budgetPeriod", "rvDetails", "note",
 ]);
 

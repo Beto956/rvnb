@@ -4,7 +4,7 @@ import styles from "./ecosystemnav.module.css";
 const navItems = [
   { label: "Listings", description: "Find RV stays that fit your journey.", href: "/listings", icon: "pin" },
   { label: "Transport", description: "Explore help moving RVs and equipment.", href: "/transport", icon: "road" },
-  { label: "Insurance", description: "Discover coverage built around RV travel.", href: "/insurance", icon: "shield" },
+  { label: "Insurance", description: "Explore RV coverage guidance and intake.", href: "/insurance", icon: "shield" },
   { label: "Community", description: "Connect with travelers, hosts, and the road.", href: "/community", icon: "community" },
 ] as const;
 
@@ -16,7 +16,7 @@ export default function EcosystemNav() {
           <p className={styles.eyebrow}>EXPLORE RVNB</p>
           <h2 id="rvnb-hub-title" className={styles.title}>The RVNB Hub</h2>
           <p className={styles.subtitle}>
-            Everything you need for the road ahead—stays, transportation, protection, and community.
+            Listings stay at the center, with transport, coverage guidance, and community connected around the road ahead.
           </p>
         </div>
 
