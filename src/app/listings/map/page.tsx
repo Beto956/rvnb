@@ -9,9 +9,8 @@ import { db } from "@/lib/firebase";
 import type { MapListing } from "@/app/components/ListingsMap";
 
 // ✅ Client-only map render (prevents hydration issues)
-// NOTE: we cast to `any` so this file can pass new optional props
-// without forcing you to refactor ListingsMap immediately.
-const ListingsMap = dynamic(() => import("@/app/components/ListingsMap"), { ssr: false }) as any;
+// ListingsMap's Props already include the optional selectedId/onSelect props used below.
+const ListingsMap = dynamic(() => import("@/app/components/ListingsMap"), { ssr: false });
 
 type ListingDoc = {
   title?: string;
@@ -21,7 +20,7 @@ type ListingDoc = {
   price?: number;
   pricingType?: string;
 
-  createdAt?: any;
+  createdAt?: unknown;
 
   // ✅ Phase 1 additive fields (optional; no migration required)
   lat?: number;
@@ -66,8 +65,8 @@ export default function ListingsMapPage() {
         });
 
         if (mounted) setListings(rows);
-      } catch (e: any) {
-        if (mounted) setError(e?.message || "Failed to load listings.");
+      } catch (e: unknown) {
+        if (mounted) setError((e as { message?: string } | null)?.message || "Failed to load listings.");
       } finally {
         if (mounted) setLoading(false);
       }

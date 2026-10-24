@@ -1,0 +1,171 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Read-only token. No secrets, no deploy, no Firebase/Vercel login anywhere in this file.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  typecheck-build:
+    name: Typecheck + build (demo Firebase env)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Non-secret placeholders. `next build` prerenders pages that call
+      # initializeApp/getAuth at import time; with an empty API key the build
+      # fails with auth/invalid-api-key, so placeholders are required.
+      # These do NOT point at any real Firebase project.
+      NEXT_PUBLIC_FIREBASE_API_KEY: demo-api-key
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: demo-rvnb.firebaseapp.com
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-rvnb
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: demo-rvnb.appspot.com
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "000000000000"
+      NEXT_PUBLIC_FIREBASE_APP_ID: "1:000000000000:web:demo"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Build
+        run: npm run build
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0            # needed to diff against the PR base
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+
+      # NON-BLOCKING by design: the repo has a known pre-existing lint baseline
+      # (14 errors / 27 warnings on 067bb8e). This step reports the full-repo
+      # counts transparently (log, step summary, ::warning annotation) but does
+      # not fail because of lint findings. The blocking gate is the changed-files
+      # step below. It DOES fail if ESLint itself crashes or is misconfigured
+      # (exit code > 1, or no JSON report produced), since that is not baseline.
+      - name: Full-repo lint (report only; known baseline 14 errors / 27 warnings on 067bb8e)
+        env:
+          BASELINE_ERRORS: "14"
+          BASELINE_WARNINGS: "27"
+          BASELINE_SHA: "067bb8e"
+        run: |
+          report="${RUNNER_TEMP:-/tmp}/eslint-report.json"
+          rm -f "$report"
+          set +e
+          npx eslint . -f json -o "$report"
+          json_status=$?
+          set -e
+          if [ "$json_status" -gt 1 ] || [ ! -s "$report" ]; then
+            echo "::error title=ESLint crashed::eslint exited with code $json_status (report present: $([ -s "$report" ] && echo yes || echo no)). This is a config/crash error, not the known baseline."
+            exit 1
+          fi
+          echo "----- Full ESLint output (stylish) -----"
+          npx eslint . || true
+          echo "----------------------------------------"
+          REPORT="$report" node -e '
+            const fs = require("fs");
+            const r = JSON.parse(fs.readFileSync(process.env.REPORT, "utf8"));
+            const e = r.reduce((a, f) => a + f.errorCount, 0);
+            const w = r.reduce((a, f) => a + f.warningCount, 0);
+            const be = Number(process.env.BASELINE_ERRORS);
+            const bw = Number(process.env.BASELINE_WARNINGS);
+            const sha = process.env.BASELINE_SHA;
+            const msg = `Full-repo ESLint (non-blocking): ${e} errors, ${w} warnings (known baseline on ${sha}: ${be} errors, ${bw} warnings)`;
+            const lines = [`### ${msg}`];
+            console.log(msg);
+            console.log(`::warning title=ESLint baseline::${msg}`);
+            if (e > be) {
+              const extra = `ESLint errors (${e}) exceed the known baseline (${be}). Still non-blocking here; the changed-files lint step is the gate.`;
+              console.log(`::warning title=ESLint above baseline::${extra}`);
+              lines.push(`**${extra}**`);
+            }
+            if (process.env.GITHUB_STEP_SUMMARY) {
+              fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n\n") + "\n");
+            }
+          '
+          exit 0
+
+      # BLOCKING. Lints only JS/TS files added/changed by this PR and fails on any
+      # ESLint error in them. NOTE: this requires every touched file to be fully
+      # clean, even if that file already had lint errors before the PR (touching a
+      # baseline file means fixing its errors). Warnings are reported, not fatal.
+      - name: Lint files changed in this PR (STRICT, blocking)
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(
+            git diff --name-only --diff-filter=ACMR "$BASE_SHA"...HEAD -- \
+              '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs' |
+            while IFS= read -r f; do [ -f "$f" ] && printf '%s\n' "$f"; done
+          )
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No changed JS/TS files to lint."
+            exit 0
+          fi
+          printf 'Linting %s changed file(s):\n' "${#files[@]}"; printf '  %s\n' "${files[@]}"
+          npx eslint --no-warn-ignored -- "${files[@]}"
+
+  rules-tests:
+    name: Firestore rules tests (emulator, demo project)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Guard - rules tests must target demo-rvnb-rules-test
+        # Fails fast if test:rules ever stops passing --project demo-rvnb-rules-test,
+        # so the emulator can never fall back to .firebaserc's default (rvnb-latest).
+        run: |
+          if ! grep -E '"test:rules":.*--project demo-rvnb-rules-test' package.json; then
+            echo "::error title=Unsafe test:rules::package.json test:rules must contain '--project demo-rvnb-rules-test'"
+            exit 1
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Cache Firebase emulator binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npm ci
+      - name: Rules tests
+        # test:rules = firebase emulators:exec --only firestore --project demo-rvnb-rules-test
+        #   "node --test firestore.rules.test.js"
+        # --project overrides .firebaserc's default (rvnb-latest); the demo- prefix keeps
+        # the emulator offline/demo-mode. No login or credentials are used.
+        run: npm run test:rules

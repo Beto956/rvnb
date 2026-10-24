@@ -1,124 +1,323 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import styles from "../page.module.css";
 
 import { db } from "@/lib/firebase";
 import { collection, getDocs, limit, query } from "firebase/firestore";
 
-type Hookups = "Full" | "Partial" | "None" | string;
-
-type ListingDoc = {
+type Listing = {
   id: string;
-  title?: string;
-  city?: string;
-  state?: string;
-  hookups?: Hookups;
+  title: string;
+  city: string;
+  state: string;
+  hookups: string;
   maxLengthFt?: number;
-
-  // Old pricing format:
-  pricePerNight?: number;
-
-  // New pricing format (supported):
   price?: number;
-  pricingType?: string; // e.g. "night", "day", "week", etc.
-
-  imageUrl?: string;
-  photoURL?: string;
-  photos?: string[];
+  pricePerNight?: number;
+  pricingType: string;
+  photos: string[];
 };
 
-function firstListingPhoto(listing: ListingDoc): string | null {
-  if (typeof listing.imageUrl === "string" && listing.imageUrl.trim()) return listing.imageUrl.trim();
-  if (typeof listing.photoURL === "string" && listing.photoURL.trim()) return listing.photoURL.trim();
-  if (Array.isArray(listing.photos)) {
-    const first = listing.photos.find((value) => typeof value === "string" && value.trim());
-    return first?.trim() ?? null;
+type LoadState =
+  | { limit: number; status: "loading" }
+  | { limit: number; status: "error" }
+  | { limit: number; status: "ready"; items: Listing[] };
+
+function cleanText(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function validAmount(value: unknown): number | undefined {
+  return typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= 0
+    ? value
+    : undefined;
+}
+
+function safePhotoUrl(value: unknown): string | null {
+  const candidate = cleanText(value);
+
+  if (!candidate || /[\u0000-\u0020\\]/.test(candidate)) {
+    return null;
   }
+
+  // Support local images, excluding protocol-relative URLs.
+  if (candidate.startsWith("/") && !candidate.startsWith("//")) {
+    return candidate;
+  }
+
+  try {
+    const url = new URL(candidate);
+
+    if (
+      (url.protocol === "https:" || url.protocol === "http:") &&
+      !url.username &&
+      !url.password
+    ) {
+      return url.href;
+    }
+  } catch {
+    // Invalid URLs use the photo fallback.
+  }
+
   return null;
 }
 
-function formatPrice(listing: ListingDoc): { label: string; value: string } {
-  // Backward compatible:
-  // - If pricePerNight exists, treat as per night.
-  // - Else if price exists, use pricingType (default "night").
-  // - Else show "Contact host" pricing.
-  if (typeof listing.pricePerNight === "number") {
-    return { label: "/ night", value: `$${listing.pricePerNight}` };
-  }
+function normalizeListing(
+  id: string,
+  data: Record<string, unknown>
+): Listing {
+  const candidates = [
+    data.imageUrl,
+    data.photoURL,
+    ...(Array.isArray(data.photos) ? data.photos : []),
+  ];
 
-  if (typeof listing.price === "number") {
-    const rawType = (listing.pricingType || "night").toLowerCase();
-    const normalized =
-      rawType === "pernight" || rawType === "night" ? "night" : rawType;
+  const photos = candidates
+    .map(safePhotoUrl)
+    .filter((photo): photo is string => photo !== null);
 
-    return { label: ` / ${normalized}`, value: `$${listing.price}` };
-  }
+  const maxLengthFt = validAmount(data.maxLengthFt);
 
-  return { label: "", value: "Contact host" };
+  return {
+    // Use Firestore's document ID rather than a stored "id" field.
+    id,
+    title: cleanText(data.title) || "Untitled Spot",
+    city: cleanText(data.city),
+    state: cleanText(data.state),
+    hookups: cleanText(data.hookups) || "—",
+    maxLengthFt:
+      maxLengthFt !== undefined && maxLengthFt > 0
+        ? maxLengthFt
+        : undefined,
+    price: validAmount(data.price),
+    pricePerNight: validAmount(data.pricePerNight),
+    pricingType:
+      cleanText(data.pricingType).toLowerCase() || "night",
+    photos: [...new Set(photos)],
+  };
 }
 
-export default function FeaturedListingsPreview({ limitCount = 3 }: { limitCount?: number }) {
-  const [items, setItems] = useState<ListingDoc[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>("");
+function formatPrice(listing: Listing): {
+  value: string;
+  label: string;
+} {
+  // Prefer current pricing when both formats exist.
+  if (listing.price !== undefined) {
+    let unit = listing.pricingType;
 
-  const safeLimit = useMemo(() => Math.max(1, Math.min(limitCount, 12)), [limitCount]);
+    switch (unit) {
+      case "pernight":
+      case "per night":
+      case "nightly":
+        unit = "night";
+        break;
+      case "weekly":
+        unit = "week";
+        break;
+      case "monthly":
+        unit = "month";
+        break;
+      case "daily":
+        unit = "day";
+        break;
+    }
+
+    return {
+      value: `$${listing.price}`,
+      label: `/ ${unit}`,
+    };
+  }
+
+  if (listing.pricePerNight !== undefined) {
+    return {
+      value: `$${listing.pricePerNight}`,
+      label: "/ night",
+    };
+  }
+
+  return {
+    value: "Contact host",
+    label: "",
+  };
+}
+
+function ListingPhoto({ photos }: { photos: string[] }) {
+  const [photoIndex, setPhotoIndex] = useState(0);
+  const photo = photos[photoIndex];
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        aspectRatio: "8 / 5",
+        overflow: "hidden",
+        borderRadius: 12,
+        marginBottom: 14,
+        background: "#17243a",
+      }}
+    >
+      {photo ? (
+        // Host images may use domains not configured for Next Image.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={photo}
+          src={photo}
+          alt=""
+          width={640}
+          height={400}
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={() => setPhotoIndex((index) => index + 1)}
+          style={{
+            display: "block",
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          }}
+        />
+      ) : (
+        <div
+          aria-hidden="true"
+          style={{
+            display: "grid",
+            placeItems: "center",
+            height: "100%",
+            background:
+              "linear-gradient(135deg, #203c49, #182336)",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "2rem",
+              fontWeight: 900,
+              letterSpacing: "0.15em",
+              color: "white",
+            }}
+          >
+            RVNB
+          </span>
+        </div>
+      )}
+
+      <span
+        style={{
+          position: "absolute",
+          bottom: 10,
+          left: 10,
+          padding: "4px 8px",
+          borderRadius: 8,
+          background: "rgba(0, 0, 0, 0.75)",
+          color: "white",
+          fontSize: "0.8rem",
+        }}
+      >
+        {photo
+          ? "Host photo"
+          : photos.length
+            ? "Photo unavailable"
+            : "Photos not added"}
+      </span>
+    </div>
+  );
+}
+
+export default function FeaturedListingsPreview({
+  limitCount = 3,
+}: {
+  limitCount?: number;
+}) {
+  const safeLimit = Number.isFinite(limitCount)
+    ? Math.max(1, Math.min(12, Math.floor(limitCount)))
+    : 3;
+
+  const [state, setState] = useState<LoadState>({
+    limit: safeLimit,
+    status: "loading",
+  });
 
   useEffect(() => {
     let alive = true;
 
-    (async () => {
+    async function loadListings() {
       try {
-        setLoading(true);
-        setError("");
+        const listingsQuery = query(
+          collection(db, "listings"),
+          limit(safeLimit)
+        );
 
-        const q = query(collection(db, "listings"), limit(safeLimit));
-        const snap = await getDocs(q);
-
-        const rows: ListingDoc[] = snap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as Omit<ListingDoc, "id">),
-        }));
+        const snapshot = await getDocs(listingsQuery);
 
         if (!alive) return;
-        setItems(rows);
-      } catch (e: unknown) {
+
+        const items = snapshot.docs.map((document) =>
+          normalizeListing(document.id, document.data())
+        );
+
+        setState({
+          limit: safeLimit,
+          status: "ready",
+          items,
+        });
+      } catch {
         if (!alive) return;
-        setError(e instanceof Error ? e.message : "Failed to load featured listings.");
-      } finally {
-        if (!alive) return;
-        setLoading(false);
+
+        setState({
+          limit: safeLimit,
+          status: "error",
+        });
       }
-    })();
+    }
+
+    void loadListings();
 
     return () => {
+      // Ignore results after unmount or a change to the query.
       alive = false;
     };
   }, [safeLimit]);
 
-  if (loading) {
-    return <div className={styles.previewState}>Loading featured listings…</div>;
+  if (state.limit !== safeLimit || state.status === "loading") {
+    return (
+      <div className={styles.previewState} role="status">
+        Loading featured listings…
+      </div>
+    );
   }
 
-  if (error) {
+  if (state.status === "error") {
     return (
-      <div className={styles.previewState}>
-        <div className={styles.previewErrorTitle}>Couldn’t load featured listings</div>
-        <div className={styles.previewErrorBody}>{error}</div>
-        <Link className={styles.previewFallbackLink} href="/listings">
+      <div className={styles.previewState} role="status">
+        <div className={styles.previewErrorTitle}>
+          Couldn’t load featured listings
+        </div>
+
+        <div className={styles.previewErrorBody}>
+          Please try again later, or browse all listings.
+        </div>
+
+        <Link
+          className={styles.previewFallbackLink}
+          href="/listings"
+        >
           View All Listings
         </Link>
       </div>
     );
   }
 
-  if (!items.length) {
+  if (state.items.length === 0) {
     return (
-      <div className={styles.previewState}>
+      <div className={styles.previewState} role="status">
         No listings found yet.{" "}
-        <Link className={styles.previewFallbackLink} href="/host">
+        <Link
+          className={styles.previewFallbackLink}
+          href="/host"
+        >
           Create the first listing
         </Link>
         .
@@ -128,60 +327,96 @@ export default function FeaturedListingsPreview({ limitCount = 3 }: { limitCount
 
   return (
     <div className={styles.previewGrid}>
-      {items.map((l) => {
-        const price = formatPrice(l);
-        const photo = firstListingPhoto(l);
+      {state.items.map((listing) => {
+        const price = formatPrice(listing);
+
+        const location =
+          [listing.city, listing.state]
+            .filter(Boolean)
+            .join(", ") || "—";
 
         return (
-          <Link key={l.id} href={`/listings/${l.id}`} className={styles.previewCardLink}>
+          <Link
+            key={listing.id}
+            href={`/listings/${encodeURIComponent(listing.id)}`}
+            className={styles.previewCardLink}
+            style={{ minWidth: 0 }}
+          >
             <article className={styles.previewCard}>
-              <div className={styles.previewMedia}>
-                {photo ? (
-                  <span
-                    className={styles.previewPhoto}
-                    style={{ backgroundImage: `url(${photo})` }}
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <div className={styles.previewFallbackMedia} aria-hidden="true">
-                    <span className={styles.previewFallbackMark}>RVNB</span>
-                  </div>
-                )}
-                <span className={styles.previewMediaBadge}>
-                  {photo ? "Host photo" : "Photos not added"}
-                </span>
-              </div>
+              <ListingPhoto
+                key={JSON.stringify(listing.photos)}
+                photos={listing.photos}
+              />
 
-              <div className={styles.previewCardTop}>
-                <h3 className={styles.previewTitle}>{l.title || "Untitled Spot"}</h3>
-                <div className={styles.previewPrice}>
-                  <span className={styles.previewPriceValue}>{price.value}</span>
-                  {price.label ? <span className={styles.previewPriceLabel}>{price.label}</span> : null}
+              <div
+                className={styles.previewCardTop}
+                style={{ flexWrap: "wrap" }}
+              >
+                <h3
+                  className={styles.previewTitle}
+                  style={{
+                    minWidth: 0,
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {listing.title}
+                </h3>
+
+                <div
+                  className={styles.previewPrice}
+                  style={{
+                    whiteSpace: "normal",
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  <span className={styles.previewPriceValue}>
+                    {price.value}
+                  </span>
+
+                  {price.label ? (
+                    <span className={styles.previewPriceLabel}>
+                      {price.label}
+                    </span>
+                  ) : null}
                 </div>
               </div>
 
               <div className={styles.previewMeta}>
-                <div className={styles.previewMetaRow}>
-                  <span className={styles.previewMetaKey}>Location</span>
-                  <span className={styles.previewMetaVal}>
-                    {(l.city || "—") + ", " + (l.state || "—")}
-                  </span>
-                </div>
+                {[
+                  ["Location", location],
+                  ["Hookups", listing.hookups],
+                  [
+                    "Max length",
+                    listing.maxLengthFt !== undefined
+                      ? `${listing.maxLengthFt} ft`
+                      : "—",
+                  ],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    className={styles.previewMetaRow}
+                  >
+                    <span className={styles.previewMetaKey}>
+                      {label}
+                    </span>
 
-                <div className={styles.previewMetaRow}>
-                  <span className={styles.previewMetaKey}>Hookups</span>
-                  <span className={styles.previewMetaVal}>{l.hookups || "—"}</span>
-                </div>
-
-                <div className={styles.previewMetaRow}>
-                  <span className={styles.previewMetaKey}>Max length</span>
-                  <span className={styles.previewMetaVal}>
-                    {typeof l.maxLengthFt === "number" ? `${l.maxLengthFt} ft` : "—"}
-                  </span>
-                </div>
+                    <span
+                      className={styles.previewMetaVal}
+                      style={{
+                        minWidth: 0,
+                        overflowWrap: "anywhere",
+                        textAlign: "right",
+                      }}
+                    >
+                      {value}
+                    </span>
+                  </div>
+                ))}
               </div>
 
-              <div className={styles.previewCardCta}>View spot →</div>
+              <div className={styles.previewCardCta}>
+                View spot →
+              </div>
             </article>
           </Link>
         );

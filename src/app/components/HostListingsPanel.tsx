@@ -114,14 +114,9 @@ export default function HostListingsPanel({ listings, loading, error }: Props) {
                   <Link href="/host/calendar" className={styles.actionBtn}>
                     Calendar
                   </Link>
-                  <button
-                    type="button"
-                    className={styles.actionBtn}
-                    disabled
-                    title="Listing editing isn't available yet — coming soon"
-                  >
+                  <Link href={`/host/listings/${l.id}/edit`} className={styles.actionBtn}>
                     Edit
-                  </button>
+                  </Link>
                 </div>
               </div>
             </article>
