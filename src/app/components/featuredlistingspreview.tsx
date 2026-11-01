@@ -3,11 +3,15 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import styles from "../page.module.css";
+import { listingPhotos } from "@/lib/listing-photos";
+import { capacity, isAccommodation, listingType, listingTypeLabel, type ListingType } from "@/lib/listing-types";
 
 import { db } from "@/lib/firebase";
 import { collection, getDocs, limit, query } from "firebase/firestore";
 
 type Listing = {
+  listingType: ListingType | null;
+  maxGuests: number | null;
   id: string;
   title: string;
   city: string;
@@ -37,52 +41,16 @@ function validAmount(value: unknown): number | undefined {
     : undefined;
 }
 
-function safePhotoUrl(value: unknown): string | null {
-  const candidate = cleanText(value);
-
-  if (!candidate || /[\u0000-\u0020\\]/.test(candidate)) {
-    return null;
-  }
-
-  // Support local images, excluding protocol-relative URLs.
-  if (candidate.startsWith("/") && !candidate.startsWith("//")) {
-    return candidate;
-  }
-
-  try {
-    const url = new URL(candidate);
-
-    if (
-      (url.protocol === "https:" || url.protocol === "http:") &&
-      !url.username &&
-      !url.password
-    ) {
-      return url.href;
-    }
-  } catch {
-    // Invalid URLs use the photo fallback.
-  }
-
-  return null;
-}
-
 function normalizeListing(
   id: string,
   data: Record<string, unknown>
 ): Listing {
-  const candidates = [
-    data.imageUrl,
-    data.photoURL,
-    ...(Array.isArray(data.photos) ? data.photos : []),
-  ];
-
-  const photos = candidates
-    .map(safePhotoUrl)
-    .filter((photo): photo is string => photo !== null);
+  const photos = listingPhotos(data);
 
   const maxLengthFt = validAmount(data.maxLengthFt);
 
   return {
+    listingType: listingType(data.listingType), maxGuests: capacity(data),
     // Use Firestore's document ID rather than a stored "id" field.
     id,
     title: cleanText(data.title) || "Untitled Spot",
@@ -96,7 +64,7 @@ function normalizeListing(
     price: validAmount(data.price),
     pricePerNight: validAmount(data.pricePerNight),
     pricingType:
-      cleanText(data.pricingType).toLowerCase() || "night",
+      cleanText(data.pricingType).toLowerCase() || (isAccommodation(data.listingType) && data.price !== undefined ? "" : "night"),
     photos: [...new Set(photos)],
   };
 }
@@ -128,7 +96,7 @@ function formatPrice(listing: Listing): {
 
     return {
       value: `$${listing.price}`,
-      label: `/ ${unit}`,
+      label: unit ? `/ ${unit}` : "Billing period not provided",
     };
   }
 
@@ -300,12 +268,6 @@ export default function FeaturedListingsPreview({
           Please try again later, or browse all listings.
         </div>
 
-        <Link
-          className={styles.previewFallbackLink}
-          href="/listings"
-        >
-          View All Listings
-        </Link>
       </div>
     );
   }
@@ -383,11 +345,12 @@ export default function FeaturedListingsPreview({
 
               <div className={styles.previewMeta}>
                 {[
+                  ["Type", listingTypeLabel(listing.listingType)],
                   ["Location", location],
-                  ["Hookups", listing.hookups],
+                  [isAccommodation(listing.listingType) ? "Guests" : "Hookups", isAccommodation(listing.listingType) ? listing.maxGuests === null ? "Not provided" : `Up to ${listing.maxGuests}` : listing.hookups],
                   [
-                    "Max length",
-                    listing.maxLengthFt !== undefined
+                    isAccommodation(listing.listingType) ? "Use" : "Max length",
+                    isAccommodation(listing.listingType) ? "Stationary accommodation" : listing.maxLengthFt !== undefined
                       ? `${listing.maxLengthFt} ft`
                       : "—",
                   ],

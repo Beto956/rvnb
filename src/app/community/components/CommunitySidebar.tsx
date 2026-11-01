@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import type { User } from "firebase/auth";
-import { DEMO_MEETUP, DEMO_TOP_CONTRIBUTORS, DEMO_TRENDING_TOPICS } from "../mockData";
 import { initialsFromName } from "@/lib/community";
 import styles from "./CommunitySidebar.module.css";
 
@@ -15,10 +14,7 @@ export default function CommunitySidebar({ user, onSignIn }: CommunitySidebarPro
   return (
     <aside className={styles.sidebar} aria-label="Community sidebar">
       <ProfileCard user={user} onSignIn={onSignIn} />
-      <QuickActionsCard signedIn={!!user} onSignIn={onSignIn} />
-      <TrendingCard />
-      <MeetupCard />
-      <ContributorsCard />
+      <QuickActionsCard signedIn={!!user} />
       <GuidelinesCard />
     </aside>
   );
@@ -29,7 +25,7 @@ function ProfileCard({ user, onSignIn }: { user: User | null; onSignIn: () => vo
     return (
       <section className={styles.card} aria-labelledby="profile-card-heading">
         <h3 id="profile-card-heading" className={styles.cardTitle}>Join the conversation</h3>
-        <p className={styles.mutedText}>Sign in to post, reply, and save discussions.</p>
+        <p className={styles.mutedText}>Sign in to post, reply, and report concerns.</p>
         <button type="button" className={styles.primaryButton} onClick={onSignIn}>
           Sign In
         </button>
@@ -51,13 +47,13 @@ function ProfileCard({ user, onSignIn }: { user: User | null; onSignIn: () => vo
         </div>
       </div>
       <Link href="/account" className={styles.outlineButton}>
-        Edit profile
+        My account
       </Link>
     </section>
   );
 }
 
-function QuickActionsCard({ signedIn, onSignIn }: { signedIn: boolean; onSignIn: () => void }) {
+function QuickActionsCard({ signedIn }: { signedIn: boolean }) {
   const actions = [
     { label: "Create post", href: "/community/new" },
     { label: "Ask a question", href: "/community/new?category=general_discussion" },
@@ -68,84 +64,12 @@ function QuickActionsCard({ signedIn, onSignIn }: { signedIn: boolean; onSignIn:
     <section className={styles.card} aria-labelledby="quick-actions-heading">
       <h3 id="quick-actions-heading" className={styles.cardTitle}>Quick actions</h3>
       <div className={styles.quickActions}>
-        {actions.map((action) =>
-          signedIn ? (
-            <Link key={action.label} href={action.href} className={styles.quickAction}>
+        {actions.map((action) => (
+            <Link key={action.label} href={signedIn ? action.href : `/login?next=${encodeURIComponent(action.href)}`} className={styles.quickAction}>
               {action.label}
             </Link>
-          ) : (
-            <button
-              key={action.label}
-              type="button"
-              className={styles.quickAction}
-              onClick={onSignIn}
-            >
-              {action.label}
-            </button>
-          )
-        )}
-      </div>
-    </section>
-  );
-}
-
-function DemoBadge() {
-  return <span className={styles.demoBadge}>Demo</span>;
-}
-
-function TrendingCard() {
-  return (
-    <section className={styles.card} aria-labelledby="trending-heading">
-      <div className={styles.cardHeaderRow}>
-        <h3 id="trending-heading" className={styles.cardTitle}>Trending now</h3>
-        <DemoBadge />
-      </div>
-      <ol className={styles.trendingList}>
-        {DEMO_TRENDING_TOPICS.map((topic, index) => (
-          <li key={topic.id} className={styles.trendingItem}>
-            <span className={styles.trendingRank}>{index + 1}</span>
-            <span className={styles.trendingLabel}>{topic.label}</span>
-          </li>
         ))}
-      </ol>
-    </section>
-  );
-}
-
-function MeetupCard() {
-  return (
-    <section className={styles.card} aria-labelledby="meetup-heading">
-      <div className={styles.cardHeaderRow}>
-        <h3 id="meetup-heading" className={styles.cardTitle}>Upcoming meetup</h3>
-        <DemoBadge />
       </div>
-      <p className={styles.meetupTitle}>{DEMO_MEETUP.title}</p>
-      <p className={styles.mutedText}>{DEMO_MEETUP.dateLabel} · {DEMO_MEETUP.location}</p>
-      <p className={styles.mutedText}>{DEMO_MEETUP.goingCount} going</p>
-    </section>
-  );
-}
-
-function ContributorsCard() {
-  return (
-    <section className={styles.card} aria-labelledby="contributors-heading">
-      <div className={styles.cardHeaderRow}>
-        <h3 id="contributors-heading" className={styles.cardTitle}>Top contributors</h3>
-        <DemoBadge />
-      </div>
-      <ul className={styles.contributorList}>
-        {DEMO_TOP_CONTRIBUTORS.map((contributor) => (
-          <li key={contributor.id} className={styles.contributorItem}>
-            <span className={styles.avatar} aria-hidden="true">
-              {initialsFromName(contributor.name)}
-            </span>
-            <div className={styles.contributorText}>
-              <span className={styles.contributorName}>{contributor.name}</span>
-              <span className={styles.mutedText}>{contributor.helpfulVotes.toLocaleString()} helpful votes</span>
-            </div>
-          </li>
-        ))}
-      </ul>
     </section>
   );
 }
@@ -159,6 +83,8 @@ function GuidelinesCard() {
         <li>Share real experiences.</li>
         <li>No spam or self-promotion.</li>
         <li>Keep it helpful and on topic.</li>
+        <li>Protect private information.</li>
+        <li>For emergencies, contact emergency services.</li>
       </ul>
       <Link href="#standards-heading" className={styles.mutedLink}>
         Learn more

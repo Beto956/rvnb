@@ -107,6 +107,9 @@ export default function PublicProfileEditorPage() {
 
       if (!existingSnap.exists()) {
         payload.createdAt = serverTimestamp();
+        // The profile rules require this nullable field on creation.
+        // Leave existing photo URLs untouched when editing a profile.
+        payload.photoURL = null;
       }
 
       await setDoc(ref, payload, { merge: true });
@@ -177,7 +180,7 @@ export default function PublicProfileEditorPage() {
             </div>
           ) : (
             <form className={styles.editForm} style={{ marginTop: 24 }} onSubmit={(e) => e.preventDefault()}>
-              {errorMsg && <div className={styles.placeholderText}>{errorMsg}</div>}
+              {errorMsg && <div className={styles.placeholderText} role="alert">{errorMsg}</div>}
               {status && (
                 <div className={styles.placeholderText} role="status">
                   {status}

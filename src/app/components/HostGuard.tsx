@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import {
@@ -18,7 +18,7 @@ type Role = "guest" | "host";
 type UserProfile = {
   email?: string;
   role?: Role;
-  createdAt?: any;
+  createdAt?: unknown;
 };
 
 type Props = {
@@ -28,10 +28,11 @@ type Props = {
 
 export default function HostGuard({ children, redirectTo }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
 
   const loginRedirect = useMemo(
-    () => redirectTo ?? "/login?next=/host",
-    [redirectTo]
+    () => redirectTo ?? `/login?next=${encodeURIComponent(pathname || "/host")}`,
+    [redirectTo, pathname]
   );
 
   const [authUser, setAuthUser] = useState<User | null>(null);
@@ -42,7 +43,10 @@ export default function HostGuard({ children, redirectTo }: Props) {
 
   // Listen to auth state
   useEffect(() => {
+    let revision = 0;
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      const currentRevision = ++revision;
+      setLoading(true);
       setAuthUser(user);
       setRole(null);
       setError(null);
@@ -55,10 +59,11 @@ export default function HostGuard({ children, redirectTo }: Props) {
       try {
         const userRef = doc(db, "users", user.uid);
         const snapshot = await getDoc(userRef);
+        if (currentRevision !== revision) return;
 
         if (snapshot.exists()) {
           const data = snapshot.data() as UserProfile;
-          setRole((data.role ?? "guest") as Role);
+          setRole(data.role === "host" ? "host" : "guest");
         } else {
           // Safety: create minimal profile if missing
           await setDoc(
@@ -71,17 +76,22 @@ export default function HostGuard({ children, redirectTo }: Props) {
             { merge: true }
           );
 
+          if (currentRevision !== revision) return;
           setRole("guest");
         }
-      } catch (err: any) {
-        setError(err?.message ?? "Failed to load user profile.");
-        setRole("guest");
+      } catch {
+        if (currentRevision !== revision) return;
+        setError("Couldn't load your account. Refresh this page to try again.");
+        setRole(null);
       } finally {
-        setLoading(false);
+        if (currentRevision === revision) setLoading(false);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      revision++;
+      unsubscribe();
+    };
   }, []);
 
   // Redirect if not logged in
@@ -92,7 +102,7 @@ export default function HostGuard({ children, redirectTo }: Props) {
   }, [loading, authUser, router, loginRedirect]);
 
   async function becomeHost() {
-    if (!authUser) return;
+    if (!authUser || busy || role !== "guest") return;
 
     setBusy(true);
     setError(null);
@@ -100,21 +110,14 @@ export default function HostGuard({ children, redirectTo }: Props) {
     try {
       const userRef = doc(db, "users", authUser.uid);
 
-      await setDoc(
-        userRef,
-        {
-          email: authUser.email ?? "",
-          role: "host",
-          createdAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-
+      // The existing account's email and creation timestamp are immutable.
       await updateDoc(userRef, { role: "host" });
 
-      setRole("host");
-    } catch (err: any) {
-      setError(err?.message ?? "Could not upgrade to host.");
+      if (auth.currentUser?.uid === authUser.uid) setRole("host");
+    } catch {
+      if (auth.currentUser?.uid === authUser.uid) {
+        setError("Couldn't upgrade your account. Please try again.");
+      }
     } finally {
       setBusy(false);
     }
@@ -185,6 +188,7 @@ export default function HostGuard({ children, redirectTo }: Props) {
 
           {error && (
             <div
+              role="alert"
               style={{
                 marginTop: 12,
                 padding: "10px 12px",
@@ -200,7 +204,7 @@ export default function HostGuard({ children, redirectTo }: Props) {
           <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
             <button
               onClick={becomeHost}
-              disabled={busy}
+              disabled={busy || role !== "guest"}
               style={{
                 border: "1px solid rgba(255,255,255,0.18)",
                 background: "rgba(255,255,255,0.12)",

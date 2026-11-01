@@ -16,6 +16,8 @@ import {
 import styles from "./account.module.css";
 import AuthNav from "../components/authnav";
 import AccountHeader from "./components/AccountHeader";
+import AccountRequestsPanel from "./components/AccountRequestsPanel";
+import AccountTransportPanel from "./components/AccountTransportPanel";
 import AccountStatsRow from "./components/AccountStatsRow";
 import AccountListingsPanel, { AccountListing } from "./components/AccountListingsPanel";
 import AccountTripsPanel, { AccountTrip } from "./components/AccountTripsPanel";
@@ -28,8 +30,10 @@ import { normalizeBookingStatus } from "@/lib/booking-status";
 import { summarizeRatings, type ReviewDirection } from "@/lib/reviews";
 import { classifyBooking, chunk, formatYmdLabel, nightsBetween } from "./accountUtils";
 import type { MemberProfileVisibility } from "../members/memberProfileTypes";
+import { listingPhotos, type PhotoFields } from "@/lib/listing-photos";
+import { listingType } from "@/lib/listing-types";
 
-type ListingDoc = {
+type ListingDoc = PhotoFields & {
   id: string;
   title?: string;
   city?: string;
@@ -43,6 +47,8 @@ type ListingDoc = {
 };
 
 type BookingDoc = {
+  listingType?: unknown;
+  guestCount?: unknown;
   id: string;
   hostId?: string;
   guestId?: string;
@@ -399,6 +405,8 @@ export default function AccountPage() {
         const destination = [city, state].filter(Boolean).join(", ") || "Destination pending";
 
         out.push({
+          listingType: listingType(b.listingType),
+          guestCount: typeof b.guestCount === "number" && Number.isInteger(b.guestCount) && b.guestCount >= 1 && b.guestCount <= 30 ? b.guestCount : null,
           id: b.id,
           listingId: b.listingId,
           listingTitle: title,
@@ -487,6 +495,7 @@ export default function AccountPage() {
         state: l.state || "",
         priceLabel: formatPrice(l),
         description: l.description?.trim() || "",
+        photos: listingPhotos(l),
       })),
     [myListings]
   );
@@ -577,6 +586,8 @@ export default function AccountPage() {
 
           <div className={styles.layoutGrid}>
             <div className={styles.mainCol}>
+              {user && <AccountRequestsPanel key={user.uid} uid={user.uid} />}
+              {user && <AccountTransportPanel key={`transport-${user.uid}`} uid={user.uid} />}
               <AccountListingsPanel loading={listingsLoading} error={listingsError} listings={accountListings} />
               <AccountTripsPanel loading={tripsLoading} error={tripsError} trips={trips} />
               <AccountReviewsToWritePanel loading={tripsLoading} opportunities={hostedReviewOpportunities} />

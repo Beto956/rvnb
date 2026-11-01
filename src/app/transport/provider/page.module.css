@@ -11,9 +11,8 @@
   box-sizing: border-box;
 }
 
-.page a {
-  color: inherit;
-}
+.formFields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.page :is(a,button,input,select,textarea):focus-visible { outline: 3px solid #a1d6ff; outline-offset: 3px; }
 
 .shell {
   width: min(1160px, calc(100% - 36px));
@@ -162,9 +161,9 @@
 }
 
 .primaryButton {
-  color: #06101d;
-  background: #dbeafe;
-  border-color: #eff6ff;
+  color: #fff;
+  background: #2166c4;
+  border-color: #6da9ff;
 }
 
 .secondaryButton {

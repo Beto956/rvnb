@@ -19,7 +19,7 @@ export type HostAnalyticsBooking = {
   checkIn: string;
   checkOut: string;
   nights: number;
-  estimatedTotal: number;
+  estimatedTotal: number | null;
   status: HostAnalyticsBookingStatus;
   // Safe display label only — never a fabricated name (see host/page.tsx guestLabel logic).
   guestLabel?: string;
@@ -182,7 +182,7 @@ export function getUpcomingBookings(
 export function getLifetimeRevenue(bookings: HostAnalyticsBooking[]): number {
   return bookings
     .filter((b) => b.status !== "cancelled")
-    .reduce((sum, b) => sum + (Number.isFinite(b.estimatedTotal) ? b.estimatedTotal : 0), 0);
+    .reduce((sum, b) => sum + (b.estimatedTotal !== null && Number.isFinite(b.estimatedTotal) ? b.estimatedTotal : 0), 0);
 }
 
 export function getRevenueLast30Days(
@@ -200,7 +200,7 @@ export function getRevenueLast30Days(
 
       const t = start.getTime();
       if (t >= windowStart.getTime() && t <= windowEnd.getTime()) {
-        return sum + (Number.isFinite(b.estimatedTotal) ? b.estimatedTotal : 0);
+        return sum + (b.estimatedTotal !== null && Number.isFinite(b.estimatedTotal) ? b.estimatedTotal : 0);
       }
 
       return sum;
@@ -222,7 +222,7 @@ export function getRevenueThisMonth(
 
       const t = start.getTime();
       if (t >= monthStart.getTime() && t <= monthEnd.getTime()) {
-        return sum + (Number.isFinite(b.estimatedTotal) ? b.estimatedTotal : 0);
+        return sum + (b.estimatedTotal !== null && Number.isFinite(b.estimatedTotal) ? b.estimatedTotal : 0);
       }
 
       return sum;
@@ -242,7 +242,7 @@ export function getMonthlyRevenueBreakdown(
 
       const key = toMonthKey(start);
       const current = buckets.get(key) ?? 0;
-      buckets.set(key, current + (Number.isFinite(b.estimatedTotal) ? b.estimatedTotal : 0));
+      buckets.set(key, current + (b.estimatedTotal !== null && Number.isFinite(b.estimatedTotal) ? b.estimatedTotal : 0));
     });
 
   return Array.from(buckets.entries())
@@ -266,7 +266,7 @@ export function getRevenuePerListing(
       const current = byListing.get(b.listingId) ?? 0;
       byListing.set(
         b.listingId,
-        current + (Number.isFinite(b.estimatedTotal) ? b.estimatedTotal : 0)
+        current + (b.estimatedTotal !== null && Number.isFinite(b.estimatedTotal) ? b.estimatedTotal : 0)
       );
     });
 

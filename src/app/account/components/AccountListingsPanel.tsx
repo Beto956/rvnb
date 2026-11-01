@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import styles from "../account.module.css";
+import ListingPhoto from "../../components/ListingPhoto";
 
 export type AccountListing = {
+  photos: string[];
   id: string;
   title: string;
   city: string;
@@ -56,14 +58,14 @@ export default function AccountListingsPanel({ loading, error, listings }: Props
         <div className={styles.cardGrid}>
           {listings.slice(0, 3).map((listing) => (
             <article key={listing.id} className={styles.itemCard}>
-              <div className={styles.placeholderMedia}>
-                <span className={styles.statusPillActive} style={{ alignSelf: "flex-start", margin: "10px" }}>
+              <div className={styles.placeholderMedia} style={{ position: "relative", overflow: "hidden" }}>
+                <span className={styles.statusPillActive} style={{ alignSelf: "flex-start", margin: "10px", zIndex: 1 }}>
                   Active
                 </span>
-                <span className={styles.placeholderMediaIcon} aria-hidden="true">
+                <ListingPhoto photos={listing.photos} fill fallback={<><span className={styles.placeholderMediaIcon} aria-hidden="true">
                   🚐
                 </span>
-                Photos coming soon
+                Photos not added</>} />
               </div>
               <div className={styles.itemBody}>
                 <div className={styles.itemTopRow}>

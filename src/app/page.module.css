@@ -212,7 +212,6 @@
   text-shadow: 0 12px 30px rgba(0, 0, 0, 0.44);
 }
 
-.heroActions,
 .finalActions {
   display: flex;
   flex-wrap: wrap;
@@ -287,11 +286,7 @@
   letter-spacing: 0.08em;
 }
 
-.journeyGrid {
-  display: grid;
-  gap: 10px;
-}
-
+.journeyGrid { display: grid; gap: 10px; }
 .journeyCard {
   display: grid;
   gap: 8px;
@@ -304,39 +299,22 @@
   background: rgba(255, 255, 255, 0.06);
   transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
 }
-
 .journeyCard:hover {
   transform: translateY(-2px);
   border-color: rgba(255, 255, 255, 0.32);
   background: rgba(255, 255, 255, 0.1);
 }
+.journeyCard:focus-visible { outline: 3px solid #a9d7ff; outline-offset: 3px; }
+.blue { box-shadow: inset 4px 0 0 var(--rvnb-blue); }
+.cyan { box-shadow: inset 4px 0 0 var(--rvnb-cyan); }
+.gold { box-shadow: inset 4px 0 0 var(--rvnb-gold); }
+.journeyTitle { font-size: 1.1rem; font-weight: 950; }
+.journeyText { color: var(--rvnb-muted); line-height: 1.45; }
+.journeyCta { align-self: end; color: #bfdbfe; font-weight: 950; }
 
-.blue {
-  box-shadow: inset 4px 0 0 var(--rvnb-blue);
-}
-
-.cyan {
-  box-shadow: inset 4px 0 0 var(--rvnb-cyan);
-}
-
-.gold {
-  box-shadow: inset 4px 0 0 var(--rvnb-gold);
-}
-
-.journeyTitle {
-  font-size: 1.1rem;
-  font-weight: 950;
-}
-
-.journeyText {
-  color: var(--rvnb-muted);
-  line-height: 1.45;
-}
-
-.journeyCta {
-  align-self: end;
-  color: #bfdbfe;
-  font-weight: 950;
+@media (prefers-reduced-motion: reduce) {
+  .journeyCard { transition: none; }
+  .journeyCard:hover { transform: none; }
 }
 
 .searchBand {
@@ -822,18 +800,9 @@
 }
 
 @media (max-width: 1040px) {
-  .heroInner {
-    grid-template-columns: 1fr;
-  }
-
-  .heroPanel {
-    max-width: 760px;
-  }
-
-  .journeyGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
+  .heroInner { grid-template-columns: 1fr; }
+  .heroPanel { max-width: 760px; }
+  .journeyGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .previewGrid,
   .platformGrid,
   .stepsGrid {
@@ -905,7 +874,6 @@
     line-height: 1.58;
   }
 
-  .heroActions,
   .finalActions {
     flex-direction: column;
   }
@@ -917,9 +885,7 @@
     width: 100%;
   }
 
-  .journeyGrid {
-    grid-template-columns: 1fr;
-  }
+  .journeyGrid { grid-template-columns: 1fr; }
 
   .searchBand {
     margin-top: 0;

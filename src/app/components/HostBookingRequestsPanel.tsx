@@ -1,15 +1,18 @@
 "use client";
 
 import styles from "./hostDashboard.module.css";
+import { listingTypeLabel, type ListingType } from "@/lib/listing-types";
 
 export type HostBookingRequestData = {
+  listingType?: ListingType | null;
+  guestCount?: number | null;
   id: string;
   listingTitle: string;
   guestLabel: string;
   checkInLabel: string;
   checkOutLabel: string;
   nights: number;
-  estimatedTotal: number;
+  estimatedTotal: number | null;
   status: "pending" | "approved" | "declined" | "cancelled" | "other";
   note: string;
 };
@@ -78,9 +81,10 @@ export default function HostBookingRequestsPanel({
                 <div>
                   <div className={styles.bookingGuest}>{b.guestLabel}</div>
                   <div className={styles.bookingListing}>{b.listingTitle}</div>
+                  {b.listingType && <div className={styles.panelSub}>{listingTypeLabel(b.listingType)}{b.guestCount ? ` · ${b.guestCount} guests` : ""}</div>}
                   <div className={styles.bookingDates}>
                     {b.checkInLabel} → {b.checkOutLabel} · {b.nights} night
-                    {b.nights === 1 ? "" : "s"} · ${b.estimatedTotal}
+                    {b.nights === 1 ? "" : "s"} · {b.estimatedTotal === null ? "Total to be confirmed by host" : `$${b.estimatedTotal} estimate`}
                   </div>
                 </div>
 

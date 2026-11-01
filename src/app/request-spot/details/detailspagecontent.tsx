@@ -147,7 +147,7 @@ type DetailsPageContentProps = {
   requestId: string;
 };
 
-export default function DetailsPageContent({ requestId }: DetailsPageContentProps) {
+function OwnedDetailsPageContent({ requestId }: DetailsPageContentProps) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
 
@@ -593,8 +593,7 @@ export default function DetailsPageContent({ requestId }: DetailsPageContentProp
               </h2>
               <p className={styles.heroPanelText}>
                 Step 1 captured the request. Step 2 improves the way it can be
-                matched, followed up on, and eventually surfaced inside a fuller
-                RVNB request workspace.
+                matched and reviewed in your private My Requests workspace.
               </p>
 
               <div className={styles.heroPanelList}>
@@ -603,15 +602,22 @@ export default function DetailsPageContent({ requestId }: DetailsPageContentProp
                   Cleaner workflow handoff
                 </div>
                 <div className={styles.heroPanelListItem}>
-                  Future request tracking
+                  Private request tracking
                 </div>
               </div>
             </aside>
           </div>
         </section>
 
+        {!loading && !loadError && requestData?.isFinalized && <section className={styles.messageSuccess}>
+          <p>Your request is open for host responses. Responses are not confirmed bookings.</p>
+          <Link href={`/account/requests?requestId=${encodeURIComponent(requestId)}`}>View my request →</Link>
+          {" · "}<Link href="/account/requests">My Requests</Link>
+        </section>}
+
         {submitMsg ? (
           <section
+            role={submitMsgType === "error" ? "alert" : "status"}
             className={
               submitMsgType === "success"
                 ? styles.messageSuccess
@@ -1004,4 +1010,9 @@ export default function DetailsPageContent({ requestId }: DetailsPageContentProp
       </div>
     </main>
   );
+}
+
+export default function DetailsPageContent({ requestId }: DetailsPageContentProps) {
+  const { user } = useAuth();
+  return <OwnedDetailsPageContent key={`${user?.uid || "anonymous"}:${requestId}`} requestId={requestId} />;
 }

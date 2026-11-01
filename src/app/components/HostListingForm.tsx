@@ -7,9 +7,15 @@
  * field names/types/normalization.
  */
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
+import ListingPhotoEditor, { type PhotoSave } from "./ListingPhotoEditor";
+import type { PhotoFields } from "@/lib/listing-photos";
 
 import HostLocationPicker from "./HostLocationPicker";
+import AccommodationFields from "./AccommodationFields";
+import stayStyles from "./stayFields.module.css";
+import { EMPTY_ACCOMMODATION, LISTING_TYPES, isAccommodation, listingType, validateAccommodation, type Accommodation, type ListingType } from "@/lib/listing-types";
+import { amenityProjections, type StayAmenities } from "@/lib/stay-amenities";
 
 export type Hookups = "Full" | "Partial" | "None";
 export type PricingType = "Night" | "Weekly" | "Monthly";
@@ -71,6 +77,9 @@ export async function geocodeCityState(
 }
 
 export type ListingFormValues = {
+  listingType?: ListingType | "";
+  accommodation?: Accommodation;
+  stayAmenities?: StayAmenities;
   title: string;
   city: string;
   stateCode: string;
@@ -104,6 +113,7 @@ export type ListingFormValues = {
 
 /** Defaults used by the create page (unchanged from the original create form). */
 export const DEFAULT_LISTING_FORM_VALUES: ListingFormValues = {
+  listingType: "rv_space",
   title: "",
   city: "",
   stateCode: "",
@@ -169,11 +179,19 @@ export function validateListingForm(values: ListingFormValues): string | null {
   const c = values.city.trim();
   const s = values.stateCode.trim().toUpperCase();
 
-  if (!t) return "Please enter a listing title.";
-  if (!c) return "Please enter a city.";
+  if (!t || t.length > 200) return "Please enter a listing title, up to 200 characters.";
+  if (!c || c.length > 120) return "Please enter a city, up to 120 characters.";
   if (s.length !== 2) return "State must be 2 letters (example: TX).";
-  if (!Number.isFinite(values.price) || values.price < 0) return "Price must be 0 or more.";
-  if (!Number.isFinite(values.maxLengthFt) || values.maxLengthFt < 0) {
+  if (!Number.isFinite(values.price) || values.price < 0 || values.price > 1000000) return "Price must be from 0 to 1,000,000.";
+  if (!["Night", "Weekly", "Monthly"].includes(values.pricingType)) return "Choose a billing period.";
+  if (values.description.trim().length > 800) return "Description must be up to 800 characters.";
+  if (values.listingType && !listingType(values.listingType)) return "Select a supported listing type.";
+  if (isAccommodation(values.listingType)) {
+    if (!values.description.trim()) return "Describe the accommodation.";
+    const error = validateAccommodation(values.accommodation ?? EMPTY_ACCOMMODATION, values.listingType);
+    if (error) return error;
+  }
+  if (!isAccommodation(values.listingType) && (!Number.isFinite(values.maxLengthFt) || values.maxLengthFt < 0)) {
     return "Max length must be 0 or more.";
   }
 
@@ -189,13 +207,23 @@ export function validateListingForm(values: ListingFormValues): string | null {
  * Never includes the owner field (hostId), createdAt, or location fields.
  */
 export function buildListingFields(values: ListingFormValues): Record<string, unknown> {
-  return {
+  const common = {
     title: values.title.trim(),
     city: values.city.trim(),
     state: values.stateCode.trim().toUpperCase(),
 
     price: Number(values.price) || 0,
     pricingType: values.pricingType,
+    description: values.description.trim(),
+    nearbyAttractions: values.nearbyAttractions.trim(),
+    ...(values.listingType ? { listingType: values.listingType } : {}),
+  };
+  if (isAccommodation(values.listingType)) return {
+    ...common, accommodation: values.accommodation, stayAmenities: values.stayAmenities ?? {},
+    ...amenityProjections(values.stayAmenities ?? {}),
+  };
+  return {
+    ...common,
 
     maxLengthFt: Number(values.maxLengthFt) || 0,
     hookups: values.hookups,
@@ -204,9 +232,6 @@ export function buildListingFields(values: ListingFormValues): Record<string, un
     water: toWaterValue(values.water),
     sewer: toSewerValue(values.sewer, values.dump),
     laundry: toLaundryValue(values.laundry, values.washFold),
-
-    description: values.description.trim(),
-    nearbyAttractions: values.nearbyAttractions.trim(),
 
     wifi: values.wifi,
     petsAllowed: values.petsAllowed,
@@ -260,7 +285,11 @@ type HostListingFormProps = {
   status: string;
   submitLabel: string;
   savingLabel: string;
-  onSubmit: (values: ListingFormValues, touched: AmenityTouches) => void;
+  onSubmit: (values: ListingFormValues, touched: AmenityTouches) => Promise<string | undefined>;
+  photoOwnerId: string;
+  photoListingId?: string;
+  initialPhotos?: PhotoFields;
+  onComplete: () => void;
   /** Stored amenity values that did not map to any checkbox (edit flow only), shown as hints. */
   legacyAmenityHints?: Partial<Record<AmenityField, string>>;
 };
@@ -280,8 +309,23 @@ export default function HostListingForm({
   savingLabel,
   onSubmit,
   legacyAmenityHints,
+  photoOwnerId,
+  photoListingId,
+  initialPhotos = {},
+  onComplete,
 }: HostListingFormProps) {
+  const photoSave = useRef<PhotoSave | null>(null);
+  const locked = useRef(false);
+  const [photoSaving, setPhotoSaving] = useState(false);
+  const [photoPreparing, setPhotoPreparing] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [needsRetry, setNeedsRetry] = useState(false);
+  const busy = saving || photoSaving;
   const [title, setTitle] = useState(initialValues.title);
+  const [offeringType, setOfferingType] = useState(initialValues.listingType ?? "");
+  const [accommodation, setAccommodation] = useState(initialValues.accommodation ?? EMPTY_ACCOMMODATION);
+  const [stayAmenities, setStayAmenities] = useState(initialValues.stayAmenities ?? {});
+  const accommodationMode = isAccommodation(offeringType);
   const [city, setCity] = useState(initialValues.city);
   const [stateCode, setStateCode] = useState(initialValues.stateCode);
 
@@ -355,6 +399,7 @@ export default function HostListingForm({
 
   const values = useMemo<ListingFormValues>(
     () => ({
+      listingType: offeringType, accommodation, stayAmenities,
       title,
       city,
       stateCode,
@@ -386,6 +431,7 @@ export default function HostListingForm({
       manualLng: initialPinStale ? null : manualLng,
     }),
     [
+      offeringType, accommodation, stayAmenities,
       title,
       city,
       stateCode,
@@ -419,17 +465,50 @@ export default function HostListingForm({
     ]
   );
 
-  function handleSubmit() {
-    onSubmit(values, touched);
+  async function handleSubmit() {
+    if (locked.current || photoPreparing) return;
+    const error = validateListingForm(values);
+    if (error) { setSaveError(error); return; }
+    locked.current = true;
+    setPhotoSaving(true);
+    setSaveError("");
+    try {
+      const id = await onSubmit(values, touched);
+      if (id) {
+        const complete = await photoSave.current?.(id);
+        setNeedsRetry(!complete);
+        if (complete) onComplete();
+      }
+    } catch (error) {
+      console.error("[RVNB] listing save failed", error);
+      setSaveError(error instanceof Error ? error.message : "Could not save listing. Try Save again.");
+      setNeedsRetry(true);
+    } finally {
+      locked.current = false;
+      setPhotoSaving(false);
+    }
   }
 
   return (
-    <section style={card}>
-      {status && <div style={statusBox}>{status}</div>}
+    <section style={card} className={stayStyles.hostForm}>
+      {status && <div role="status" style={statusBox}>{status}</div>}
+      {saveError && <div role="alert" style={statusBox}>{saveError}</div>}
+      <fieldset disabled={busy} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
+      <ListingPhotoEditor initial={initialPhotos} uid={photoOwnerId} listingId={photoListingId}
+        busy={busy} register={save => { photoSave.current = save; }} onPreparing={setPhotoPreparing} />
+      <div style={fieldBlock}>
+        <label style={label} htmlFor="listing-offering-type">Listing type — one independently bookable unit</label>
+        <select id="listing-offering-type" style={selectFull} value={offeringType} onChange={event => setOfferingType(event.target.value as ListingType | "")}>
+          {!initialValues.listingType && <option value="">Keep existing legacy RV / land space</option>}
+          {Object.entries(LISTING_TYPES).map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+        </select>
+        <p style={tinyHelp}>Changing type does not erase stored prices, photos, location, or hidden fields. RV length and hookups do not describe accommodation amenities. Review the selected type before saving; only its offering is available to guests.</p>
+      </div>
 
       <div style={fieldBlock}>
-        <label style={label}>Listing title</label>
+        <label style={label} htmlFor="listing-title">{accommodationMode ? "Accommodation title" : "Listing title"}</label>
         <input
+          id="listing-title"
           style={input}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -439,8 +518,9 @@ export default function HostListingForm({
 
       <div style={row2}>
         <div style={fieldBlock}>
-          <label style={label}>City</label>
+          <label style={label} htmlFor="listing-city">City</label>
           <input
+            id="listing-city"
             style={input}
             value={city}
             onChange={(e) => setCity(e.target.value)}
@@ -449,8 +529,9 @@ export default function HostListingForm({
         </div>
 
         <div style={fieldBlock}>
-          <label style={label}>State</label>
+          <label style={label} htmlFor="listing-state">State</label>
           <input
+            id="listing-state"
             style={input}
             value={stateCode}
             onChange={(e) => setStateCode(e.target.value.toUpperCase().trim())}
@@ -513,11 +594,12 @@ export default function HostListingForm({
       </div>
 
       <div style={fieldBlock}>
-        <label style={label}>Price</label>
+        <label style={label} htmlFor="listing-price">Price</label>
         <div style={priceRow}>
           <div style={priceInputWrapper}>
             {showDollar && <span style={priceSymbol}>$</span>}
             <input
+              id="listing-price"
               style={{ ...priceInput, paddingLeft: showDollar ? 22 : 12 }}
               type="number"
               min={0}
@@ -530,6 +612,7 @@ export default function HostListingForm({
           </div>
 
           <select
+            aria-label="Billing period"
             style={select}
             value={pricingType}
             onChange={(e) => setPricingType(e.target.value as PricingType)}
@@ -547,10 +630,11 @@ export default function HostListingForm({
         </div>
       </div>
 
-      <div style={fieldBlock}>
-        <label style={label}>Max RV length allowed</label>
+      {!accommodationMode && <div style={fieldBlock}>
+        <label style={label} htmlFor="listing-max-length">Max RV length allowed</label>
         <div style={unitRow}>
           <input
+            id="listing-max-length"
             style={unitInput}
             type="number"
             min={0}
@@ -565,11 +649,12 @@ export default function HostListingForm({
           <span style={unitSuffix}>ft</span>
         </div>
         <small style={tinyHelp}>Enter the longest RV that can fit (max 50 ft).</small>
-      </div>
+      </div>}
 
-      <div style={fieldBlock}>
-        <label style={label}>Hookups</label>
+      {!accommodationMode && <div style={fieldBlock}>
+        <label style={label} htmlFor="listing-hookups">Hookups</label>
         <select
+          id="listing-hookups"
           style={selectFull}
           value={hookups}
           onChange={(e) => setHookups(e.target.value as Hookups)}
@@ -584,11 +669,12 @@ export default function HostListingForm({
             No Hookups
           </option>
         </select>
-      </div>
+      </div>}
 
       <div style={fieldBlock}>
-        <label style={label}>Spot description (optional)</label>
+        <label style={label} htmlFor="listing-description">{accommodationMode ? "Accommodation description (required)" : "Spot description (optional)"}</label>
         <textarea
+          id="listing-description"
           style={textarea}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -602,8 +688,9 @@ export default function HostListingForm({
       </div>
 
       <div style={fieldBlock}>
-        <label style={label}>Nearby attractions / theme parks (optional)</label>
+        <label style={label} htmlFor="listing-nearby">Nearby attractions / theme parks (optional)</label>
         <textarea
+          id="listing-nearby"
           style={textarea}
           value={nearbyAttractions}
           onChange={(e) => setNearbyAttractions(e.target.value)}
@@ -617,8 +704,9 @@ export default function HostListingForm({
       </div>
 
       <div style={divider} />
+      {accommodationMode && <AccommodationFields type={offeringType} value={accommodation} amenities={stayAmenities} onChange={setAccommodation} onAmenities={setStayAmenities} />}
 
-      {legacyAmenityHints &&
+      {!accommodationMode && legacyAmenityHints &&
         (Object.keys(AMENITY_LABELS) as AmenityField[])
           .filter((f) => legacyAmenityHints[f])
           .map((f) =>
@@ -635,7 +723,7 @@ export default function HostListingForm({
             )
           )}
 
-      <div style={amenityWrap}>
+      {!accommodationMode && <div style={amenityWrap}>
         <AmenitySection title="RV Infrastructure">
           <Checkbox label="🔌 30 Amp Power" checked={power30} onChange={touch("power", setPower30)} />
           <Checkbox label="🔌 50 Amp Power" checked={power50} onChange={touch("power", setPower50)} />
@@ -683,11 +771,12 @@ export default function HostListingForm({
             onChange={setPullThrough}
           />
         </AmenitySection>
-      </div>
+      </div>}
 
-      <button style={{ ...btn, opacity: saving ? 0.7 : 1 }} onClick={handleSubmit} disabled={saving}>
-        {saving ? savingLabel : submitLabel}
+      <button style={{ ...btn, opacity: busy ? 0.7 : 1 }} onClick={handleSubmit} disabled={busy || photoPreparing}>
+        {busy ? savingLabel : needsRetry ? "Retry save" : submitLabel}
       </button>
+      </fieldset>
 
       <div style={tinyHelp}>
         Saved legacy-compatible fields: <b>power</b>, <b>water</b>, <b>sewer</b>,{" "}
@@ -784,7 +873,7 @@ const fieldBlock: React.CSSProperties = { marginTop: 14 };
 
 const row2: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "1fr 140px",
+  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
   gap: 12,
 };
 
@@ -819,8 +908,8 @@ const counterRow: React.CSSProperties = {
 const label: React.CSSProperties = { fontWeight: 800 };
 const tinyHelp: React.CSSProperties = { opacity: 0.7, fontSize: 12 };
 
-const priceRow: React.CSSProperties = { display: "flex", gap: 12, marginTop: 8 };
-const priceInputWrapper: React.CSSProperties = { position: "relative", flex: 1 };
+const priceRow: React.CSSProperties = { display: "flex", flexWrap: "wrap", gap: 12, marginTop: 8 };
+const priceInputWrapper: React.CSSProperties = { position: "relative", flex: 1, minWidth: "min(100%, 160px)" };
 
 const priceSymbol: React.CSSProperties = {
   position: "absolute",
@@ -881,6 +970,7 @@ const unitSuffix: React.CSSProperties = {
 
 const unitInput: React.CSSProperties = {
   flex: 1,
+  minWidth: 0,
   padding: 12,
   borderRadius: 10,
   border: "1px solid rgba(255,255,255,0.15)",

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   addDoc,
@@ -11,10 +11,14 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
+import styles from "./listingdetail.module.css";
+import { capacity, inquiryBookingType, inquiryEstimate, inquiryNights, isAccommodation, listingTypeLabel, listingType as readListingType, type ListingType } from "@/lib/listing-types";
 
 type BookingType = "RV" | "LAND" | "RV_PROVIDED";
 
 type Props = {
+  listingType?: ListingType | null;
+  accommodation?: Record<string, unknown>;
   listingId: string;
   hostId: string;
   nightlyPrice: number;
@@ -32,7 +36,7 @@ function addDays(yyyyMmDd: string, days: number) {
   return d.toISOString().slice(0, 10);
 }
 
-export default function BookingPanel({ listingId, hostId, nightlyPrice, priceLabel }: Props) {
+export default function BookingPanel({ listingId, hostId, nightlyPrice, priceLabel, listingType = null, accommodation = {} }: Props) {
   const router = useRouter();
   const { user } = useAuth();
   const [checkIn, setCheckIn] = useState("");
@@ -41,31 +45,23 @@ export default function BookingPanel({ listingId, hostId, nightlyPrice, priceLab
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [guests, setGuests] = useState(1);
+  const locked = useRef(false);
+  const accommodationMode = isAccommodation(listingType);
+  const maximumGuests = capacity({ accommodation });
+  const offeredBookingType = listingType ? inquiryBookingType(listingType) : bookingType;
 
   // Today in YYYY-MM-DD (used for min date)
   const today = useMemo(() => {
     const d = new Date();
     // local date -> yyyy-mm-dd
     const local = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    return local.toISOString().slice(0, 10);
+    return `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, "0")}-${String(local.getDate()).padStart(2, "0")}`;
   }, []);
 
-  const nights = useMemo(() => {
-    if (!checkIn || !checkOut) return 0;
-    const start = toDateLocal(checkIn);
-    const end = toDateLocal(checkOut);
-    const diff = end.getTime() - start.getTime();
-    const n = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    return Number.isFinite(n) && n > 0 ? n : 0;
-  }, [checkIn, checkOut]);
+  const nights = useMemo(() => inquiryNights(checkIn, checkOut), [checkIn, checkOut]);
 
-  const premium = useMemo(() => (bookingType === "RV_PROVIDED" ? 50 : 0), [bookingType]);
-
-  const estimatedTotal = useMemo(() => {
-    const base = Number(nightlyPrice) || 0;
-    if (!base || nights === 0) return 0;
-    return nights * (base + premium);
-  }, [nightlyPrice, nights, premium]);
+  const estimatedTotal = inquiryEstimate(nightlyPrice, priceLabel, nights);
 
   const minCheckout = useMemo(() => {
     if (!checkIn) return today;
@@ -73,6 +69,7 @@ export default function BookingPanel({ listingId, hostId, nightlyPrice, priceLab
   }, [checkIn, today]);
 
   async function handleBooking() {
+    if (locked.current) return;
     setMessage("");
 
     if (!user) {
@@ -81,6 +78,9 @@ export default function BookingPanel({ listingId, hostId, nightlyPrice, priceLab
       return;
     }
 
+    locked.current = true;
+    setSaving(true);
+    try {
     const listingSnap = await getDoc(doc(db, "listings", listingId));
     if (!listingSnap.exists()) {
       setMessage("This listing could not be found.");
@@ -107,6 +107,19 @@ export default function BookingPanel({ listingId, hostId, nightlyPrice, priceLab
       setMessage("This listing owner no longer matches the current listing.");
       return;
     }
+    const current = listingSnap.data();
+    const currentType = readListingType(current.listingType);
+    if (currentType !== listingType) { setMessage("The offering changed. Refresh this listing before requesting dates."); return; }
+    if (accommodationMode) {
+      const max = capacity(current);
+      if (max === null || !Number.isInteger(guests) || guests < 1 || guests > max) {
+        setMessage("Enter a guest count within the host's declared capacity. Missing capacity must be supplied by the host first."); return;
+      }
+    }
+    const currentRate = typeof current.price === "number" ? current.price : current.pricePerNight;
+    const currentPeriod = typeof current.price === "number" ? current.pricingType : "Night";
+    const expectedLabel = currentPeriod === "Night" ? "night" : currentPeriod === "Weekly" ? "week" : currentPeriod === "Monthly" ? "month" : "";
+    if (currentRate !== nightlyPrice || expectedLabel !== priceLabel) { setMessage("The rate changed or is incomplete. Refresh before requesting dates."); return; }
 
     if (!listingId) {
       setMessage("Listing id missing. Please refresh.");
@@ -125,6 +138,10 @@ export default function BookingPanel({ listingId, hostId, nightlyPrice, priceLab
       setMessage("Check-out must be after check-in.");
       return;
     }
+    if (!nights) {
+      setMessage("Choose valid dates, no more than 3,660 nights apart.");
+      return;
+    }
 
     // Prevent past check-ins
     if (toDateLocal(checkIn).getTime() < toDateLocal(today).getTime()) {
@@ -135,9 +152,6 @@ export default function BookingPanel({ listingId, hostId, nightlyPrice, priceLab
     // Optional: keep notes small & clean (prevents giant messages)
     const cleanNote = note.trim().slice(0, 500);
 
-    setSaving(true);
-
-    try {
       // Pending inquiries do not reserve dates; host approval is authoritative.
       await addDoc(collection(db, "bookings"), {
         listingId,
@@ -145,9 +159,12 @@ export default function BookingPanel({ listingId, hostId, nightlyPrice, priceLab
         hostId: listingOwnerId,
         checkIn,
         checkOut,
-        bookingType,
+        bookingType: offeredBookingType,
+        ...(listingType ? { listingType } : {}),
+        ...(accommodationMode ? { guestCount: guests } : {}),
         nights,
         estimatedTotal,
+        estimateStatus: estimatedTotal === null ? "host_confirmation_required" : "nightly_estimate",
         note: cleanNote || "",
         status: "pending",
         createdAt: serverTimestamp(),
@@ -162,37 +179,29 @@ export default function BookingPanel({ listingId, hostId, nightlyPrice, priceLab
       console.error(err);
       setMessage("❌ Could not submit date inquiry.");
     } finally {
+      locked.current = false;
       setSaving(false);
     }
   }
 
   return (
-    <div
-      style={{
-        padding: 20,
-        borderRadius: 16,
-        border: "1px solid rgba(255,255,255,0.12)",
-        background: "rgba(255,255,255,0.06)",
-      }}
-    >
-      <div style={{ fontWeight: 900, fontSize: 18 }}>
+    <section className={styles.bookingCard} aria-labelledby="booking-title" aria-busy={saving}>
+      <div className={styles.bookingTop}>
+        <h2 id="booking-title" className={styles.bookingTitle}>Request your stay</h2>
+        <p className={styles.bookingSub}>Send your dates to the host. This is an inquiry, not a confirmed booking.</p>
+      </div>
+      <div className={styles.bookingRate}>
         ${nightlyPrice} / {priceLabel}
       </div>
 
-      {/* Price breakdown (nice touch, no schema change) */}
-      <div style={{ marginTop: 8, opacity: 0.85, fontSize: 13, lineHeight: 1.4 }}>
-        Base: <b>${Number(nightlyPrice) || 0}</b>
-        {premium > 0 && (
-          <>
-            {" "}
-            • RV Provided premium: <b>+${premium}</b>
-          </>
-        )}
+      <div className={styles.bookingBreakdown}>
+        Listed rate: <b>${nightlyPrice} / {priceLabel}</b>. No automatic RV surcharge.
       </div>
 
-      <div style={{ marginTop: 16 }}>
-        <label style={{ fontWeight: 700 }}>Check-in</label>
+      <div className={styles.bookingFields}>
+        <label className={styles.label} htmlFor="booking-check-in">Check-in</label>
         <input
+          id="booking-check-in"
           type="date"
           value={checkIn}
           min={today}
@@ -208,29 +217,31 @@ export default function BookingPanel({ listingId, hostId, nightlyPrice, priceLab
               }
             }
           }}
-          style={inputStyle}
+          className={styles.input}
         />
 
-        <label style={{ fontWeight: 700 }}>Check-out</label>
+        <label className={styles.label} htmlFor="booking-check-out">Check-out</label>
         <input
+          id="booking-check-out"
+          aria-describedby={!checkIn ? "booking-check-out-help" : undefined}
           type="date"
           value={checkOut}
           min={minCheckout}
           onChange={(e) => setCheckOut(e.target.value)}
-          style={inputStyle}
+          className={styles.input}
           disabled={!checkIn}
         />
 
         {!checkIn && (
-          <div style={{ marginTop: -6, marginBottom: 10, opacity: 0.75, fontSize: 12 }}>
+          <div id="booking-check-out-help" className={styles.bookingSub}>
             Select a check-in date first to unlock check-out.
           </div>
         )}
       </div>
 
-      <div style={{ marginTop: 16 }}>
-        <strong>Booking Type</strong>
-        <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+      {!listingType ? <fieldset className={styles.bookingTypes}>
+        <legend className={styles.label}>Booking type</legend>
+        <div className={styles.segmentRow}>
           <SelectorButton
             label="🚐 RV Stay"
             active={bookingType === "RV"}
@@ -241,65 +252,58 @@ export default function BookingPanel({ listingId, hostId, nightlyPrice, priceLab
             active={bookingType === "LAND"}
             onClick={() => setBookingType("LAND")}
           />
-          <SelectorButton
-            label="🚌 RV Provided"
-            active={bookingType === "RV_PROVIDED"}
-            onClick={() => setBookingType("RV_PROVIDED")}
-          />
         </div>
-      </div>
+      </fieldset> : <p className={styles.bookingSub}>Offering: {listingTypeLabel(listingType)}{accommodationMode ? ". Stationary accommodation; guests may not drive, tow, or remove it." : ""}</p>}
+      {accommodationMode && <div className={styles.bookingFields}>
+        <label htmlFor="booking-guests" className={styles.label}>Guests{maximumGuests ? ` (maximum ${maximumGuests})` : ""}</label>
+        <input id="booking-guests" type="number" min={1} max={maximumGuests ?? undefined} step={1} value={Number.isNaN(guests) ? "" : guests} onChange={event => setGuests(event.target.value === "" ? NaN : Number(event.target.value))} className={styles.input} disabled={saving || maximumGuests === null} />
+        {maximumGuests === null && <p className={styles.bookingSub}>The host has not declared guest capacity. Inquiries are unavailable until it is supplied.</p>}
+      </div>}
 
       {/* Note to host */}
-      <div style={{ marginTop: 16 }}>
-        <label style={{ fontWeight: 700 }}>Note to host (optional)</label>
+      <div className={styles.bookingFields}>
+        <label className={styles.label} htmlFor="booking-note">Note to host (optional)</label>
         <textarea
+          id="booking-note"
+          aria-describedby="booking-note-count"
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="Example: arriving around 8pm, 32ft trailer, need a level spot…"
+          placeholder={accommodationMode ? "Arrival questions or accommodation needs..." : "Example: arriving around 8pm, 32ft trailer, need a level spot…"}
           rows={3}
-          style={textareaStyle}
+          className={styles.textarea}
           maxLength={500}
         />
-        <div style={{ opacity: 0.75, fontSize: 12, marginTop: 6 }}>
+        <div id="booking-note-count" className={styles.bookingSub}>
           {note.trim().length}/500
         </div>
       </div>
 
-      <div style={{ marginTop: 16 }}>
+      <div className={styles.summary} aria-live="polite">
         Nights: <strong>{nights}</strong>
         {nights > 0 && (
           <>
             {" "}
-            • Total: <strong>${estimatedTotal}</strong>
+            {estimatedTotal === null ? "Total to be confirmed by host" : <> · Estimated total: <strong>${estimatedTotal}</strong></>}
           </>
         )}
       </div>
 
       <button
+        type="button"
         onClick={handleBooking}
-        disabled={saving}
-        style={{
-          marginTop: 20,
-          width: "100%",
-          padding: 14,
-          borderRadius: 12,
-          border: "1px solid rgba(255,255,255,0.15)",
-          background: "rgba(255,255,255,0.15)",
-          color: "white",
-          fontWeight: 900,
-          cursor: saving ? "not-allowed" : "pointer",
-          opacity: saving ? 0.7 : 1,
-        }}
+        disabled={saving || (accommodationMode && maximumGuests === null)}
+        className={styles.primaryAction}
       >
-        {saving ? "Checking availability..." : "Request Booking"}
+        {saving ? "Sending inquiry..." : "Request Booking"}
       </button>
 
-      {message && <div style={{ marginTop: 12, fontWeight: 700 }}>{message}</div>}
+      {message && <div role="status" aria-live="polite" className={styles.message}>{message}</div>}
 
-      <div style={{ marginTop: 10, opacity: 0.65, fontSize: 12, lineHeight: 1.35 }}>
-        By requesting a booking you agree to the host’s rules and RVNB terms (coming soon).
+      <p className={styles.bookingSub}>Selected dates do not verify availability. The host must approve your inquiry.</p>
+      <div className={styles.bookingSub}>
+        Client totals are estimates, not authoritative charges. No payment is collected.
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -316,45 +320,10 @@ function SelectorButton({
     <button
       type="button"
       onClick={onClick}
-      style={{
-        padding: "8px 12px",
-        borderRadius: 999,
-        border: active
-          ? "1px solid rgba(255,255,255,0.4)"
-          : "1px solid rgba(255,255,255,0.15)",
-        background: active
-          ? "rgba(255,255,255,0.25)"
-          : "rgba(255,255,255,0.08)",
-        color: "white",
-        fontWeight: 800,
-        cursor: "pointer",
-      }}
+      aria-pressed={active}
+      className={`${styles.segmentBtn} ${active ? styles.segmentActive : ""}`}
     >
       {label}
     </button>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  display: "block",
-  width: "100%",
-  padding: 12,
-  marginTop: 6,
-  marginBottom: 12,
-  borderRadius: 10,
-  border: "1px solid rgba(255,255,255,0.15)",
-  background: "rgba(255,255,255,0.06)",
-  color: "white",
-};
-
-const textareaStyle: React.CSSProperties = {
-  display: "block",
-  width: "100%",
-  padding: 12,
-  marginTop: 6,
-  borderRadius: 10,
-  border: "1px solid rgba(255,255,255,0.15)",
-  background: "rgba(255,255,255,0.06)",
-  color: "white",
-  resize: "vertical",
-};

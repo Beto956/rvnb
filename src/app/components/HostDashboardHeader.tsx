@@ -46,6 +46,7 @@ export default function HostDashboardHeader({ hostName }: Props) {
           </div>
 
           <nav className={styles.nav} aria-label="Host account">
+            <Link href="/account/requests" className={styles.navLink}>My Requests</Link>
             <Link
               href="/host/calendar"
               className={`${styles.navLink} ${

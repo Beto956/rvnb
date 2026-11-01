@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import styles from "./hostDashboard.module.css";
+import ListingPhoto from "./ListingPhoto";
 
 export type HostListingCardData = {
+  photos: string[];
   id: string;
   title: string;
   city: string;
@@ -78,10 +80,12 @@ export default function HostListingsPanel({ listings, loading, error }: Props) {
         <div className={styles.listingsGrid}>
           {listings.map((l) => (
             <article className={styles.listingCard} key={l.id}>
-              <div className={styles.listingImage}>
-                <span className={styles.listingStatusBadge}>Active</span>
+              <div className={styles.listingImage} style={{ position: "relative", overflow: "hidden" }}>
+                <span className={styles.listingStatusBadge} style={{ zIndex: 1 }}>Active</span>
+                <ListingPhoto photos={l.photos} fill fallback={<>
                 <RvPlaceholderIcon />
-                Photos coming soon
+                Photos not added
+                </>} />
               </div>
 
               <div className={styles.listingBody}>
@@ -126,7 +130,10 @@ export default function HostListingsPanel({ listings, loading, error }: Props) {
             <span className={styles.addListingPlus} aria-hidden="true">
               +
             </span>
-            Add new listing
+            <span>Add a space or accommodation</span>
+            <span className={styles.panelSub}>
+              RV spaces, host-provided RVs, mobile homes, and cabins.
+            </span>
           </Link>
         </div>
       )}

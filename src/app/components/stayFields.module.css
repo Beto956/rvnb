@@ -1,0 +1,20 @@
+.fields { display: grid; gap: 20px; color: #f5f7fb; margin: 20px 0; }
+.fields label { display: grid; gap: 8px; font-size: 14px; line-height: 1.5; min-width: 0; }
+.fields :is(input,select,textarea) { width: 100%; box-sizing: border-box; min-width: 0; min-height: 46px; font: inherit; color: #f5f7fb; background: #0b1c2e; border: 1px solid #526b85; border-radius: 8px; padding: 10px; color-scheme: dark; }
+.fields textarea { min-height: 100px; resize: vertical; }
+.fields fieldset { min-width: 0; border: 1px solid #354b64; border-radius: 8px; padding: 16px; }
+.fields legend { color: #e8c58e; padding: 0 6px; font-size: 14px; }
+.fields :is(input,button,select,textarea):focus-visible { outline: 3px solid #8ad1ff; outline-offset: 3px; }
+.grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.help,.notice { color: #c5d2e3; font-size: 14px; line-height: 1.7; }
+.notice { padding: 12px; border-left: 3px solid #e8c58e; background: #102338; }
+.iconLabel { display: flex; align-items: center; gap: 8px; }
+.groups { display: grid; gap: 24px; }
+.groups h3 { font-size: 17px; font-weight: 600; margin: 8px 0 12px; color: #e8c58e; }
+.amenities { margin: 0; display: grid; gap: 10px; }
+.amenities>div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; border-bottom: 1px solid #354b64; padding-bottom: 10px; }
+.amenities dt { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.amenities dd { margin: 0; font-size: 14px; color: #c5d2e3; }
+@media(max-width:540px) { .grid { grid-template-columns: 1fr; } }
+.hostForm,.hostForm * { box-sizing: border-box; }
+.hostForm :is(a,input,select,textarea,button):focus-visible { outline: 3px solid #8ad1ff; outline-offset: 3px; }

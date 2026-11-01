@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { FirebaseError } from "firebase/app";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { normalizeBookingStatus } from "@/lib/booking-status";
@@ -119,10 +120,18 @@ function NewReviewPageInner() {
           return;
         }
 
-        const existingReview = await getDoc(doc(db, "reviews", reviewDocId(bookingId, user.uid)));
-        if (existingReview.exists()) {
-          setEligibility("already-reviewed");
-          return;
+        try {
+          const existingReview = await getDoc(doc(db, "reviews", reviewDocId(bookingId, user.uid)));
+          if (existingReview.exists()) {
+            setEligibility("already-reviewed");
+            return;
+          }
+        } catch (error) {
+          // Missing reviews cannot be read under the published-only read rule.
+          // Creation rules still enforce eligibility and reject duplicate writes.
+          if (!(error instanceof FirebaseError) || error.code !== "permission-denied") {
+            throw error;
+          }
         }
 
         setDirection(nextDirection);
@@ -240,7 +249,7 @@ function NewReviewPageInner() {
           </p>
 
           <form className={styles.editForm} style={{ marginTop: 24 }} onSubmit={(e) => e.preventDefault()}>
-            {saveError && <div className={styles.placeholderText}>{saveError}</div>}
+            {saveError && <div className={styles.placeholderText} role="alert">{saveError}</div>}
 
             <StarRatingInput label="Overall rating" name="overall-rating" value={rating} onChange={setRating} disabled={saving} />
 

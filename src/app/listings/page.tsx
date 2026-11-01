@@ -1,8 +1,11 @@
 import Link from "next/link";
 import Image from "next/image";
+import { listingPhotos } from "@/lib/listing-photos";
 import styles from "./listings.module.css";
 
-import ListingsMapPanel from "../components/ListingsMapPanel";
+import ListingsResults from "../components/ListingsResults";
+import { hasListingCoordinates } from "@/lib/listing-location";
+import { accommodationRate, isAccommodation, listingType, record, type ListingType } from "@/lib/listing-types";
 import AuthNav from "../components/authnav";
 
 import { db } from "@/lib/firebase";
@@ -12,6 +15,8 @@ type Hookups = "Full" | "Partial" | "None";
 type PricingType = "Night" | "Weekly" | "Monthly";
 
 type ListingDoc = {
+  listingType?: unknown;
+  accommodation?: unknown;
   title?: string;
   city?: string;
   state?: string;
@@ -36,6 +41,8 @@ type ListingDoc = {
 };
 
 type ListingUI = {
+  listingType: ListingType | null;
+  accommodation: Record<string, unknown>;
   id: string;
   title: string;
   city: string;
@@ -48,21 +55,11 @@ type ListingUI = {
   lat?: number;
   lng?: number;
 
-  displayPriceValue: number;
+  displayPriceValue: number | null;
   displayPriceLabel: string;
-  photoUrl: string | null;
+  photos: string[];
   hasCoords: boolean;
 };
-
-function firstListingPhoto(data: ListingDoc): string | null {
-  if (typeof data.imageUrl === "string" && data.imageUrl.trim()) return data.imageUrl.trim();
-  if (typeof data.photoURL === "string" && data.photoURL.trim()) return data.photoURL.trim();
-  if (Array.isArray(data.photos)) {
-    const first = data.photos.find((value) => typeof value === "string" && value.trim());
-    return first?.trim() ?? null;
-  }
-  return null;
-}
 
 function normalizePricingLabel(pricingType: PricingType): string {
   if (pricingType === "Night") return "night";
@@ -81,10 +78,11 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
 
   const lat = typeof data.lat === "number" ? data.lat : undefined;
   const lng = typeof data.lng === "number" ? data.lng : undefined;
-  const photoUrl = firstListingPhoto(data);
-  const hasCoords = typeof lat === "number" && typeof lng === "number";
+  const hasCoords = hasListingCoordinates({ lat, lng });
 
-  const hasNewPrice = typeof data.price === "number";
+  const rate = accommodationRate(data);
+  const accommodationMode = isAccommodation(data.listingType);
+  const hasNewPrice = typeof data.price === "number" && (!accommodationMode || (Number.isFinite(data.price) && data.price >= 0));
   const hasNewPricingType =
     data.pricingType === "Night" ||
     data.pricingType === "Weekly" ||
@@ -92,6 +90,7 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
 
   if (hasNewPrice && hasNewPricingType) {
     return {
+      listingType: listingType(data.listingType), accommodation: record(data.accommodation),
       id,
       title: title || "(Untitled Listing)",
       city: city || "(City not set)",
@@ -102,7 +101,7 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
       lng,
       displayPriceValue: data.price as number,
       displayPriceLabel: normalizePricingLabel(data.pricingType as PricingType),
-      photoUrl,
+      photos: listingPhotos(data),
       hasCoords,
     };
   }
@@ -111,6 +110,7 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
     typeof data.pricePerNight === "number" ? data.pricePerNight : 0;
 
   return {
+    listingType: listingType(data.listingType), accommodation: record(data.accommodation),
     id,
     title: title || "(Untitled Listing)",
     city: city || "(City not set)",
@@ -119,9 +119,9 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
     maxLengthFt,
     lat,
     lng,
-    displayPriceValue: oldPrice,
-    displayPriceLabel: "night",
-    photoUrl,
+    displayPriceValue: accommodationMode ? rate.price : oldPrice,
+    displayPriceLabel: accommodationMode ? rate.label : "night",
+    photos: listingPhotos(data),
     hasCoords,
   };
 }
@@ -198,17 +198,17 @@ export default async function ListingsPage({
   }
 
   if (selectedHookups !== "Any") {
-    listings = listings.filter((l) => l.hookups === selectedHookups);
+    listings = listings.filter((l) => !isAccommodation(l.listingType) && l.hookups === selectedHookups);
   }
 
   if (selectedMaxPrice !== null) {
-    listings = listings.filter((l) => l.displayPriceValue <= selectedMaxPrice);
+    listings = listings.filter((l) => l.displayPriceValue !== null && l.displayPriceValue <= selectedMaxPrice);
   }
 
   if (selectedSort === "price_asc") {
-    listings.sort((a, b) => a.displayPriceValue - b.displayPriceValue);
+    listings.sort((a, b) => (a.displayPriceValue ?? Infinity) - (b.displayPriceValue ?? Infinity));
   } else if (selectedSort === "price_desc") {
-    listings.sort((a, b) => b.displayPriceValue - a.displayPriceValue);
+    listings.sort((a, b) => (b.displayPriceValue ?? -Infinity) - (a.displayPriceValue ?? -Infinity));
   } else if (selectedSort === "title_asc") {
     listings.sort((a, b) => a.title.localeCompare(b.title));
   }
@@ -221,8 +221,7 @@ export default async function ListingsPage({
       <header className={styles.headerBar}>
         <div className={styles.headerInner}>
           <Link href="/" className={styles.brand} aria-label="RVNB Home">
-            <Image src="/rvnb-logo-icon.png" alt="RVNB" className={styles.brandIcon} width={180} height={72} />
-            <span className={styles.brandText}>RVNB</span>
+            <Image src="/rvnb-logo-icon.png" alt="RVNB" className={styles.brandIcon} width={320} height={213} />
           </Link>
 
           <nav className={styles.nav} aria-label="Listings navigation">
@@ -346,70 +345,11 @@ export default async function ListingsPage({
             <span className={styles.resultsDot}>•</span>
             <span className={styles.resultsMeta}>{mappedCount} on the map</span>
           </div>
+          <Link href="/unique-stays" className={styles.resultsRequestLink}>Explore Unique Stays</Link>
           <Link href="/request-spot" className={styles.resultsRequestLink}>Need something specific?</Link>
         </div>
 
-        <div className={styles.resultsLayout}>
-          <div className={styles.mapCol}>
-            <ListingsMapPanel listings={listings} />
-          </div>
-
-          <div className={styles.cardsCol}>
-            <div className={styles.grid}>
-              {listings.map((l) => (
-                <Link
-                  key={l.id}
-                  href={`/listings/${l.id}`}
-                  className={styles.card}
-                >
-                  <div className={styles.photoArea}>
-                    {l.photoUrl ? (
-                      <span
-                        className={styles.cardPhoto}
-                        style={{ backgroundImage: `url(${l.photoUrl})` }}
-                        aria-hidden="true"
-                      />
-                    ) : (
-                      <span className={styles.cardFallbackPhoto} aria-hidden="true">
-                        <span className={styles.fallbackWordmark}>RVNB</span>
-                      </span>
-                    )}
-                    <span className={styles.photoBadge}>{l.photoUrl ? "Host photo" : "Photos not added"}</span>
-                  </div>
-
-                  <div className={styles.cardTop}>
-                    <div className={styles.cardTitle}>{l.title}</div>
-                    <div className={styles.price}>
-                      <span className={styles.priceValue}>
-                        ${l.displayPriceValue}
-                      </span>
-                      <span className={styles.per}>
-                        / {l.displayPriceLabel}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className={styles.cardMeta}>
-                    <span className={styles.pill}>
-                      {l.city}, {l.state}
-                    </span>
-                    <span className={styles.pill}>{l.hookups} hookups</span>
-                    <span className={styles.pill}>
-                      Max {l.maxLengthFt} ft
-                    </span>
-                    <span className={l.hasCoords ? styles.pillMapped : styles.pillMuted}>
-                      {l.hasCoords ? "Mapped" : "Map pending"}
-                    </span>
-                  </div>
-
-                  <div className={styles.cardCta}>
-                    View spot →
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
+        <ListingsResults listings={listings} />
       </div>
     </div>
   );

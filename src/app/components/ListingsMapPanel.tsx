@@ -2,13 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useJsApiLoader } from "@react-google-maps/api";
+import styles from "./listingsMapPanel.module.css";
+import { hasListingCoordinates } from "@/lib/listing-location";
 
 type MapListing = {
   id: string;
   title: string;
   city: string;
   state: string;
-  displayPriceValue: number;
+  displayPriceValue: number | null;
   displayPriceLabel: string;
   lat?: number;
   lng?: number;
@@ -16,21 +18,13 @@ type MapListing = {
 
 type Props = {
   listings: MapListing[];
+  selection?: { id: string; sequence: number };
 };
 
 type GoogleMapInstance = google.maps.Map;
 type GoogleMarkerInstance = google.maps.Marker;
 type GoogleInfoWindowInstance = google.maps.InfoWindow;
 type GoogleLatLngBounds = google.maps.LatLngBounds;
-
-function hasValidCoords(listing: MapListing) {
-  return (
-    typeof listing.lat === "number" &&
-    Number.isFinite(listing.lat) &&
-    typeof listing.lng === "number" &&
-    Number.isFinite(listing.lng)
-  );
-}
 
 function escapeHtml(value: string) {
   return value
@@ -41,7 +35,7 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#039;");
 }
 
-export default function ListingsMapPanel({ listings }: Props) {
+export default function ListingsMapPanel({ listings, selection }: Props) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
   const { isLoaded, loadError } = useJsApiLoader({
     id: "rvnb-google-maps",
@@ -54,7 +48,7 @@ export default function ListingsMapPanel({ listings }: Props) {
   const infoWindowRef = useRef<GoogleInfoWindowInstance | null>(null);
 
   const mappableListings = useMemo(() => {
-    return listings.filter(hasValidCoords);
+    return listings.filter(hasListingCoordinates);
   }, [listings]);
 
   const mapReady = Boolean(apiKey) && isLoaded && !loadError;
@@ -130,7 +124,8 @@ export default function ListingsMapPanel({ listings }: Props) {
               ${escapeHtml(listing.city)}, ${escapeHtml(listing.state)}
             </div>
             <div style="margin-top:8px;font-size:14px;font-weight:700;">
-              $${listing.displayPriceValue} / ${escapeHtml(listing.displayPriceLabel)}
+              ${listing.displayPriceValue === null ? "Rate not provided" : `$${listing.displayPriceValue}`}
+              ${listing.displayPriceLabel ? `/ ${escapeHtml(listing.displayPriceLabel)}` : "Billing period not provided"}
             </div>
             <a
               href="/listings/${encodeURIComponent(listing.id)}"
@@ -168,7 +163,43 @@ export default function ListingsMapPanel({ listings }: Props) {
     } else {
       map.fitBounds(bounds, 60);
     }
-  }, [mappableListings]);
+  }, [mappableListings, isLoaded, mapNode]);
+
+  useEffect(() => {
+    if (!selection || !mapReady) return;
+    const index = mappableListings.findIndex(listing => listing.id === selection.id);
+    const marker = markersRef.current[index];
+    const map = mapInstanceRef.current;
+    const position = marker?.getPosition();
+    if (!map || !marker || !position) return;
+    map.panTo(position);
+    map.setZoom(12);
+    window.google.maps.event.trigger(marker, "click");
+  }, [selection, mapReady, mapNode, mappableListings]);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const googleMaps = window.google?.maps;
+    if (!map || !googleMaps || !mapNode) return;
+
+    const observer = new ResizeObserver(() => {
+      if (!mapNode.clientWidth || !mapNode.clientHeight) return;
+      const center = map.getCenter();
+      googleMaps.event.trigger(map, "resize");
+      if (markersRef.current.length > 1) {
+        const bounds = new googleMaps.LatLngBounds();
+        markersRef.current.forEach(marker => {
+          const position = marker.getPosition();
+          if (position) bounds.extend(position);
+        });
+        map.fitBounds(bounds, 40);
+      } else if (center) {
+        map.setCenter(center);
+      }
+    });
+    observer.observe(mapNode);
+    return () => observer.disconnect();
+  }, [isLoaded, mapNode]);
 
   return (
     <div style={wrap}>
@@ -217,6 +248,7 @@ export default function ListingsMapPanel({ listings }: Props) {
 
       <div
         ref={setMapNode}
+        className={styles.map}
         style={{
           ...mapBox,
           display: mapReady && mappableListings.length > 0 ? "block" : "none",
@@ -226,13 +258,16 @@ export default function ListingsMapPanel({ listings }: Props) {
       <div style={footNote}>
         Click a pin to preview the listing and jump directly to its detail page.
       </div>
+      {selection && <div role="status" style={footNote}>
+        {mapReady ? `Selected location: ${mappableListings.find(listing => listing.id === selection.id)?.title ?? "listing"}.`
+          : loadError || !apiKey ? "Map unavailable. Use the listing link to view its saved location."
+          : "Loading the selected listing location..."}
+      </div>}
     </div>
   );
 }
 
 const wrap: React.CSSProperties = {
-  position: "sticky",
-  top: 92,
   borderRadius: 10,
   border: "1px solid rgba(180,205,255,0.16)",
   background: "linear-gradient(180deg, rgba(7,13,28,0.88), rgba(7,13,28,0.68))",
@@ -243,6 +278,7 @@ const wrap: React.CSSProperties = {
 
 const topRow: React.CSSProperties = {
   display: "flex",
+  flexWrap: "wrap",
   alignItems: "flex-start",
   justifyContent: "space-between",
   gap: 12,
@@ -275,7 +311,6 @@ const metaPill: React.CSSProperties = {
 
 const mapBox: React.CSSProperties = {
   width: "100%",
-  height: 420,
   borderRadius: 10,
   overflow: "hidden",
   background: "rgba(0,0,0,0.18)",

@@ -6,6 +6,13 @@ import { FormEvent, useEffect, useMemo, useRef, useState, useSyncExternalStore }
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
+import {
+  TRANSPORT_EQUIPMENT_OPTIONS,
+  TRANSPORT_OPERATING_SCOPE_LABELS,
+  TRANSPORT_PROVIDER_TYPE_LABELS,
+  TRANSPORT_SERVICE_OPTIONS,
+  type TransportOptionHelp,
+} from "@/lib/transport-options";
 import styles from "./page.module.css";
 
 type Step = 1 | 2 | 3;
@@ -40,14 +47,14 @@ const initialForm: ProviderForm = {
   company: "",
   homeCity: "",
   homeState: "",
-  providerType: "independent",
-  services: ["travel_trailer", "fifth_wheel"],
-  equipment: ["heavy_duty_truck", "fifth_wheel_hitch"],
+  providerType: "",
+  services: [],
+  equipment: [],
   serviceArea: "",
-  operatingScope: "regional",
-  cdlStatus: "none",
-  insuranceStatus: "active",
-  experienceYears: "1_to_3",
+  operatingScope: "",
+  cdlStatus: "",
+  insuranceStatus: "",
+  experienceYears: "",
   notes: "",
   confirmsAccuracy: false,
   confirmsEarlyAccess: false,
@@ -70,7 +77,8 @@ function getDraftSnapshot(): string {
   if (typeof window === "undefined") return "";
   try {
     return window.sessionStorage.getItem(STORAGE_KEY) || "";
-  } catch {
+  } catch (error) {
+    console.error("Could not read provider draft:", error);
     return "";
   }
 }
@@ -84,8 +92,9 @@ function saveDraftToStorage(data: ProviderForm) {
   try {
     window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     window.dispatchEvent(new Event(DRAFT_EVENT_NAME));
-  } catch {
-    // ignore quota errors
+  } catch (error) {
+    console.error("Could not save provider draft:", error);
+    throw error;
   }
 }
 
@@ -94,8 +103,8 @@ function clearDraftFromStorage() {
   try {
     window.sessionStorage.removeItem(STORAGE_KEY);
     window.dispatchEvent(new Event(DRAFT_EVENT_NAME));
-  } catch {
-    // ignore
+  } catch (error) {
+    console.error("Could not clear submitted provider draft:", error);
   }
 }
 
@@ -106,163 +115,6 @@ const US_STATES = [
   "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
   "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"
 ] as const;
-
-type OptionHelp = {
-  definition: string;
-  example: string;
-  clarification?: string;
-};
-
-type OptionItem = {
-  id: string;
-  label: string;
-  help: OptionHelp;
-};
-
-const SERVICE_OPTIONS: readonly OptionItem[] = [
-  {
-    id: "travel_trailer",
-    label: "Travel-trailer transport",
-    help: {
-      definition: "Tow conventional bumper-pull travel trailers using a properly rated tow vehicle and hitch setup.",
-      example: "Moving a 30-foot travel trailer from an RV dealership to the owner’s seasonal campsite.",
-    },
-  },
-  {
-    id: "fifth_wheel",
-    label: "Fifth-wheel transport",
-    help: {
-      definition: "Tow RVs that connect to a fifth-wheel hitch mounted in the bed of a suitable pickup truck.",
-      example: "Relocating a 40-foot fifth wheel between an RV park in Texas and a winter site in Arizona.",
-    },
-  },
-  {
-    id: "driveaway",
-    label: "Motorhome drive-away",
-    help: {
-      definition: "A qualified driver operates the customer’s motorhome itself instead of towing it on a trailer.",
-      example: "Driving a roadworthy Class A motorhome from the owner’s home to a repair facility.",
-      clarification: "The motorhome must be legally operable and suitable for the planned trip.",
-    },
-  },
-  {
-    id: "towaway",
-    label: "Tow-away & hitch service",
-    help: {
-      definition: "The provider supplies the tow vehicle and appropriate hitch equipment to move a towable RV.",
-      example: "Picking up a bumper-pull camper from a private seller and delivering it to the buyer.",
-    },
-  },
-  {
-    id: "local_relocation",
-    label: "Local campsite & storage moves",
-    help: {
-      definition: "Short-distance RV relocation between nearby properties, campgrounds, dealerships, or storage facilities.",
-      example: "Moving a fifth wheel from a storage lot to a campsite within the same city.",
-    },
-  },
-  {
-    id: "long_distance",
-    label: "Long-distance & cross-country routes",
-    help: {
-      definition: "RV transportation across longer regional, interstate, or nationwide routes.",
-      example: "Transporting a travel trailer from Florida to Colorado.",
-    },
-  },
-  {
-    id: "non_operational",
-    label: "Non-operational / flatbed hauling",
-    help: {
-      definition: "Transport for an RV that cannot be safely driven or conventionally towed and may require a winch, flatbed, or equipment trailer.",
-      example: "Hauling a damaged camper with unsafe tires to a repair facility.",
-      clarification: "Select this only when you have suitable loading and securement equipment.",
-    },
-  },
-  {
-    id: "oversized",
-    label: "Specialized or oversized transport",
-    help: {
-      definition: "Movement of unusually wide, tall, long, or heavy RVs requiring specialized equipment or additional route planning.",
-      example: "Moving a wide-body park model that may require permits or escort coordination.",
-      clarification: "Select this only if you are appropriately equipped and qualified. Requirements vary by route and jurisdiction.",
-    },
-  },
-] as const;
-
-const EQUIPMENT_OPTIONS: readonly OptionItem[] = [
-  {
-    id: "heavy_duty_truck",
-    label: "Heavy-duty pickup / dually",
-    help: {
-      definition: "A properly rated pickup truck suitable for the RV weights and towing configuration you accept.",
-      example: "A one-ton dually configured to tow a large fifth wheel.",
-    },
-  },
-  {
-    id: "fifth_wheel_hitch",
-    label: "Fifth-wheel hitch",
-    help: {
-      definition: "An in-bed coupling system designed for fifth-wheel RV trailers.",
-      example: "A properly rated fifth-wheel hitch mounted in the bed of a pickup.",
-    },
-  },
-  {
-    id: "gooseneck",
-    label: "Gooseneck ball",
-    help: {
-      definition: "An in-bed ball coupling used for compatible gooseneck trailers or properly approved configurations.",
-      example: "Moving a trailer specifically designed for an in-bed gooseneck-ball connection.",
-      clarification: "A gooseneck ball is not automatically interchangeable with every fifth-wheel RV connection.",
-    },
-  },
-  {
-    id: "bumper_pull",
-    label: "Bumper-pull / weight distribution",
-    help: {
-      definition: "A receiver-hitch system for conventional travel trailers, sometimes using weight-distribution and sway-control equipment.",
-      example: "Towing a bumper-pull travel trailer using a rated weight-distribution hitch.",
-    },
-  },
-  {
-    id: "flatbed_trailer",
-    label: "Flatbed / equipment trailer",
-    help: {
-      definition: "A trailer capable of carrying RVs or units that cannot be moved through conventional towing.",
-      example: "Loading a non-operational camper onto a suitably rated flatbed trailer.",
-    },
-  },
-  {
-    id: "chase_vehicle",
-    label: "Escort / chase vehicle",
-    help: {
-      definition: "An additional support vehicle used when a move requires route assistance, visibility, or specialized coordination.",
-      example: "Supporting the movement of an oversized park model where legally required.",
-    },
-  },
-  {
-    id: "other",
-    label: "Other specialized gear",
-    help: {
-      definition: "Additional professional equipment used for loading, securement, safety, or uncommon RV configurations.",
-      example: "Winches, wheel straps, heavy-duty tie-downs, loading ramps, or specialized adapters.",
-      clarification: "The provider can describe this equipment in the application’s additional-information field.",
-    },
-  },
-] as const;
-
-const PROVIDER_TYPE_LABELS: Record<string, string> = {
-  independent: "Independent transporter / Hotshot driver",
-  company: "Transport company / Fleet operator",
-  driveaway: "Motorhome drive-away specialist",
-  towaway: "Tow-away / Dealership relocator",
-  other: "Other specialized transport",
-};
-
-const OPERATING_SCOPE_LABELS: Record<string, string> = {
-  intrastate: "Intrastate only (within home state)",
-  regional: "Regional & multi-state corridors",
-  nationwide: "Nationwide / Lower 48",
-};
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
@@ -290,6 +142,7 @@ export default function TransporterProviderPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const formRef = useRef<HTMLFormElement | null>(null);
+  const submitLock = useRef(false);
 
   const isMounted = useSyncExternalStore(subscribeClient, getClientSnapshot, getServerClientSnapshot);
   const rawDraft = useSyncExternalStore(subscribeDraft, getDraftSnapshot, getServerDraftSnapshot);
@@ -301,13 +154,24 @@ export default function TransporterProviderPage() {
   const savedForm = useMemo<ProviderForm>(() => {
     if (!isMounted || !rawDraft) return initialForm;
     try {
-      const parsed = JSON.parse(rawDraft) as Partial<ProviderForm>;
+      const parsed: unknown = JSON.parse(rawDraft);
+      if (!parsed || typeof parsed !== "object") throw new Error("Invalid provider draft");
+      const restored = { ...initialForm };
+      for (const key of Object.keys(initialForm) as (keyof ProviderForm)[]) {
+        if (!(key in parsed)) continue;
+        const value = (parsed as Record<string, unknown>)[key];
+        const expected = initialForm[key];
+        if (Array.isArray(expected) ? !Array.isArray(value) || !value.every(item => typeof item === "string") : typeof value !== typeof expected) {
+          throw new Error("Invalid provider draft field");
+        }
+        Object.assign(restored, { [key]: value });
+      }
       return {
-        ...initialForm,
-        ...parsed,
-        step: (parsed.step === 1 || parsed.step === 2 || parsed.step === 3 ? parsed.step : 1) as Step,
+        ...restored,
+        step: restored.step === 1 || restored.step === 2 || restored.step === 3 ? restored.step : 1,
       };
-    } catch {
+    } catch (error) {
+      console.error("Could not restore provider draft:", error);
       return initialForm;
     }
   }, [isMounted, rawDraft]);
@@ -343,32 +207,45 @@ export default function TransporterProviderPage() {
   }, [savedForm, user, isMounted]);
 
   const updateField = <K extends keyof ProviderForm>(field: K, value: ProviderForm[K]) => {
+    if (submitLock.current) return;
     const next = { ...savedForm, [field]: value };
-    saveDraftToStorage(next);
+    try { saveDraftToStorage(next); }
+    catch {
+      setStatus("error");
+      setMessage("Your browser could not save this change. Allow session storage, then try again.");
+      return false;
+    }
     setStatus("idle");
     setMessage("");
+    return true;
   };
 
   const toggleArrayItem = (field: "services" | "equipment", item: string) => {
+    if (submitLock.current) return;
     const list = savedForm[field];
     const nextList = list.includes(item)
       ? list.filter((val) => val !== item)
       : [...list, item];
     const next = { ...savedForm, [field]: nextList };
-    saveDraftToStorage(next);
+    try { saveDraftToStorage(next); }
+    catch {
+      setStatus("error");
+      setMessage("Your browser could not save this change. Allow session storage, then try again.");
+      return;
+    }
     setStatus("idle");
     setMessage("");
   };
 
   const scrollToFormTop = () => {
     if (formRef.current) {
-      formRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      formRef.current.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
     }
   };
 
   const goToStep = (nextStep: Step) => {
     if (status === "submitting") return;
-    updateField("step", nextStep);
+    if (!updateField("step", nextStep)) return;
     setStatus("idle");
     setMessage("");
     scrollToFormTop();
@@ -425,6 +302,9 @@ export default function TransporterProviderPage() {
       if (!data.homeCity.trim() || !data.homeState) return "Enter your primary base city and state.";
       if (!data.providerType) return "Select a provider category.";
       if (!data.operatingScope) return "Select an operating scope (intrastate, regional, or nationwide).";
+      if (data.name.trim().length > 100 || data.homeCity.trim().length > 100 || data.company.trim().length > 100) return "Keep name, city, and company to 100 characters or fewer.";
+      if (data.email.trim().length > 120) return "Keep email to 120 characters or fewer.";
+      if (data.phone.trim().length < 5 || data.phone.trim().length > 30) return "Use a contact phone number between 5 and 30 characters.";
       return null;
     }
 
@@ -432,6 +312,7 @@ export default function TransporterProviderPage() {
       if (data.services.length === 0) return "Select at least one transport service offered.";
       if (data.equipment.length === 0) return "Select at least one equipment capability.";
       if (!data.serviceArea.trim()) return "Describe your preferred service area or operating corridors.";
+      if (data.serviceArea.trim().length > 500) return "Keep your service area description to 500 characters or fewer.";
       return null;
     }
 
@@ -439,8 +320,9 @@ export default function TransporterProviderPage() {
       if (!data.cdlStatus) return "Select your CDL status.";
       if (!data.insuranceStatus) return "Select your commercial insurance status.";
       if (!data.experienceYears) return "Select your experience level.";
+      if (data.notes.trim().length > 2000) return "Keep notes to 2,000 characters or fewer.";
       if (!data.confirmsAccuracy || !data.confirmsEarlyAccess) {
-        return "Confirm both statements before submitting your application.";
+        return "Confirm both statements before sending your registration.";
       }
       return null;
     }
@@ -463,6 +345,7 @@ export default function TransporterProviderPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitLock.current || status === "success") return;
 
     // Validate the entire form in step order
     const step1Error = validateStep(1, formWithProfile);
@@ -488,14 +371,24 @@ export default function TransporterProviderPage() {
       return;
     }
 
-    if (authLoading) return;
-
-    if (!user) {
-      saveDraftToStorage(formWithProfile);
-      router.push(`/login?next=${encodeURIComponent("/transport/provider")}`);
+    if (authLoading) {
+      setStatus("error");
+      setMessage("Your sign-in status is still loading. Please try again shortly.");
       return;
     }
 
+    if (!user) {
+      try {
+        saveDraftToStorage(formWithProfile);
+        router.push(`/login?next=${encodeURIComponent("/transport/provider")}`);
+      } catch {
+        setStatus("error");
+        setMessage("Your browser could not save this draft for sign-in. Allow session storage, then try again.");
+      }
+      return;
+    }
+
+    submitLock.current = true;
     try {
       setStatus("submitting");
 
@@ -529,9 +422,10 @@ export default function TransporterProviderPage() {
 
       clearDraftFromStorage();
       setStatus("success");
-      setMessage("Your transporter profile has been received. You are now registered for RVNB Transport Network early onboarding.");
+      setMessage("Thanks—your provider information is recorded for future network planning. You can review it in My Account. It does not create a public listing or guarantee work.");
       scrollToFormTop();
     } catch (err) {
+      submitLock.current = false;
       console.error("Provider submission failed:", err);
       setStatus("error");
       setMessage("Could not submit your provider profile right now. Please check your connection and try again.");
@@ -540,12 +434,12 @@ export default function TransporterProviderPage() {
 
   // Summary labels for Step 3 review
   const selectedServicesText = useMemo(() => {
-    const list = SERVICE_OPTIONS.filter((s) => formWithProfile.services.includes(s.id)).map((s) => s.label);
+    const list = TRANSPORT_SERVICE_OPTIONS.filter((s) => formWithProfile.services.includes(s.id)).map((s) => s.label);
     return list.length > 0 ? list.join(", ") : "";
   }, [formWithProfile.services]);
 
   const selectedEquipmentText = useMemo(() => {
-    const list = EQUIPMENT_OPTIONS.filter((e) => formWithProfile.equipment.includes(e.id)).map((e) => e.label);
+    const list = TRANSPORT_EQUIPMENT_OPTIONS.filter((e) => formWithProfile.equipment.includes(e.id)).map((e) => e.label);
     return list.length > 0 ? list.join(", ") : "";
   }, [formWithProfile.equipment]);
 
@@ -568,16 +462,16 @@ export default function TransporterProviderPage() {
             <div className={styles.heroCopy}>
               <div className={styles.earlyAccessBadge}>
                 <span className={styles.badgeDot} aria-hidden="true" />
-                <span>Early Access • Transporter Onboarding</span>
+                <span>Early Access • Provider Interest</span>
               </div>
               <p className={styles.kicker}>RVNB TRANSPORT NETWORK</p>
-              <h1>Put your rig, route, and hauling capacity on the map.</h1>
+              <h1>Tell us how you move RVs.</h1>
               <p className={styles.heroLead}>
-                Join the developing RVNB Transport Network. Connect with RV owners, employers, and hosts who need trusted equipment movement across local corridors and national lanes.
+                Share your services, equipment, and operating areas to express interest in the developing RVNB transport network. Your registration is private and does not verify credentials, guarantee work, or guarantee a response time.
               </p>
               <div className={styles.heroActions}>
                 <a className={styles.primaryButton} href="#onboard-form">
-                  Join the Transport Network
+                  Register as a transport provider
                 </a>
                 <a className={styles.secondaryButton} href="#how-it-works">
                   How It Works
@@ -591,7 +485,7 @@ export default function TransporterProviderPage() {
                   <span className={styles.badgeDot} aria-hidden="true" />
                   <span>Example Transport Lanes</span>
                 </span>
-                <span>Demand-First Matching</span>
+                <span>Illustration only · Not live demand</span>
               </div>
               <div className={styles.hudLanes}>
                 <div className={styles.hudLane}>
@@ -614,8 +508,8 @@ export default function TransporterProviderPage() {
                 </div>
               </div>
               <div className={styles.hudFooter}>
-                <span>Verified equipment readiness</span>
-                <span>Direct customer coordination</span>
+                <span>Self-reported equipment</span>
+                <span>Illustration only · Not live demand</span>
               </div>
             </div>
           </div>
@@ -624,42 +518,42 @@ export default function TransporterProviderPage() {
         {/* TRANSPORTER BENEFITS */}
         <section className={styles.section} aria-labelledby="benefits-heading">
           <div className={styles.sectionIntro}>
-            <p className={styles.kicker}>WHY JOIN RVNB TRANSPORT</p>
-            <h2 id="benefits-heading">Built around real RV movement and driver lanes.</h2>
+            <p className={styles.kicker}>SHARE YOUR EXPERIENCE</p>
+            <h2 id="benefits-heading">Tell us where and how you work.</h2>
             <p>
-              Rather than scrolling generic freight boards, RVNB is designing route-aligned RV movement so qualified haulers and drivers can maximize their active lanes.
+              We are exploring how route and service-area information could help RV transport providers and travelers in the future.
             </p>
           </div>
           <div className={styles.benefitsGrid}>
             <article className={styles.benefitCard}>
               <div className={styles.benefitIcon} aria-hidden="true"><RouteIcon /></div>
-              <h3>Discover RV Transport Demand</h3>
-              <p>Gain visibility into real move requests from travelers, seasonal workers, campground hosts, and employers.</p>
+              <h3>Help us understand demand</h3>
+              <p>Your registration helps us learn where RV transport services may be needed.</p>
             </article>
             <article className={styles.benefitCard}>
               <div className={styles.benefitIcon} aria-hidden="true"><CompassIcon /></div>
-              <h3>Choose Preferred Routes</h3>
-              <p>Specify the exact regions, interstate corridors, or local radiuses you want to operate within.</p>
+              <h3>Share your service area</h3>
+              <p>Share the regions, routes, or local areas where you prefer to work.</p>
             </article>
             <article className={styles.benefitCard}>
               <div className={styles.benefitIcon} aria-hidden="true"><ShieldCheckIcon /></div>
-              <h3>Build a Trusted Profile</h3>
-              <p>Showcase equipment capabilities, towing ratings, and experience to stand out with rig owners.</p>
+              <h3>Share Your Capabilities</h3>
+              <p>Record equipment and experience privately. This does not create a public profile or verify your details.</p>
             </article>
             <article className={styles.benefitCard}>
               <div className={styles.benefitIcon} aria-hidden="true"><CalendarIcon /></div>
-              <h3>Organized Availability</h3>
-              <p>Keep your active lanes, travel schedules, and empty deadhead capacity visible for route matching.</p>
+              <h3>Share preferred routes</h3>
+              <p>Share the routes and areas where you prefer to operate.</p>
             </article>
             <article className={styles.benefitCard}>
               <div className={styles.benefitIcon} aria-hidden="true"><UserGroupIcon /></div>
-              <h3>Direct Rig Owner Connection</h3>
-              <p>Align pickup schedules, site drop-offs, and staging directly with clear customer context.</p>
+              <h3>Plan future moves directly</h3>
+              <p>Any future move would need to be arranged directly between provider and customer.</p>
             </article>
             <article className={styles.benefitCard}>
               <div className={styles.benefitIcon} aria-hidden="true"><LockIcon /></div>
-              <h3>Early Network Access</h3>
-              <p>Registered providers receive first review when formal carrier verification and matching open.</p>
+              <h3>Register your interest</h3>
+              <p>Register interest. Approval, work assignments, and earnings are not guaranteed.</p>
             </article>
           </div>
         </section>
@@ -667,9 +561,9 @@ export default function TransporterProviderPage() {
         {/* HOW IT WORKS */}
         <section className={styles.section} id="how-it-works" aria-labelledby="how-it-works-heading">
           <div className={styles.sectionIntro}>
-            <p className={styles.kicker}>HOW ONBOARDING WORKS</p>
+            <p className={styles.kicker}>WHAT TO EXPECT</p>
             <h2 id="how-it-works-heading">From initial intake to future route coordination.</h2>
-            <p>The network is launching in structured phases to ensure verified readiness and safety on every move.</p>
+            <p>Share your details and equipment now. The later steps describe possible future plans.</p>
           </div>
           <div className={styles.stepsGrid}>
             <article className={styles.stepCard}>
@@ -685,17 +579,17 @@ export default function TransporterProviderPage() {
             <article className={styles.stepCard}>
               <span className={styles.stepNumber}>03</span>
               <h3>Future Verification</h3>
-              <p>Complete license, insurance, and operating documentation as verification opens.</p>
+              <p>Credential and insurance checks may be considered later; this form does not verify them.</p>
             </article>
             <article className={styles.stepCard}>
               <span className={styles.stepNumber}>04</span>
               <h3>Discover Routes</h3>
-              <p>Receive route-matched transport requests matching your preferred lanes.</p>
+              <p>Route information and provider tools are possible future plans, not live services.</p>
             </article>
             <article className={styles.stepCard}>
               <span className={styles.stepNumber}>05</span>
               <h3>Coordinate Delivery</h3>
-              <p>Align timing, access logistics, and handoff directly with the customer.</p>
+              <p>Providers and customers would arrange any future move directly.</p>
             </article>
           </div>
         </section>
@@ -705,28 +599,28 @@ export default function TransporterProviderPage() {
           <div className={styles.sectionIntro}>
             <p className={styles.kicker}>SERVICES & EQUIPMENT</p>
             <h2 id="capabilities-heading">Movement support for diverse RV classifications.</h2>
-            <p>We are welcoming providers with specialized equipment across all major recreational and workforce housing classes.</p>
+            <p>Share which services and equipment describe your work. Suitability depends on the RV, route, and provider equipment.</p>
           </div>
           <div className={styles.capabilitiesGrid}>
             <article className={styles.capabilityCard}>
               <span className={styles.capabilityPill} aria-hidden="true" />
               <h3>Travel Trailers</h3>
-              <p>Bumper-pull, weight-distribution, and sway-control setups for standard trailers.</p>
+              <p>Tow-away support for travel trailers, depending on the vehicle, setup, route, and provider equipment.</p>
             </article>
             <article className={styles.capabilityCard}>
               <span className={styles.capabilityPill} aria-hidden="true" />
               <h3>Fifth Wheels</h3>
-              <p>Heavy-duty fifth-wheel and gooseneck hitch capabilities for luxury and multi-slide rigs.</p>
+              <p>Tow-away support for fifth wheels, depending on the hitch, setup, route, and provider equipment.</p>
             </article>
             <article className={styles.capabilityCard}>
               <span className={styles.capabilityPill} aria-hidden="true" />
               <h3>Motorhome Drive-Away</h3>
-              <p>Qualified, insured drivers for Class A, Class B, and Class C motorized relocations.</p>
+              <p>Drive-away moves for operable motorhomes, arranged directly with a suitable provider.</p>
             </article>
             <article className={styles.capabilityCard}>
               <span className={styles.capabilityPill} aria-hidden="true" />
               <h3>Tow-Away Service</h3>
-              <p>Direct tow-away delivery for dealer inventory, private owners, and camp staging.</p>
+              <p>Tow-away moves for compatible trailers and fifth wheels.</p>
             </article>
             <article className={styles.capabilityCard}>
               <span className={styles.capabilityPill} aria-hidden="true" />
@@ -741,12 +635,12 @@ export default function TransporterProviderPage() {
             <article className={styles.capabilityCard}>
               <span className={styles.capabilityPill} aria-hidden="true" />
               <h3>Non-Operational Rigs</h3>
-              <p>Flatbed or winch-equipped transport for unready, damaged, or stored trailers.</p>
+              <p>Trailer or flatbed transport may suit some non-operational RVs, depending on condition and equipment.</p>
             </article>
             <article className={styles.capabilityCard}>
               <span className={styles.capabilityPill} aria-hidden="true" />
               <h3>Specialized / Oversized</h3>
-              <p>Park models, tiny homes, and wide-body workforce housing units where qualified.</p>
+              <p>Some larger units may need specialized equipment and a provider familiar with the configuration.</p>
             </article>
           </div>
         </section>
@@ -754,22 +648,21 @@ export default function TransporterProviderPage() {
         {/* TRUST & READINESS EXPECTATIONS */}
         <section className={styles.section} aria-labelledby="trust-heading">
           <div className={styles.sectionIntro}>
-            <p className={styles.kicker}>TRUST, SAFETY & READINESS</p>
-            <h2 id="trust-heading">General onboarding expectations.</h2>
-            <p>To ensure high standards across the ecosystem, providers will be expected to demonstrate readiness in key operational areas.</p>
+            <p className={styles.kicker}>BEFORE A MOVE</p>
+            <h2 id="trust-heading">Details to confirm with a provider.</h2>
+            <p>Before agreeing to a move, discuss safe handling and applicable requirements directly with the provider.</p>
           </div>
           <div className={styles.trustPanel}>
             <ul className={styles.trustList}>
-              <li><strong>Valid Driver Information:</strong> Appropriate driver’s licensing, CDL where applicable for gross vehicle weight ratings.</li>
-              <li><strong>Current Insurance Coverage:</strong> Commercial auto liability, cargo protection, or verified towing insurance riders.</li>
-              <li><strong>Rated Equipment:</strong> Correctly rated hitches, brake controllers, safety chains, breakaways, and tires.</li>
-              <li><strong>Regulatory Compliance:</strong> Willingness to adhere to applicable federal (DOT/FMCSA), state, and municipal regulations.</li>
-              <li><strong>Clear Communication:</strong> Commitment to transparent scheduling, pre-trip inspections, and customer handoffs.</li>
+              <li><strong>Requirements:</strong> Confirm applicable licensing and requirements for the service and route.</li>
+              <li><strong>Insurance:</strong> Discuss coverage and exclusions directly with the customer and insurer. Intake answers are self-reported, not verified.</li>
+              <li><strong>Equipment:</strong> Confirm equipment is suitable for the RV and route.</li>
+              <li><strong>Handoff:</strong> Agree on timing, condition documentation, access, and delivery details.</li>
             </ul>
             <div className={styles.disclaimerBox}>
-              <strong>Onboarding Note & Disclaimer</strong>
+              <strong>Before making arrangements</strong>
               <p>
-                Requirements vary depending on vehicle weight, equipment, jurisdictional boundaries (intrastate vs. interstate), and service type. Submitting this early-access form expresses interest and does not guarantee formal carrier verification, platform approval, or job assignments.
+                Requirements vary by RV, equipment, route, and service. This early-access registration does not verify credentials, approve a provider, or guarantee work.
               </p>
             </div>
           </div>
@@ -780,10 +673,13 @@ export default function TransporterProviderPage() {
           {status === "success" ? (
             <div className={styles.successPanel} aria-live="polite">
               <span className={styles.successMark} aria-hidden="true">✓</span>
-              <h2>Transporter Profile Received</h2>
+              <h2>Registration received</h2>
               <p>{message}</p>
               <Link href="/transport" className={styles.primaryButton}>
                 Return to Transport Hub
+              </Link>{" "}
+              <Link href="/account" className={styles.secondaryButton}>
+                View in My Account
               </Link>
             </div>
           ) : (
@@ -793,8 +689,9 @@ export default function TransporterProviderPage() {
               onSubmit={formWithProfile.step === 3 ? handleSubmit : handleContinue}
               noValidate
             >
+              <fieldset className={styles.formFields} disabled={status === "submitting"} aria-busy={status === "submitting"}>
               {/* COMPACT PROGRESS INDICATOR */}
-              <nav className={styles.stepperNav} aria-label="Transporter application progress">
+              <nav className={styles.stepperNav} aria-label="Transport provider registration progress">
                 <div className={styles.stepperHeader}>
                   <span className={styles.stepperCounter}>
                     Section {formWithProfile.step} of 3 • {completedCount} of 3 complete
@@ -811,14 +708,14 @@ export default function TransporterProviderPage() {
                   aria-valuenow={completedCount}
                   aria-valuemin={0}
                   aria-valuemax={3}
-                  aria-label="Application completion progress"
+                  aria-label="Registration completion progress"
                 >
                   <div
                     className={styles.progressBar}
                     style={{ width: `${progressPercent}%` }}
                   />
                 </div>
-                <div className={styles.stepPills} role="tablist" aria-label="Application sections">
+                <div className={styles.stepPills} role="tablist" aria-label="Registration sections">
                   <button
                     type="button"
                     role="tab"
@@ -865,7 +762,7 @@ export default function TransporterProviderPage() {
                   </button>
                 </div>
                 <p className={styles.stepperHint}>
-                  Feel free to review all three sections before completing your application.
+                  Review your details before sending your registration.
                 </p>
               </nav>
 
@@ -997,7 +894,7 @@ export default function TransporterProviderPage() {
                   <fieldset className={styles.fieldset}>
                     <legend>Services offered (select all that apply) <span className={styles.required}>Required</span></legend>
                     <div className={styles.checkGroup}>
-                      {SERVICE_OPTIONS.map((srv) => {
+                      {TRANSPORT_SERVICE_OPTIONS.map((srv) => {
                         const isSelected = formWithProfile.services.includes(srv.id);
                         return (
                           <label
@@ -1026,7 +923,7 @@ export default function TransporterProviderPage() {
                   <fieldset className={styles.fieldset}>
                     <legend>Equipment & setup capabilities (select all that apply) <span className={styles.required}>Required</span></legend>
                     <div className={styles.checkGroup}>
-                      {EQUIPMENT_OPTIONS.map((eq) => {
+                      {TRANSPORT_EQUIPMENT_OPTIONS.map((eq) => {
                         const isSelected = formWithProfile.equipment.includes(eq.id);
                         return (
                           <label
@@ -1072,8 +969,8 @@ export default function TransporterProviderPage() {
                 <div>
                   <div className={styles.stepIntro}>
                     <p className={styles.kicker}>STEP 03 / READINESS & SUBMIT</p>
-                    <h2 id="form-heading">Review & Confirm Readiness</h2>
-                    <p>Review your details and share your operating readiness before submitting.</p>
+                    <h2 id="form-heading">Review your details</h2>
+                    <p>Check your information before sending it privately for future planning.</p>
                   </div>
 
                   {/* COMPACT REVIEW SUMMARY */}
@@ -1087,7 +984,7 @@ export default function TransporterProviderPage() {
                           {formWithProfile.homeCity.trim() && formWithProfile.homeState
                             ? `${formWithProfile.homeCity.trim()}, ${formWithProfile.homeState}`
                             : "Base location not selected yet"}{" "}
-                          • {PROVIDER_TYPE_LABELS[formWithProfile.providerType] || "Classification not selected yet"}
+                          • {TRANSPORT_PROVIDER_TYPE_LABELS[formWithProfile.providerType] || "Classification not selected yet"}
                         </p>
                       </div>
                       <button
@@ -1103,7 +1000,7 @@ export default function TransporterProviderPage() {
                       <div className={styles.reviewInfo}>
                         <h4>Services & Operating Scope</h4>
                         <p>
-                          <strong>Scope:</strong> {OPERATING_SCOPE_LABELS[formWithProfile.operatingScope] || "Scope not selected yet"}<br />
+                          <strong>Scope:</strong> {TRANSPORT_OPERATING_SCOPE_LABELS[formWithProfile.operatingScope] || "Scope not selected yet"}<br />
                           <strong>Services:</strong> {selectedServicesText || "No services selected yet"}<br />
                           <strong>Equipment:</strong> {selectedEquipmentText || "No equipment selected yet"}<br />
                           <strong>Lanes:</strong> {formWithProfile.serviceArea.trim() || "Operating lanes not provided yet"}
@@ -1193,7 +1090,7 @@ export default function TransporterProviderPage() {
                         onChange={(e) => updateField("confirmsEarlyAccess", e.target.checked)}
                       />
                       <span>
-                        I understand that this is an early-access onboarding intake and does not guarantee verification approval, customer matches, or earnings.
+                        I understand that this is early-access registration. My information is self-reported and does not guarantee verification, work, or earnings.
                       </span>
                     </label>
                   </div>
@@ -1238,16 +1135,17 @@ export default function TransporterProviderPage() {
                     className={styles.primaryButton}
                     disabled={status === "submitting"}
                   >
-                    {status === "submitting" ? "Submitting Application..." : "Submit Early-Access Application"}
+                    {status === "submitting" ? "Sending registration..." : "Send provider registration"}
                   </button>
                 )}
               </div>
 
               {formWithProfile.step === 3 && (
                 <p className={styles.reassuranceNote}>
-                  Submitting expresses interest in joining the RVNB Transport Network. It does not guarantee approval, job access, or earnings.
+                  Submitting records your interest for future planning. It does not guarantee verification or work.
                 </p>
               )}
+              </fieldset>
             </form>
           )}
         </section>
@@ -1324,7 +1222,7 @@ function OptionHelpButton({
 }: {
   id: string;
   title: string;
-  help: OptionHelp;
+  help: TransportOptionHelp;
   activeId: string | null;
   onToggle: (id: string) => void;
 }) {

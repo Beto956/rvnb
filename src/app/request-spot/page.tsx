@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import React, { CSSProperties, useEffect, useId, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import React, { CSSProperties, Suspense, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { addDoc, collection, doc, getDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import styles from "./page.module.css";
@@ -315,7 +315,7 @@ function SelectMenu<T extends string>({
   );
 }
 
-export default function RequestSpotPage() {
+function RequestSpotContent({ requestId }: { requestId: string }) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
 
@@ -361,6 +361,86 @@ export default function RequestSpotPage() {
 
   const [requestSaving, setRequestSaving] = useState(false);
   const [requestMsg, setRequestMsg] = useState("");
+  const [draftLoading, setDraftLoading] = useState(Boolean(requestId));
+  const [draftError, setDraftError] = useState("");
+  const [draftAttempt, setDraftAttempt] = useState(0);
+  const savedRequestId = useRef(requestId);
+
+  useEffect(() => {
+    let active = true;
+    if (!requestId || authLoading) return;
+    if (!user) {
+      setDraftLoading(false);
+      setDraftError("Please sign in to continue your draft.");
+      return;
+    }
+    setDraftLoading(true);
+    setDraftError("");
+    async function loadDraft() {
+      try {
+        const snapshot = await getDoc(doc(db, "spotRequests", requestId));
+        if (!active) return;
+        if (!snapshot.exists()) throw new Error("This draft could not be found.");
+        const data = snapshot.data();
+        if (data.requesterId !== user?.uid) throw new Error("You are not authorized to edit this draft.");
+        if (data.status !== "draft" || data.isFinalized !== false) throw new Error("This request is not an editable draft. View it in My Requests.");
+        function choice<T extends string>(value: unknown, options: readonly T[], fallback: T): T {
+          return options.find((option) => option === value) ?? fallback;
+        }
+        function text(value: unknown) { return typeof value === "string" ? value : ""; }
+        function count(value: unknown) { return typeof value === "number" ? String(value) : ""; }
+        const primary = data.primaryRv ?? {};
+        setRequestType(choice(data.requestType, ["Personal Travel", "Work Stay", "Employer / Team Housing"] as const, "Personal Travel"));
+        setLocationText(text(data.locationText) || text(data.city));
+        setStateCode(text(data.state));
+        setArrivalDate(text(data.startDate));
+        setDepartureDate(text(data.endDate));
+        setFlexibleDates(data.flexibleDates === true);
+        setEmployerName(text(data.employerName));
+        setWorkGroupName(text(data.teamName));
+        setEmployerProjectName(text(data.teamName));
+        setWorkLocation(text(data.teamLocation));
+        setEmployerJobsiteArea(text(data.teamLocation));
+        setRepresentativeRole(text(data.representativeRole));
+        setWorkersCount(count(data.workersCount));
+        setRigsCount(count(data.rigsCount));
+        setSpotsNeeded(count(data.spotsNeeded));
+        setSeparateSpotsNeeded(data.separateSpotsNeeded === true ? "Yes" : "No");
+        setSingleCoordinator(data.singleCoordinator === true ? "Yes" : "No");
+        setStayDurationType(choice(data.stayDurationType, ["Short-term", "Long-term"] as const, "Long-term"));
+        setRigType(choice(primary.rigType, rigTypeOptions, "5th Wheel"));
+        setRigLength(text(primary.rigLength));
+        setHookupsPreference(choice(primary.hookupsPreference, hookupsOptions, "Any"));
+        setPullThroughPreference(choice(primary.pullThroughPreference, pullThroughOptions, "Any"));
+        setLaundryNeed(choice(primary.laundryNeed, laundryOptions, "Any"));
+        setPetsTraveling(primary.petsTraveling === true);
+        setMoreThanOneRv(data.moreThanOneRv === true);
+        setAdditionalRvs(Array.isArray(data.additionalRvs) ? data.additionalRvs.map((rv: Record<string, unknown>, index: number) => ({
+          id: `loaded-rv-${index}`,
+          rigType: choice(rv.rigType, rigTypeOptions, "Travel Trailer"),
+          rigLength: text(rv.rigLength),
+          hookupsPreference: choice(rv.hookupsPreference, hookupsOptions, "Any"),
+          pullThroughPreference: choice(rv.pullThroughPreference, pullThroughOptions, "Any"),
+          laundryNeed: choice(rv.laundryNeed, laundryOptions, "Any"),
+          petsTraveling: rv.petsTraveling === true,
+        })) : []);
+        setBudgetAmount(count(data.budgetMax));
+        setBudgetPeriod(choice(data.budgetPeriod, budgetPeriodOptions, "Month"));
+        setNotes(text(data.note));
+      } catch (error) {
+        console.error("[RVNB] Draft continuation failed", error);
+        if (active) setDraftError(
+          error && typeof error === "object" && "code" in error && error.code === "permission-denied"
+            ? "This draft is unavailable or you are not authorized to edit it."
+            : error instanceof Error ? error.message : "Could not load your draft."
+        );
+      } finally {
+        if (active) setDraftLoading(false);
+      }
+    }
+    loadDraft();
+    return () => { active = false; };
+  }, [requestId, authLoading, user, draftAttempt]);
 
   const notesCount = useMemo(() => notes.length, [notes]);
 
@@ -400,6 +480,7 @@ export default function RequestSpotPage() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (requestSaving || draftLoading || draftError) return;
     setRequestMsg("");
 
     const cleanLocation = locationText.trim().slice(0, 80);
@@ -454,7 +535,7 @@ export default function RequestSpotPage() {
 
     if (!user) {
       setRequestMsg("Please sign in before starting a request.");
-      router.push(`/login?next=${encodeURIComponent("/request-spot")}`);
+      router.push(`/login?next=${encodeURIComponent(requestId ? `/request-spot?requestId=${requestId}` : "/request-spot")}`);
       return;
     }
 
@@ -484,12 +565,11 @@ export default function RequestSpotPage() {
     setRequestSaving(true);
 
     try {
-      const docRef = await addDoc(collection(db, "spotRequests"), {
+      const draftFields = {
         requesterId: user.uid,
         publicVersion: 2,
         status: "draft",
         isFinalized: false,
-        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
 
         requestType,
@@ -530,10 +610,26 @@ export default function RequestSpotPage() {
         rvDetails,
         note: cleanNotes,
 
-      });
+      };
+      let id = savedRequestId.current;
+      if (id) {
+        const requestRef = doc(db, "spotRequests", id);
+        await runTransaction(db, async (transaction) => {
+          const snapshot = await transaction.get(requestRef);
+          if (!snapshot.exists()) throw new Error("This draft could not be found.");
+          const current = snapshot.data();
+          if (current.requesterId !== user.uid) throw new Error("You are not authorized to edit this draft.");
+          if (current.status !== "draft" || current.isFinalized !== false) throw new Error("This request is no longer an editable draft.");
+          transaction.update(requestRef, draftFields);
+        });
+      } else {
+        const created = await addDoc(collection(db, "spotRequests"), { ...draftFields, createdAt: serverTimestamp() });
+        id = created.id;
+        savedRequestId.current = id;
+      }
 
       setRequestMsg("✅ Request submitted successfully.");
-      router.push(`/request-spot/details?requestId=${docRef.id}`);
+      router.push(`/request-spot/details?requestId=${encodeURIComponent(id)}`);
 
       setRequestType("Personal Travel");
       setLocationText("");
@@ -570,7 +666,7 @@ export default function RequestSpotPage() {
       setNotes("");
     } catch (error) {
       console.error(error);
-      setRequestMsg("❌ Could not submit request. Please try again.");
+      setRequestMsg(error instanceof Error ? error.message : "Could not save request. Please try again.");
     } finally {
       setRequestSaving(false);
     }
@@ -578,6 +674,16 @@ export default function RequestSpotPage() {
 
   const requestTypeHelper =
     requestTypeHints[requestType];
+
+  if (requestId && (draftLoading || draftError)) {
+    return <main className={styles.page}><div className={styles.pageInner}><section className={styles.shell}>
+      {draftLoading ? <p role="status">Loading your draft...</p> : <div role="alert"><h1>Draft unavailable</h1><p>{draftError}</p>
+        <button type="button" onClick={() => setDraftAttempt((value) => value + 1)}>Retry draft</button>
+        {!user && <p><Link href={`/login?next=${encodeURIComponent(`/request-spot?requestId=${requestId}`)}`}>Sign in</Link></p>}
+      </div>}
+      <p><Link href="/account/requests">My Requests</Link></p>
+    </section></div></main>;
+  }
 
   return (
     <main className={styles.page}>
@@ -1207,13 +1313,13 @@ export default function RequestSpotPage() {
               <div className={styles.countRow}>{notesCount}/500</div>
             </section>
 
-            {requestMsg ? <div style={statusBox}>{requestMsg}</div> : null}
+            {requestMsg ? <div style={statusBox} role="status">{requestMsg}</div> : null}
 
             <div className={styles.submitWrap}>
               <button
                 type="submit"
                 className={styles.submitButton}
-                disabled={requestSaving}
+                disabled={requestSaving || draftLoading || Boolean(draftError)}
                 style={{ opacity: requestSaving ? 0.75 : 1 }}
               >
                 {requestSaving ? "Saving..." : "Continue Request"}
@@ -1246,4 +1352,15 @@ export default function RequestSpotPage() {
       </div>
     </main>
   );
+}
+
+function RequestSpotRoute() {
+  const params = useSearchParams();
+  const { user } = useAuth();
+  const requestId = params.get("requestId")?.trim() || "";
+  return <RequestSpotContent key={`${user?.uid || "anonymous"}:${requestId}`} requestId={requestId} />;
+}
+
+export default function RequestSpotPage() {
+  return <Suspense fallback={<p role="status">Loading request form...</p>}><RequestSpotRoute /></Suspense>;
 }

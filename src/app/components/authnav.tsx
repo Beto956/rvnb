@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 
 type AuthNavProps = {
@@ -16,6 +16,7 @@ export default function AuthNav({
   navLogoutClassName = "",
 }: AuthNavProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, loading, logout } = useAuth();
 
   async function handleLogout() {
@@ -47,6 +48,9 @@ export default function AuthNav({
 
   return (
     <>
+      <Link className={navLinkClassName} href="/account/requests" aria-current={pathname === "/account/requests" ? "page" : undefined}>
+        My Requests
+      </Link>
       <Link className={navLinkClassName} href="/host">
         Host Dashboard
       </Link>

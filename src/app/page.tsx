@@ -5,6 +5,8 @@ import HomeQuickSearchBar from "./components/homequicksearchbar";
 import FeaturedListingsPreview from "./components/featuredlistingspreview";
 import AuthNav from "./components/authnav";
 import EcosystemNav from "./components/ecosystemnav";
+import HostGrowthIntro from "./components/HostGrowthIntro";
+import UniqueStaysIntro from "./components/UniqueStaysIntro";
 
 const journeyCards = [
   {
@@ -100,17 +102,6 @@ export default function Home() {
               RVNB connects travelers looking for practical RV stays with hosts who have usable space, plus a growing hub for requests, transport, insurance guidance, and community.
             </p>
 
-            <div className={styles.heroActions} aria-label="Primary RVNB actions">
-              <Link href="/search" className={styles.primaryCta}>
-                Find a stay
-              </Link>
-              <Link href="/request-spot" className={styles.secondaryCta}>
-                Request a spot
-              </Link>
-              <Link href="/host" className={styles.tertiaryCta}>
-                List a property
-              </Link>
-            </div>
           </div>
 
           <aside className={styles.heroPanel} aria-label="RVNB quick paths">
@@ -152,6 +143,8 @@ export default function Home() {
             <Link href="/listings" className={styles.sectionAction}>View all listings</Link>
           </div>
           <FeaturedListingsPreview limitCount={3} />
+          <UniqueStaysIntro />
+          <HostGrowthIntro />
         </div>
       </section>
 
