@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useJsApiLoader } from "@react-google-maps/api";
+import styles from "./listingsMapPanel.module.css";
+import { hasListingCoordinates } from "@/lib/listing-location";
 
 type MapListing = {
   id: string;
   title: string;
   city: string;
   state: string;
-  displayPriceValue: number;
+  displayPriceValue: number | null;
   displayPriceLabel: string;
   lat?: number;
   lng?: number;
@@ -15,21 +18,13 @@ type MapListing = {
 
 type Props = {
   listings: MapListing[];
+  selection?: { id: string; sequence: number };
 };
 
 type GoogleMapInstance = google.maps.Map;
 type GoogleMarkerInstance = google.maps.Marker;
 type GoogleInfoWindowInstance = google.maps.InfoWindow;
 type GoogleLatLngBounds = google.maps.LatLngBounds;
-
-function hasValidCoords(listing: MapListing) {
-  return (
-    typeof listing.lat === "number" &&
-    Number.isFinite(listing.lat) &&
-    typeof listing.lng === "number" &&
-    Number.isFinite(listing.lng)
-  );
-}
 
 function escapeHtml(value: string) {
   return value
@@ -40,30 +35,36 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#039;");
 }
 
-export default function ListingsMapPanel({ listings }: Props) {
-  const mapRef = useRef<HTMLDivElement | null>(null);
+export default function ListingsMapPanel({ listings, selection }: Props) {
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+  const { isLoaded, loadError } = useJsApiLoader({
+    id: "rvnb-google-maps",
+    googleMapsApiKey: apiKey,
+  });
+
+  const [mapNode, setMapNode] = useState<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<GoogleMapInstance | null>(null);
   const markersRef = useRef<GoogleMarkerInstance[]>([]);
   const infoWindowRef = useRef<GoogleInfoWindowInstance | null>(null);
 
-  const [mapReady, setMapReady] = useState(false);
-
   const mappableListings = useMemo(() => {
-    return listings.filter(hasValidCoords);
+    return listings.filter(hasListingCoordinates);
   }, [listings]);
+
+  const mapReady = Boolean(apiKey) && isLoaded && !loadError;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!mapRef.current) return;
+    if (!isLoaded) return;
+    if (!mapNode) return;
 
     const googleMaps = window.google?.maps;
     if (!googleMaps) {
-      setMapReady(false);
       return;
     }
 
     if (!mapInstanceRef.current) {
-      mapInstanceRef.current = new googleMaps.Map(mapRef.current, {
+      mapInstanceRef.current = new googleMaps.Map(mapNode, {
         center: { lat: 31.9686, lng: -99.9018 }, // Texas-centered fallback
         zoom: 5,
         mapTypeControl: false,
@@ -75,9 +76,7 @@ export default function ListingsMapPanel({ listings }: Props) {
 
       infoWindowRef.current = new googleMaps.InfoWindow();
     }
-
-    setMapReady(true);
-  }, []);
+  }, [isLoaded, mapNode]);
 
   useEffect(() => {
     const googleMaps = window.google?.maps;
@@ -125,7 +124,8 @@ export default function ListingsMapPanel({ listings }: Props) {
               ${escapeHtml(listing.city)}, ${escapeHtml(listing.state)}
             </div>
             <div style="margin-top:8px;font-size:14px;font-weight:700;">
-              $${listing.displayPriceValue} / ${escapeHtml(listing.displayPriceLabel)}
+              ${listing.displayPriceValue === null ? "Rate not provided" : `$${listing.displayPriceValue}`}
+              ${listing.displayPriceLabel ? `/ ${escapeHtml(listing.displayPriceLabel)}` : "Billing period not provided"}
             </div>
             <a
               href="/listings/${encodeURIComponent(listing.id)}"
@@ -163,7 +163,43 @@ export default function ListingsMapPanel({ listings }: Props) {
     } else {
       map.fitBounds(bounds, 60);
     }
-  }, [mappableListings]);
+  }, [mappableListings, isLoaded, mapNode]);
+
+  useEffect(() => {
+    if (!selection || !mapReady) return;
+    const index = mappableListings.findIndex(listing => listing.id === selection.id);
+    const marker = markersRef.current[index];
+    const map = mapInstanceRef.current;
+    const position = marker?.getPosition();
+    if (!map || !marker || !position) return;
+    map.panTo(position);
+    map.setZoom(12);
+    window.google.maps.event.trigger(marker, "click");
+  }, [selection, mapReady, mapNode, mappableListings]);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const googleMaps = window.google?.maps;
+    if (!map || !googleMaps || !mapNode) return;
+
+    const observer = new ResizeObserver(() => {
+      if (!mapNode.clientWidth || !mapNode.clientHeight) return;
+      const center = map.getCenter();
+      googleMaps.event.trigger(map, "resize");
+      if (markersRef.current.length > 1) {
+        const bounds = new googleMaps.LatLngBounds();
+        markersRef.current.forEach(marker => {
+          const position = marker.getPosition();
+          if (position) bounds.extend(position);
+        });
+        map.fitBounds(bounds, 40);
+      } else if (center) {
+        map.setCenter(center);
+      }
+    });
+    observer.observe(mapNode);
+    return () => observer.disconnect();
+  }, [isLoaded, mapNode]);
 
   return (
     <div style={wrap}>
@@ -178,11 +214,25 @@ export default function ListingsMapPanel({ listings }: Props) {
         </div>
       </div>
 
-      {!mapReady ? (
+      {!apiKey ? (
         <div style={fallbackBox}>
-          <div style={fallbackTitle}>Map not ready yet</div>
+          <div style={fallbackTitle}>Map key missing</div>
           <div style={fallbackText}>
-            This panel is waiting for Google Maps to load. Your listing cards still work normally.
+            Listing cards are available. Add a Google Maps API key to enable the map preview.
+          </div>
+        </div>
+      ) : loadError ? (
+        <div style={fallbackBox}>
+          <div style={fallbackTitle}>Map unavailable</div>
+          <div style={fallbackText}>
+            Google Maps could not load. Listing cards are still available below.
+          </div>
+        </div>
+      ) : !mapReady ? (
+        <div style={fallbackBox}>
+          <div style={fallbackTitle}>Loading map</div>
+          <div style={fallbackText}>
+            Preparing the location preview for mapped listings.
           </div>
         </div>
       ) : null}
@@ -197,7 +247,8 @@ export default function ListingsMapPanel({ listings }: Props) {
       ) : null}
 
       <div
-        ref={mapRef}
+        ref={setMapNode}
+        className={styles.map}
         style={{
           ...mapBox,
           display: mapReady && mappableListings.length > 0 ? "block" : "none",
@@ -207,22 +258,27 @@ export default function ListingsMapPanel({ listings }: Props) {
       <div style={footNote}>
         Click a pin to preview the listing and jump directly to its detail page.
       </div>
+      {selection && <div role="status" style={footNote}>
+        {mapReady ? `Selected location: ${mappableListings.find(listing => listing.id === selection.id)?.title ?? "listing"}.`
+          : loadError || !apiKey ? "Map unavailable. Use the listing link to view its saved location."
+          : "Loading the selected listing location..."}
+      </div>}
     </div>
   );
 }
 
 const wrap: React.CSSProperties = {
-  position: "sticky",
-  top: 20,
-  borderRadius: 18,
-  border: "1px solid rgba(255,255,255,0.10)",
-  background: "rgba(255,255,255,0.04)",
-  boxShadow: "0 12px 30px rgba(0,0,0,0.22)",
-  padding: 14,
+  borderRadius: 10,
+  border: "1px solid rgba(180,205,255,0.16)",
+  background: "linear-gradient(180deg, rgba(7,13,28,0.88), rgba(7,13,28,0.68))",
+  boxShadow: "0 18px 44px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08)",
+  padding: 12,
+  backdropFilter: "blur(12px)",
 };
 
 const topRow: React.CSSProperties = {
   display: "flex",
+  flexWrap: "wrap",
   alignItems: "flex-start",
   justifyContent: "space-between",
   gap: 12,
@@ -231,8 +287,10 @@ const topRow: React.CSSProperties = {
 
 const eyebrow: React.CSSProperties = {
   fontSize: 12,
-  opacity: 0.75,
-  fontWeight: 700,
+  color: "rgba(169,200,255,0.9)",
+  fontWeight: 950,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
 };
 
 const title: React.CSSProperties = {
@@ -242,28 +300,27 @@ const title: React.CSSProperties = {
 };
 
 const metaPill: React.CSSProperties = {
-  padding: "8px 10px",
-  borderRadius: 999,
-  border: "1px solid rgba(255,255,255,0.12)",
-  background: "rgba(255,255,255,0.06)",
+  padding: "7px 9px",
+  borderRadius: 8,
+  border: "1px solid rgba(180,205,255,0.16)",
+  background: "rgba(255,255,255,0.07)",
   fontSize: 12,
-  fontWeight: 800,
+  fontWeight: 900,
   whiteSpace: "nowrap",
 };
 
 const mapBox: React.CSSProperties = {
   width: "100%",
-  height: 560,
-  borderRadius: 14,
+  borderRadius: 10,
   overflow: "hidden",
   background: "rgba(0,0,0,0.18)",
 };
 
 const fallbackBox: React.CSSProperties = {
   minHeight: 220,
-  borderRadius: 14,
-  border: "1px solid rgba(255,255,255,0.10)",
-  background: "rgba(0,0,0,0.18)",
+  borderRadius: 10,
+  border: "1px solid rgba(180,205,255,0.14)",
+  background: "rgba(0,0,0,0.22)",
   padding: 18,
   display: "flex",
   flexDirection: "column",

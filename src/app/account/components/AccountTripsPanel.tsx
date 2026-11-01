@@ -4,8 +4,11 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import styles from "../account.module.css";
 import type { TripClassification } from "../accountUtils";
+import { listingTypeLabel, type ListingType } from "@/lib/listing-types";
 
 export type AccountTrip = {
+  listingType?: ListingType | null;
+  guestCount?: number | null;
   id: string;
   listingId: string;
   listingTitle: string;
@@ -143,6 +146,7 @@ export default function AccountTripsPanel({ loading, error, trips }: Props) {
                       </span>
                     </div>
                     <p className={styles.itemMeta}>{trip.destination}</p>
+                    {trip.listingType && <p className={styles.itemMeta}>{listingTypeLabel(trip.listingType)}{trip.guestCount ? ` · ${trip.guestCount} guests` : ""}</p>}
                     <p className={styles.itemText}>
                       {trip.checkInLabel} → {trip.checkOutLabel}
                       {trip.nights > 0 ? ` · ${trip.nights} night${trip.nights === 1 ? "" : "s"}` : ""}

@@ -1,0 +1,6 @@
+.card { margin: 24px 0; padding: 22px; border: 1px solid #3b526a; border-radius: 10px; background: linear-gradient(130deg, #162d44, #0b1c2e); color: #f5f7fb; font-family: "Aptos", "Trebuchet MS", sans-serif; }
+.eyebrow { color: #e8c58e; font-size: 12px; line-height: 1.6; letter-spacing: .5px; }
+.card h2 { font-size: 22px; font-weight: 600; line-height: 1.3; margin: 8px 0; }
+.card p:not(.eyebrow) { color: #c5d2e3; font-size: 14px; line-height: 1.7; }
+.card a { display: inline-flex; align-items: center; min-height: 44px; color: #91caff; font-size: 14px; }
+.card a:focus-visible { outline: 3px solid #8ad1ff; outline-offset: 4px; }

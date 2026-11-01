@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -40,6 +40,7 @@ export default function TransportRequestPage() {
   const [form, setForm] = useState<TransportForm>(readDraft);
   const [status, setStatus] = useState<FormStatus>("idle");
   const [message, setMessage] = useState("");
+  const submitLock = useRef(false);
 
   const formWithProfile = useMemo(() => ({
     ...form,
@@ -49,7 +50,11 @@ export default function TransportRequestPage() {
   }), [form, user]);
 
   const update = (field: keyof TransportForm, value: string | boolean) => {
-    setForm((current) => ({ ...current, [field]: value }));
+    if (submitLock.current) return;
+    const next = { ...form, [field]: value };
+    setForm(next);
+    try { sessionStorage.setItem(storageKey, JSON.stringify(next)); }
+    catch (error) { console.error("Could not save transport request draft:", error); }
     setStatus("idle");
     setMessage("");
   };
@@ -77,27 +82,41 @@ export default function TransportRequestPage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const finalErrors = validateStep(formWithProfile, 3);
+    if (submitLock.current || status === "success") return;
+    const finalErrors = ([1, 2, 3] as const).flatMap(current => validateStep(formWithProfile, current));
     if (finalErrors.length > 0) {
       setStatus("error");
       setMessage(finalErrors[0]);
       return;
     }
-    if (authLoading) return;
+    if (authLoading) {
+      setStatus("error");
+      setMessage("Your sign-in status is still loading. Please try again shortly.");
+      return;
+    }
     if (!user) {
-      sessionStorage.setItem(storageKey, JSON.stringify(form));
-      router.push(`/login?next=${encodeURIComponent("/transport/request")}`);
+      try {
+        sessionStorage.setItem(storageKey, JSON.stringify(formWithProfile));
+        router.push(`/login?next=${encodeURIComponent("/transport/request")}`);
+      } catch (error) {
+        console.error("Could not save request for sign-in:", error);
+        setStatus("error");
+        setMessage("Your browser could not save this draft for sign-in. Allow session storage, then try again.");
+      }
       return;
     }
 
+    submitLock.current = true;
     try {
       setStatus("submitting");
       const request = normalizeRequest(formWithProfile, user.uid);
       await addDoc(collection(db, "transportRequests"), request);
-      sessionStorage.removeItem(storageKey);
+      try { sessionStorage.removeItem(storageKey); }
+      catch (error) { console.error("Could not clear submitted request draft:", error); }
       setStatus("success");
-      setMessage("Your transport request has been submitted for future RVNB transport coordination.");
+      setMessage("Your request has been saved privately to help RVNB understand future transport needs. You can review it in My Account. Any move would require separate arrangements.");
     } catch (error) {
+      submitLock.current = false;
       console.error(error);
       setStatus("error");
       setMessage("We could not submit your request. Please check your connection and try again.");
@@ -111,7 +130,7 @@ export default function TransportRequestPage() {
         <header className={styles.header}>
           <p className={styles.kicker}>REQUEST RV TRANSPORT</p>
           <h1>Tell us what needs to move.</h1>
-          <p>Share the RV, route, and timing details. RVNB will use your request to help build the right transport connection.</p>
+          <p>Share your RV, general route, timing, and access needs. We&apos;ll save your request privately to help us plan the network. Sign in is required; there is no guaranteed response time.</p>
         </header>
 
         {status === "success" ? (
@@ -119,10 +138,12 @@ export default function TransportRequestPage() {
             <span className={styles.successMark} aria-hidden="true">✓</span>
             <h2>Request received.</h2>
             <p>{message}</p>
-            <Link href="/transport" className={styles.primaryButton}>Return to Transport</Link>
+            <Link href="/transport" className={styles.primaryButton}>Return to Transport</Link>{" "}
+            <Link href="/account" className={styles.secondaryButton}>View in My Account</Link>
           </section>
         ) : (
           <form onSubmit={step === 3 ? submit : continueStep}>
+            <fieldset className={styles.formFields} disabled={status === "submitting"} aria-busy={status === "submitting"}>
             <nav className={styles.progress} aria-label="Transport request progress">
               {["RV Details", "Route and Timing", "Contact and Review"].map((label, index) => {
                 const itemStep = (index + 1) as Step;
@@ -141,6 +162,7 @@ export default function TransportRequestPage() {
                 {step < 3 ? <button type="submit" className={styles.primaryButton}>Continue</button> : <button type="submit" className={styles.primaryButton} disabled={status === "submitting"}>{status === "submitting" ? "Submitting..." : "Submit Transport Request"}</button>}
               </div>
             </section>
+            </fieldset>
           </form>
         )}
       </div>
@@ -150,7 +172,7 @@ export default function TransportRequestPage() {
 
 function StepOne({ form, update }: { form: TransportForm; update: (field: keyof TransportForm, value: string | boolean) => void }) {
   return <>
-    <SectionHeading eyebrow="01 / RV DETAILS" title="What are we moving?" text="A few basics help a future provider understand the rig and the safest movement method." />
+    <SectionHeading eyebrow="01 / RV DETAILS" title="What are we moving?" text="Approximate length is required; weight is optional. Don&apos;t guess—check manufacturer information when available. Add questions about coupling or setup to special instructions." />
     <div className={styles.fieldGrid}>
       <SelectField label="RV type" value={form.rvType} onChange={(value) => update("rvType", value)} required options={["Travel trailer", "Fifth wheel", "Motorhome", "Toy hauler", "Pop-up camper", "Truck camper", "Park model", "Other"]} />
       <TextField label="Year" value={form.year} onChange={(value) => update("year", value)} placeholder="Optional" inputMode="numeric" />
@@ -163,7 +185,7 @@ function StepOne({ form, update }: { form: TransportForm; update: (field: keyof 
     </div>
     <Fieldset legend="Preparation questions">
       <ChoiceField label="Are the tires in usable condition?" value={form.tires} onChange={(value) => update("tires", value)} options={["Yes", "No", "Unsure"]} />
-      <ChoiceField label="Are the lights and brakes working?" value={form.lightsBrakes} onChange={(value) => update("lightsBrakes", value)} options={["Yes", "No", "Unsure", "Not applicable"]} />
+      {form.movementMethod !== "Transport on a trailer" && <ChoiceField label="Are the lights and brakes working?" value={form.lightsBrakes} onChange={(value) => update("lightsBrakes", value)} options={["Yes", "No", "Unsure", "Not applicable"]} />}
       <ChoiceField label="Are slides and awnings secured?" value={form.slidesAwnings} onChange={(value) => update("slidesAwnings", value)} options={["Yes", "No", "Not applicable", "Unsure"]} />
       <ChoiceField label="Is the RV currently connected to utilities?" value={form.connectedUtilities} onChange={(value) => update("connectedUtilities", value)} options={["Yes", "No"]} />
     </Fieldset>
@@ -195,7 +217,7 @@ function StepTwo({ form, update }: { form: TransportForm; update: (field: keyof 
 
 function StepThree({ form, update, review, editStep }: { form: TransportForm; update: (field: keyof TransportForm, value: string | boolean) => void; review: Record<string, string>; editStep: (step: Step) => void }) {
   return <>
-    <SectionHeading eyebrow="03 / CONTACT AND REVIEW" title="Check the details before you send." text="Your contact details stay private to your request during this phase. Submission does not guarantee a provider match, price, or confirmed service." />
+    <SectionHeading eyebrow="03 / CONTACT AND REVIEW" title="Check the details before you send." text="Your contact details are included only with your private request." />
     <div className={styles.reviewList}>
       <ReviewSection title="RV" value={review.rv} onEdit={() => editStep(1)} />
       <ReviewSection title="Route and timing" value={review.route} onEdit={() => editStep(2)} />
@@ -209,7 +231,7 @@ function StepThree({ form, update, review, editStep }: { form: TransportForm; up
     </div>
     <div className={styles.confirmations}>
       <label><input type="checkbox" checked={form.confirmsAccuracy} onChange={(event) => update("confirmsAccuracy", event.target.checked)} /> I confirm that the information provided is accurate to the best of my knowledge.</label>
-      <label><input type="checkbox" checked={form.confirmsNoGuarantee} onChange={(event) => update("confirmsNoGuarantee", event.target.checked)} /> I understand this is a transport request and does not guarantee a provider match, price, or confirmed service.</label>
+      <label><input type="checkbox" checked={form.confirmsNoGuarantee} onChange={(event) => update("confirmsNoGuarantee", event.target.checked)} /> I understand this is early-access planning, not a confirmed move.</label>
     </div>
   </>;
 }
@@ -223,7 +245,7 @@ function Fieldset({ legend, children }: { legend: string; children: React.ReactN
 function TextField({ label, value, onChange, required, placeholder, type = "text", inputMode, autoComplete }: { label: string; value: string; onChange: (value: string) => void; required?: boolean; placeholder?: string; type?: string; inputMode?: "numeric" | "decimal"; autoComplete?: string }) { return <label className={styles.field}>{label}{required && <span className={styles.required}>Required</span>}<input type={type} value={value} onChange={(event) => onChange(event.target.value)} required={required} placeholder={placeholder} inputMode={inputMode} autoComplete={autoComplete} /></label>; }
 function SelectField({ label, value, onChange, options, required }: { label: string; value: string; onChange: (value: string) => void; options: readonly string[]; required?: boolean }) { return <label className={styles.field}>{label}{required && <span className={styles.required}>Required</span>}<select value={value} onChange={(event) => onChange(event.target.value)} required={required}><option value="">Select...</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>; }
 function TextAreaField({ label, value, onChange, placeholder, rows = 3 }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; rows?: number }) { return <label className={styles.field}>{label}<textarea value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} rows={rows} /></label>; }
-function ChoiceField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: readonly string[] }) { return <div className={styles.choiceField}><span>{label}</span><div className={styles.choiceRow}>{options.map((option) => <label key={option}><input type="radio" name={label} value={option} checked={value === option} onChange={() => onChange(option)} required={!value} />{option}</label>)}</div></div>; }
+function ChoiceField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: readonly string[] }) { return <fieldset className={styles.choiceField}><legend>{label}</legend><div className={styles.choiceRow}>{options.map((option) => <label key={option}><input type="radio" name={label} value={option} checked={value === option} onChange={() => onChange(option)} required={!value} />{option}</label>)}</div></fieldset>; }
 function ReviewSection({ title, value, onEdit }: { title: string; value: string; onEdit: () => void }) { return <article className={styles.reviewSection}><div><h3>{title}</h3><p>{value}</p></div><button type="button" className={styles.editButton} onClick={onEdit}>Edit</button></article>; }
 
 function validateStep(form: TransportForm, step: Step): string[] {
@@ -233,7 +255,9 @@ function validateStep(form: TransportForm, step: Step): string[] {
     if (form.weightLb && !nonNegativeNumber(form.weightLb)) return ["Enter an approximate weight of zero or greater."];
     if (!form.condition) return ["Select the current condition."];
     if (!form.movementMethod) return ["Select a movement method."];
-    if (!form.tires || !form.lightsBrakes || !form.slidesAwnings || !form.connectedUtilities) return ["Answer all preparation questions."];
+    if (form.movementMethod === "Drive my motorhome" && form.rvType !== "Motorhome") return ["Drive-away is for motorhomes. Choose another movement method or ask for help."];
+    if (form.movementMethod === "Drive my motorhome" && form.condition === "Not currently roadworthy") return ["A non-roadworthy motorhome cannot be driven. Choose trailer transport or ask for help."];
+    if (!form.tires || (form.movementMethod !== "Transport on a trailer" && !form.lightsBrakes) || !form.slidesAwnings || !form.connectedUtilities) return ["Answer all preparation questions."];
   }
   if (step === 2) {
     if (!form.pickupCity.trim() || !form.pickupState || !form.pickupLocationType || !form.destinationCity.trim() || !form.destinationState || !form.destinationLocationType) return ["Complete both pickup and destination regions."];
@@ -276,9 +300,20 @@ function readDraft(): TransportForm {
   if (typeof window === "undefined") return initialForm;
   try {
     const saved = window.sessionStorage.getItem(storageKey);
-    return saved ? { ...initialForm, ...(JSON.parse(saved) as Partial<TransportForm>) } : initialForm;
-  } catch {
-    window.sessionStorage.removeItem(storageKey);
+    if (!saved) return initialForm;
+    const parsed: unknown = JSON.parse(saved);
+    if (!parsed || typeof parsed !== "object") throw new Error("Invalid request draft");
+    const restored = { ...initialForm };
+    for (const key of Object.keys(initialForm) as (keyof TransportForm)[]) {
+      if (key in parsed) {
+        const value = (parsed as Record<string, unknown>)[key];
+        if (typeof value !== typeof initialForm[key]) throw new Error("Invalid request draft field");
+        Object.assign(restored, { [key]: value });
+      }
+    }
+    return restored;
+  } catch (error) {
+    console.error("Could not restore transport request draft:", error);
     return initialForm;
   }
 }

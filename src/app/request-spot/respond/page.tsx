@@ -412,10 +412,9 @@ function RespondToRequestContent() {
             <h1 className={styles.title}>Offer Space for an RV Request</h1>
 
             <p className={styles.subtitle}>
-              Whether you have open space, a partial setup, or a fully rig-ready
-              RV spot, RVNB can help evaluate whether your property could respond
-              to real local demand and opportunity. This intake helps us
-              understand if — and how — your space could work as a host site.
+              Tell RVNB about space you may be able to offer. This sends your
+              information for review as a possible response to traveler demand;
+              it does not create a public listing or guarantee a booking.
             </p>
 
             {requestId && linkedRequestMsg ? (
@@ -479,9 +478,8 @@ function RespondToRequestContent() {
                   </div>
 
                   <p className={styles.helperText}>
-                    Tell us where your setup stands so RVNB can better understand
-                    whether this is exploratory space, a partial setup, or a
-                    stronger immediate hosting opportunity.
+                    Start with your readiness level. You can be exploratory,
+                    partially set up, or already close to hosting-ready.
                   </p>
 
                   <div className={styles.field}>
@@ -510,6 +508,11 @@ function RespondToRequestContent() {
                   <div className={styles.sectionHeader}>
                     <h2 className={styles.sectionTitle}>Location & Details</h2>
                   </div>
+
+                  <p className={styles.helperText}>
+                    Share the general area and describe the physical space. Use
+                    placeholders as examples only; submit your real details.
+                  </p>
 
                   <div className={styles.gridThree}>
                     <div className={styles.field}>
@@ -600,6 +603,11 @@ function RespondToRequestContent() {
                   <div className={styles.sectionHeader}>
                     <h2 className={styles.sectionTitle}>Availability</h2>
                   </div>
+
+                  <p className={styles.helperText}>
+                    Tell us when the space could realistically be available and
+                    whether it is better for short stays, longer stays, or both.
+                  </p>
 
                   <div className={styles.gridTwo}>
                     <div className={styles.field}>
@@ -735,6 +743,11 @@ function RespondToRequestContent() {
                   <div className={styles.sectionHeader}>
                     <h2 className={styles.sectionTitle}>Contact Info</h2>
                   </div>
+
+                  <p className={styles.helperText}>
+                    RVNB uses this information to follow up about your submitted
+                    opportunity. It is not shown as a public listing from this form.
+                  </p>
 
                   <div className={styles.gridThree}>
                     <div className={styles.field}>

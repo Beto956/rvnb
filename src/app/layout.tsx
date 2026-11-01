@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import "./globals.css";
 import Providers from "./providers";
 
@@ -19,12 +18,6 @@ export default function RootLayout({
         <Providers>
           {children}
         </Providers>
-
-        <Script
-          id="google-maps-api"
-          src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&loading=async&v=weekly`}
-          strategy="afterInteractive"
-        />
       </body>
     </html>
   );

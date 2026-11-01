@@ -31,11 +31,6 @@ type FeedStatus = "loading" | "ready" | "error" | "permission-error";
 
 type SortOrder = "newest" | "oldest";
 
-function excerptOf(body: string): string {
-  const clean = body.replace(/\s+/g, " ").trim();
-  return clean.length > 220 ? `${clean.slice(0, 217)}...` : clean;
-}
-
 export default function CommunityPage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -50,6 +45,10 @@ export default function CommunityPage() {
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const [moreError, setMoreError] = useState("");
+  const revision = useRef(0);
+  const moreLock = useRef<number | null>(null);
 
   const loadPosts = useCallback(
     async (
@@ -88,24 +87,28 @@ export default function CommunityPage() {
 
   useEffect(() => {
     let cancelled = false;
+    const current = ++revision.current;
     setStatus("loading");
     setErrorMessage("");
     setPosts([]);
     setLastDoc(null);
     setHasMore(true);
+    setLoadingMore(false);
+    setMoreError("");
+    moreLock.current = null;
 
     const direction: OrderByDirection = sortOrder === "newest" ? "desc" : "asc";
 
     loadPosts(category, direction, null)
       .then(({ rows, lastVisible, count }) => {
-        if (cancelled) return;
+        if (cancelled || current !== revision.current) return;
         setPosts(rows);
         setLastDoc(lastVisible);
         setHasMore(count === PAGE_SIZE);
         setStatus("ready");
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (cancelled || current !== revision.current) return;
         console.error("Community feed load error:", err);
         if (err && typeof err === "object" && "code" in err && err.code === "permission-denied") {
           setStatus("permission-error");
@@ -117,23 +120,31 @@ export default function CommunityPage() {
 
     return () => {
       cancelled = true;
+      revision.current = current + 1;
     };
-  }, [category, sortOrder, loadPosts]);
+  }, [category, sortOrder, loadPosts, retry]);
 
   async function handleLoadMore() {
-    if (!lastDoc || loadingMore) return;
+    if (!lastDoc || loadingMore || moreLock.current !== null) return;
+    const current = revision.current;
+    moreLock.current = current;
     setLoadingMore(true);
+    setMoreError("");
     try {
       const direction: OrderByDirection = sortOrder === "newest" ? "desc" : "asc";
       const { rows, lastVisible, count } = await loadPosts(category, direction, lastDoc);
+      if (current !== revision.current) return;
       setPosts((prev) => [...prev, ...rows]);
       setLastDoc(lastVisible);
       setHasMore(count === PAGE_SIZE);
     } catch (err) {
       console.error("Community feed load-more error:", err);
-      setErrorMessage("Could not load more discussions right now.");
+      if (current === revision.current) setMoreError("Could not load more discussions. Your loaded discussions are still available. Try loading more again.");
     } finally {
-      setLoadingMore(false);
+      if (current === revision.current) {
+        moreLock.current = null;
+        setLoadingMore(false);
+      }
     }
   }
 
@@ -141,12 +152,12 @@ export default function CommunityPage() {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return posts;
     return posts.filter(
-      (p) => p.title.toLowerCase().includes(term) || excerptOf(p.body).toLowerCase().includes(term)
+      (p) => p.title.toLowerCase().includes(term) || p.body.toLowerCase().includes(term)
     );
   }, [posts, searchTerm]);
 
   function scrollToBoard() {
-    boardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    boardRef.current?.scrollIntoView({ block: "start" });
   }
 
   function handleStartDiscussion() {
@@ -158,6 +169,7 @@ export default function CommunityPage() {
   }
 
   function selectCategory(id: string) {
+    if (id !== category) revision.current++;
     setCategory(id);
     scrollToBoard();
   }
@@ -180,24 +192,14 @@ export default function CommunityPage() {
               Connect with RV travelers and hosts, explore practical road knowledge, and help others make
               better decisions wherever the journey leads.
             </p>
-            <div className={styles.heroSearchRow}>
-              <label className={styles.heroSearchField}>
-                <span className={styles.srOnly}>Search the community</span>
-                <input
-                  type="search"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search the community"
-                  onFocus={scrollToBoard}
-                />
-              </label>
+            <div className={styles.heroActions}>
               {user ? (
                 <button type="button" className={styles.primaryButton} onClick={handleStartDiscussion}>
                   Start a discussion →
                 </button>
               ) : (
                 <button type="button" className={styles.primaryButton} onClick={handleSignIn}>
-                  Sign in to post →
+                  Sign in to participate →
                 </button>
               )}
             </div>
@@ -207,25 +209,28 @@ export default function CommunityPage() {
         <div className={styles.layout}>
           <div className={styles.mainCol}>
             {/* BOARD CONTROLS */}
-            <section ref={boardRef} className={styles.boardSection} aria-labelledby="board-heading">
+            <section ref={boardRef} className={styles.boardSection} aria-labelledby="board-heading" aria-busy={status === "loading" || loadingMore}>
               <div className={styles.boardHeader}>
                 <h2 id="board-heading">Recent discussions</h2>
                 <label className={styles.sortField}>
                   <span className={styles.srOnly}>Sort discussions</span>
                   <select
                     value={sortOrder}
-                    onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+                    onChange={(e) => { revision.current++; setSortOrder(e.target.value as SortOrder); }}
                   >
-                    <option value="newest">Latest activity</option>
+                    <option value="newest">Newest first</option>
                     <option value="oldest">Oldest first</option>
                   </select>
                 </label>
               </div>
 
+              <details className={styles.topicPicker}>
+              <summary>Browse topics <span>{category === "all" ? "All discussions" : COMMUNITY_CATEGORIES.find(c => c.id === category)?.label}</span></summary>
               <div className={styles.chipRow} role="group" aria-label="Filter by category">
                 <button
                   type="button"
                   className={`${styles.chip} ${category === "all" ? styles.chipActive : ""}`}
+                  aria-pressed={category === "all"}
                   onClick={() => selectCategory("all")}
                 >
                   All
@@ -235,15 +240,17 @@ export default function CommunityPage() {
                     key={c.id}
                     type="button"
                     className={`${styles.chip} ${category === c.id ? styles.chipActive : ""}`}
+                    aria-pressed={category === c.id}
                     onClick={() => selectCategory(c.id)}
                   >
                     {c.label}
                   </button>
                 ))}
               </div>
+              </details>
 
               <label className={styles.searchField}>
-                <span className={styles.srOnly}>Search loaded discussions</span>
+                <span>Search loaded discussions</span>
                 <input
                   type="search"
                   value={searchTerm}
@@ -255,7 +262,7 @@ export default function CommunityPage() {
               {searchTerm.trim() && (
                 <p className={styles.searchNote}>
                   Searching only the {posts.length} discussion{posts.length === 1 ? "" : "s"} currently
-                  loaded above — not the entire board.
+                  loaded — not the entire board.
                 </p>
               )}
 
@@ -269,6 +276,7 @@ export default function CommunityPage() {
               {status === "error" && (
                 <div className={styles.feedState} role="alert">
                   {errorMessage}
+                  <button type="button" className={styles.secondaryButton} onClick={() => setRetry(value => value + 1)}>Retry discussions</button>
                 </div>
               )}
 
@@ -276,13 +284,15 @@ export default function CommunityPage() {
                 <div className={styles.feedState} role="alert">
                   You don&apos;t have permission to view discussions right now. Try signing in, or reload
                   the page.
+                  <button type="button" className={styles.secondaryButton} onClick={() => setRetry(value => value + 1)}>Retry discussions</button>
+                  {!user && <button type="button" className={styles.secondaryButton} onClick={handleSignIn}>Sign in</button>}
                 </div>
               )}
 
-              {status === "ready" && visiblePosts.length === 0 && posts.length === 0 && (
+              {status === "ready" && visiblePosts.length === 0 && posts.length === 0 && category === "all" && !searchTerm.trim() && (
                 <div className={styles.emptyState}>
-                  <h3>No discussions here yet.</h3>
-                  <p>Be the first to start a conversation in this category.</p>
+                  <h3>No discussions yet.</h3>
+                  <p>There are no discussions to show. Share a question or experience to start the conversation.</p>
                   {user ? (
                     <button type="button" className={styles.primaryButton} onClick={handleStartDiscussion}>
                       Start a Discussion
@@ -295,10 +305,12 @@ export default function CommunityPage() {
                 </div>
               )}
 
-              {status === "ready" && visiblePosts.length === 0 && posts.length > 0 && (
+              {status === "ready" && visiblePosts.length === 0 && (posts.length > 0 || category !== "all" || !!searchTerm.trim()) && (
                 <div className={styles.emptyState}>
-                  <h3>No matches found.</h3>
-                  <p>Try a different search term, or clear the search to see all loaded discussions.</p>
+                  <h3>No matches for these filters.</h3>
+                  <p>Try another topic or search term. Search covers loaded discussions only.</p>
+                  <button type="button" className={styles.secondaryButton} onClick={() => { setSearchTerm(""); selectCategory("all"); }}>Clear filters</button>
+                  <button type="button" className={styles.primaryButton} onClick={user ? handleStartDiscussion : handleSignIn}>{user ? "Start a discussion" : "Sign in to participate"}</button>
                 </div>
               )}
 
@@ -311,7 +323,8 @@ export default function CommunityPage() {
                 </ul>
               )}
 
-              {status === "ready" && hasMore && !searchTerm.trim() && (
+              {moreError && <p role="alert" className={styles.searchNote}>{moreError}</p>}
+              {status === "ready" && hasMore && (
                 <div className={styles.loadMoreRow}>
                   <button
                     type="button"
@@ -323,26 +336,6 @@ export default function CommunityPage() {
                   </button>
                 </div>
               )}
-            </section>
-
-            {/* TOPIC CATEGORIES */}
-            <section className={styles.section} aria-labelledby="categories-heading">
-              <div className={styles.sectionIntro}>
-                <p className={styles.kicker}>EXPLORE BY TOPIC</p>
-                <h2 id="categories-heading">Find the knowledge you need.</h2>
-              </div>
-              <div className={styles.categoryGrid}>
-                {COMMUNITY_CATEGORIES.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    className={`${styles.categoryCard} ${category === c.id ? styles.categoryCardActive : ""}`}
-                    onClick={() => selectCategory(c.id)}
-                  >
-                    <h3>{c.label}</h3>
-                  </button>
-                ))}
-              </div>
             </section>
 
             {/* TRUST AND STANDARDS */}

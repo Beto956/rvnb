@@ -12,6 +12,7 @@ const {
   doc,
   getDoc,
   getDocs,
+  getCountFromServer,
   orderBy,
   query,
   runTransaction,
@@ -292,7 +293,8 @@ const safePublicRequestKeys = new Set([
   "requestId", "requesterId", "publicVersion", "status", "isFinalized", "createdAt", "updatedAt",
   "finalizedAt", "requestType", "locationText", "city", "state", "startDate", "endDate",
   "flexibleDates", "employerName", "teamName", "teamLocation", "workersCount", "rigsCount",
-  "spotsNeeded", "stayDurationType", "primaryRv", "moreThanOneRv", "additionalRvs",
+  "spotsNeeded", "representativeRole", "separateSpotsNeeded", "singleCoordinator",
+  "stayDurationType", "primaryRv", "moreThanOneRv", "additionalRvs",
   "hookupsNeeded", "budgetMax", "budgetPeriod", "rvDetails", "note",
 ]);
 
@@ -486,6 +488,21 @@ test("users can create their own profile but cannot spoof another profile", asyn
   await assertFails(setDoc(doc(dbAsGuest(), "users/not-guest"), { role: "guest", email: "new@example.com", createdAt: new Date() }));
 });
 
+test("host upgrade preserves account creation time and all other profile fields", async () => {
+  const ref = doc(dbAsGuest(), "users", users.guest.uid);
+  const before = (await getDoc(ref)).data();
+  // This was the old HostGuard payload: changing createdAt makes it invalid.
+  await assertFails(setDoc(ref, {
+    email: users.guest.email,
+    role: "host",
+    createdAt: serverTimestamp(),
+  }, { merge: true }));
+  await assertSucceeds(updateDoc(ref, { role: "host" }));
+  const after = (await getDoc(ref)).data();
+  assert.equal(after.role, "host");
+  assert.deepEqual({ ...after, role: before.role }, before);
+});
+
 function memberProfile(overrides = {}) {
   const now = new Date();
   return {
@@ -501,6 +518,18 @@ function memberProfile(overrides = {}) {
     ...overrides,
   };
 }
+
+test("public profile editor can create with explicit null photo and preserve an existing photo", async () => {
+  const ref = doc(dbAsGuest(), "memberProfiles", users.guest.uid);
+  const payload = memberProfile({ createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  const missingPhoto = { ...payload };
+  delete missingPhoto.photoURL;
+  await assertFails(setDoc(ref, missingPhoto, { merge: true }));
+  await assertSucceeds(setDoc(ref, payload, { merge: true }));
+  await assertSucceeds(updateDoc(ref, { photoURL: "https://example.com/profile.jpg", updatedAt: serverTimestamp() }));
+  await assertSucceeds(setDoc(ref, { bio: "Updated bio", updatedAt: serverTimestamp() }, { merge: true }));
+  assert.equal((await getDoc(ref)).data().photoURL, "https://example.com/profile.jpg");
+});
 
 test("member profile: owner can create and read; cross-user reads respect visibility", async () => {
   const guestDb = dbAsGuest();
@@ -665,6 +694,15 @@ test("reviews: eligible traveler and host can each review a completed stay exact
   await assertFails(
     setDoc(doc(guestDb, "reviews", "booking-completed_" + users.guest.uid), travelerReview({ rating: 1 }))
   );
+});
+
+test("review form may create after a missing-review pre-read is denied, but cannot overwrite", async () => {
+  await seed("bookings/booking-completed", completedBooking());
+  const ref = doc(dbAsGuest(), "reviews", "booking-completed_" + users.guest.uid);
+  await assertFails(getDoc(ref));
+  await assertSucceeds(setDoc(ref, travelerReview()));
+  assert.equal((await assertSucceeds(getDoc(ref))).exists(), true);
+  await assertFails(setDoc(ref, travelerReview({ rating: 1 })));
 });
 
 test("reviews: only real booking participants may review, and direction cannot be impersonated", async () => {
@@ -1143,6 +1181,67 @@ test("requesters can create, read, and finalize their own request; drafts stay p
   await assertSucceeds(updateDoc(doc(guestDb, "spotRequests/request-1"), { status: "open", isFinalized: true }));
 });
 
+test("My Requests owner queries include all owned drafts and open requests, including host owners", async () => {
+  await seed("spotRequests/draft", draftRequest());
+  await seed("spotRequests/open", { ...draftRequest(), status: "open", isFinalized: true });
+  await seed("spotRequests/other", { ...draftRequest(), requesterId: users.other.uid });
+  await seed("spotRequests/host-draft", { ...draftRequest(), requesterId: users.host.uid });
+  const ownQuery = (db, uid) => query(collection(db, "spotRequests"), where("requesterId", "==", uid));
+  const snapshot = await assertSucceeds(getDocs(ownQuery(dbAsGuest(), users.guest.uid)));
+  assert.deepEqual(snapshot.docs.map((item) => item.id).sort(), ["draft", "open"]);
+  const hostSnapshot = await assertSucceeds(getDocs(ownQuery(dbAsHost(), users.host.uid)));
+  assert.deepEqual(hostSnapshot.docs.map((item) => item.id), ["host-draft"]);
+  await assertFails(getDocs(collection(dbAsGuest(), "spotRequests")));
+  await assertFails(getDocs(ownQuery(dbAsOther(), users.guest.uid)));
+  await assertFails(getDocs(ownQuery(dbAsHost(), users.guest.uid)));
+  const anonymous = testEnv.unauthenticatedContext().firestore();
+  await assertFails(getDocs(ownQuery(anonymous, users.guest.uid)));
+  await assertFails(getDoc(doc(anonymous, "spotRequests/draft")));
+});
+
+test("draft continuation updates the same owner document and cannot edit final or transfer ownership", async () => {
+  await seed("spotRequests/draft", draftRequest());
+  const guestDb = dbAsGuest();
+  const ref = doc(guestDb, "spotRequests/draft");
+  await assertSucceeds(runTransaction(guestDb, async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    assert.equal(snapshot.data().requesterId, users.guest.uid);
+    assert.equal(snapshot.data().status, "draft");
+    transaction.update(ref, { locationText: "Austin", updatedAt: serverTimestamp() });
+  }));
+  assert.equal((await getDoc(ref)).data().locationText, "Austin");
+  assert.equal((await getDocs(query(collection(dbAsGuest(), "spotRequests"), where("requesterId", "==", users.guest.uid)))).size, 1);
+  await assertFails(updateDoc(ref, { requesterId: users.other.uid }));
+  await assertFails(updateDoc(doc(dbAsOther(), "spotRequests/draft"), { locationText: "Elsewhere" }));
+  await assertFails(setDoc(doc(dbAsGuest(), "spotRequestPublic/draft"), publicRequest("draft")));
+  await assertSucceeds(updateDoc(ref, { status: "open", isFinalized: true }));
+  await assertFails(updateDoc(ref, { locationText: "Overwritten" }));
+  await assertFails(updateDoc(ref, { status: "draft", isFinalized: false }));
+});
+
+test("My Requests responses and aggregate counts are owner-scoped and request-linked", async () => {
+  await seed("spotRequestPublic/one", publicRequest("one"));
+  await seed("spotRequestPublic/two", publicRequest("two"));
+  await createLinkedResponseInTransaction(dbAsHost(), "one");
+  await createLinkedResponseInTransaction(dbAsHost(), "two");
+  const linkedQuery = (db, uid, id) => query(collection(db, "hostOpportunities"), where("requesterId", "==", uid), where("requestId", "==", id));
+  const snapshot = await assertSucceeds(getDocs(linkedQuery(dbAsGuest(), users.guest.uid, "one")));
+  assert.deepEqual(snapshot.docs.map((item) => item.id), ["one__host-1"]);
+  assert.equal((await assertSucceeds(getCountFromServer(linkedQuery(dbAsGuest(), users.guest.uid, "one")))).data().count, 1);
+  await assertFails(getDocs(linkedQuery(dbAsOther(), users.guest.uid, "one")));
+  await assertFails(getCountFromServer(linkedQuery(dbAsOther(), users.guest.uid, "one")));
+  await assertFails(getDocs(linkedQuery(testEnv.unauthenticatedContext().firestore(), users.guest.uid, "one")));
+  await assertFails(getDocs(collection(dbAsGuest(), "hostOpportunities")));
+  await assertFails(setDoc(doc(dbAsHost(), "hostOpportunities/one__forged"), {
+    requestId: "one", requesterId: users.other.uid, hostId: users.host.uid,
+  }));
+  await assertFails(updateDoc(doc(dbAsHost(), "hostOpportunities/one__host-1"), { requesterId: users.other.uid }));
+  // A missing/private public member profile never gates authorized response reads.
+  await seed("memberProfiles/host-1", memberProfile({ userId: users.host.uid, visibility: "private" }));
+  await assertFails(getDoc(doc(dbAsGuest(), "memberProfiles/host-1")));
+  await assertSucceeds(getDocs(linkedQuery(dbAsGuest(), users.guest.uid, "one")));
+});
+
 test("request finalization transaction owns public and private writes", async () => {
   await seed("spotRequests/request-1", draftRequest());
   await assert.rejects(() => finalizeRequestInTransaction(dbAsOther(), "request-1"));
@@ -1286,6 +1385,26 @@ test("transport request malformed updates are denied", async () => {
   await assertFails(updateDoc(doc(dbAsOther(), "transportRequests/immutable"), { status: "submitted" }));
 });
 
+test("transport request owner can list only their own requests", async () => {
+  const guestDb = dbAsGuest();
+  await assertSucceeds(setDoc(doc(guestDb, "transportRequests/owned"), transportRequest()));
+  await seed("transportRequests/other-owned", transportRequest(users.other.uid));
+  await assertSucceeds(getDocs(query(
+    collection(guestDb, "transportRequests"), where("requesterId", "==", users.guest.uid)
+  )));
+  await assertFails(getDocs(query(
+    collection(guestDb, "transportRequests"), where("requesterId", "==", users.other.uid)
+  )));
+  await assertFails(getDocs(collection(guestDb, "transportRequests")));
+  await assertFails(getDocs(query(
+    collection(dbAsOther(), "transportRequests"), where("requesterId", "==", users.guest.uid)
+  )));
+  await assertFails(getDocs(query(
+    collection(testEnv.unauthenticatedContext().firestore(), "transportRequests"),
+    where("requesterId", "==", users.guest.uid)
+  )));
+});
+
 test("transport interest creation requires authentication", async () => {
   await assertFails(setDoc(
     doc(testEnv.unauthenticatedContext().firestore(), "transportInterest/anonymous"),
@@ -1325,7 +1444,26 @@ test("transport provider owner can create and read a valid private record", asyn
   await assertSucceeds(getDoc(doc(hostDb, "transportProviders/owned")));
   await assertFails(getDoc(doc(dbAsOther(), "transportProviders/owned")));
   await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), "transportProviders/owned")));
+});
+
+test("transport provider owner can list only their own registrations", async () => {
+  const hostDb = dbAsHost();
+  await assertSucceeds(setDoc(doc(hostDb, "transportProviders/owned"), transportProvider()));
+  await seed("transportProviders/other-owned", transportProvider(users.other.uid));
+  await assertSucceeds(getDocs(query(
+    collection(hostDb, "transportProviders"), where("userId", "==", users.host.uid)
+  )));
+  await assertFails(getDocs(query(
+    collection(hostDb, "transportProviders"), where("userId", "==", users.other.uid)
+  )));
   await assertFails(getDocs(collection(hostDb, "transportProviders")));
+  await assertFails(getDocs(query(
+    collection(dbAsOther(), "transportProviders"), where("userId", "==", users.host.uid)
+  )));
+  await assertFails(getDocs(query(
+    collection(testEnv.unauthenticatedContext().firestore(), "transportProviders"),
+    where("userId", "==", users.host.uid)
+  )));
 });
 
 test("transport provider ownership and schema validation are enforced", async () => {
@@ -1533,4 +1671,3 @@ test("community report creation enforces reporter identity, reason enum, and imm
   await assertFails(updateDoc(doc(guestDb, "communityReports/report-1"), { status: "resolved" }));
   await assertFails(deleteDoc(doc(guestDb, "communityReports/report-1")));
 });
-

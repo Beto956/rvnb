@@ -1,21 +1,32 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import styles from "./listingdetail.module.css";
 
 import { db } from "@/lib/firebase";
-import { collection, doc, getDoc, getDocs, limit, orderBy, query, where } from "firebase/firestore";
-import { summarizeRatings, type ReviewDirection } from "@/lib/reviews";
+import { doc, getDoc, getDocsFromServer, orderBy, query } from "firebase/firestore";
+import { isValidRatingValue, summarizeRatings, type ReviewDirection } from "@/lib/reviews";
+import { publishedListingReviews, type ListingRatingState } from "@/lib/listing-ratings";
+import { hasListingCoordinates } from "@/lib/listing-location";
+import ListingRating from "@/app/components/ListingRating";
+import AccommodationDetails from "@/app/components/AccommodationDetails";
+import { accommodationRate, capacity, isAccommodation, listingTypeLabel, record, type ListingType, listingType as readListingType } from "@/lib/listing-types";
 import ReviewCard, { type ReviewCardItem } from "@/app/components/ReviewCard";
 import ReviewSummary from "@/app/components/ReviewSummary";
 import BookingPanel from "./bookingpaneltemp";
+import ListingPhotoGallery from "../../components/ListingPhotoGallery";
+import { listingPhotos, type PhotoFields } from "@/lib/listing-photos";
 
 type Hookups = "Full" | "Partial" | "None";
 type PricingType = "Night" | "Weekly" | "Monthly";
 
-type ListingDoc = {
+type ListingDoc = PhotoFields & {
+  listingType?: ListingType;
+  accommodation?: unknown;
+  stayAmenities?: unknown;
   title?: string;
   city?: string;
   state?: string;
@@ -28,6 +39,8 @@ type ListingDoc = {
   water?: string;
   sewer?: string;
   laundry?: string;
+  description?: string;
+  nearbyAttractions?: string;
 
   pricePerNight?: number;
   price?: number;
@@ -41,6 +54,9 @@ type ListingDoc = {
 };
 
 type ListingUI = {
+  listingType: ListingType | null;
+  raw: Record<string, unknown>;
+  photos: string[];
   id: string;
   title: string;
   city: string;
@@ -50,13 +66,15 @@ type ListingUI = {
   hookups: Hookups;
   maxLengthFt: number;
 
-  displayPriceValue: number;
+  displayPriceValue: number | null;
   displayPriceLabel: string;
 
   power: string;
   water: string;
   sewer: string;
   laundry: string;
+  description: string;
+  nearbyAttractions: string;
 
   lat?: number;
   lng?: number;
@@ -97,7 +115,9 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
   const geocodeAddress = (data.geocodeAddress ?? "").toString().trim() || undefined;
   const placeId = (data.placeId ?? "").toString().trim() || undefined;
 
-  const hasNewPrice = typeof data.price === "number";
+  const accommodationMode = isAccommodation(data.listingType);
+  const rate = accommodationRate(data);
+  const hasNewPrice = typeof data.price === "number" && (!accommodationMode || (Number.isFinite(data.price) && data.price >= 0));
   const hasNewPricingType =
     data.pricingType === "Night" ||
     data.pricingType === "Weekly" ||
@@ -105,7 +125,9 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
 
   if (hasNewPrice && hasNewPricingType) {
     return {
+      listingType: readListingType(data.listingType), raw: data,
       id,
+      photos: listingPhotos(data),
       title: title || "(Untitled Listing)",
       city: city || "(City not set)",
       state: state || "(State)",
@@ -118,6 +140,8 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
       water,
       sewer,
       laundry,
+      description: (data.description ?? "").toString().trim(),
+      nearbyAttractions: (data.nearbyAttractions ?? "").toString().trim(),
       lat,
       lng,
       geocodeAddress,
@@ -125,22 +149,27 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
     };
   }
 
-  const oldPrice = typeof data.pricePerNight === "number" ? data.pricePerNight : 0;
+  const oldPrice = typeof data.pricePerNight === "number" && Number.isFinite(data.pricePerNight) && data.pricePerNight >= 0
+    ? data.pricePerNight : accommodationMode ? null : 0;
 
   return {
+    listingType: readListingType(data.listingType), raw: data,
     id,
+    photos: listingPhotos(data),
     title: title || "(Untitled Listing)",
     city: city || "(City not set)",
     state: state || "(State)",
       hostId: (data.hostId ?? "").toString(),
     hookups,
     maxLengthFt,
-    displayPriceValue: oldPrice,
-    displayPriceLabel: "night",
+    displayPriceValue: accommodationMode ? rate.price : oldPrice,
+    displayPriceLabel: accommodationMode ? rate.label : "night",
     power,
     water,
     sewer,
     laundry,
+    description: (data.description ?? "").toString().trim(),
+    nearbyAttractions: (data.nearbyAttractions ?? "").toString().trim(),
     lat,
     lng,
     geocodeAddress,
@@ -181,17 +210,23 @@ function AmenityIcon({ symbol }: { symbol: string }) {
 }
 
 function buildAboutText(listing: ListingUI) {
+  if (listing.description) return listing.description;
+  if (isAccommodation(listing.listingType)) return "The host has not provided an accommodation description yet.";
   const locationText = `${listing.city}, ${listing.state}`;
   const rigText =
-    listing.maxLengthFt > 0 ? `for rigs up to ${listing.maxLengthFt} ft` : "for a range of RV sizes";
-
-  return `This RVNB stay in ${locationText} is designed to be a simple, comfortable stop ${
-    listing.hookups !== "None" ? `with ${listing.hookups.toLowerCase()} hookups` : ""
-  } ${rigText}. Whether you're passing through, staying for the week, or looking for a reliable reset point, this listing is built to give travelers a clean, host-backed place to park and settle in.`;
+    listing.maxLengthFt > 0 ? ` The listed maximum RV length is ${listing.maxLengthFt} ft.` : "";
+  return `RV space listed in ${locationText}.${rigText} The host has not added a description yet. Review the listed amenities and location below.`;
 }
 
 function buildTravelHighlights(listing: ListingUI) {
   const highlights: string[] = [];
+  if (isAccommodation(listing.listingType)) {
+    highlights.push(listingTypeLabel(listing.listingType), "Stationary accommodation; no RV of your own needed");
+    const maximum = capacity(listing.raw);
+    if (maximum !== null) highlights.push(`Host-declared maximum: ${maximum} guests`);
+    if (listing.displayPriceValue !== null) highlights.push(`Listed rate: $${listing.displayPriceValue}${listing.displayPriceLabel ? ` per ${listing.displayPriceLabel}` : " (billing period not provided)"}`);
+    return highlights;
+  }
 
   if (listing.hookups === "Full") highlights.push("Full hookup setup for an easier stay");
   if (listing.hookups === "Partial") highlights.push("Partial hookups available for added convenience");
@@ -200,8 +235,8 @@ function buildTravelHighlights(listing: ListingUI) {
   if (listing.water !== "None") highlights.push("Water access available");
   if (listing.sewer !== "None") highlights.push("Sewer access available");
   if (listing.laundry !== "None") highlights.push(`${listing.laundry} available on site`);
-  if (highlights.length < 4) highlights.push("Host-backed booking experience through RVNB");
-  if (highlights.length < 4) highlights.push("Simple stopover setup with future-ready listing details");
+  if (highlights.length < 4) highlights.push(`Listed in ${listing.city}, ${listing.state}`);
+  if (highlights.length < 4) highlights.push(`Listed rate: $${listing.displayPriceValue} per ${listing.displayPriceLabel}`);
 
   return highlights.slice(0, 4);
 }
@@ -216,8 +251,11 @@ export default function ListingDetailPage() {
   const [reviews, setReviews] = useState<ReviewCardItem[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
   const [reviewsError, setReviewsError] = useState("");
+  const [reviewsForId, setReviewsForId] = useState<string>();
+  const [reviewRetry, setReviewRetry] = useState(0);
 
   useEffect(() => {
+    let active = true;
     const run = async () => {
       try {
         if (!listingId) {
@@ -228,6 +266,7 @@ export default function ListingDetailPage() {
 
         const ref = doc(db, "listings", listingId);
         const snap = await getDoc(ref);
+        if (!active) return;
 
         if (!snap.exists()) {
           setNotFound(true);
@@ -237,18 +276,21 @@ export default function ListingDetailPage() {
           setListing(buildListingUI(snap.id, snap.data() as ListingDoc));
         }
       } catch (e) {
+        if (!active) return;
         console.error(e);
         setNotFound(true);
         setListing(null);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     run();
+    return () => { active = false; };
   }, [listingId]);
 
   useEffect(() => {
+    let active = true;
     async function loadListingReviews() {
       if (!listingId) {
         setReviews([]);
@@ -258,18 +300,14 @@ export default function ListingDetailPage() {
 
       setReviewsLoading(true);
       setReviewsError("");
+      setReviews([]);
+      setReviewsForId(listingId);
 
       try {
-        const snap = await getDocs(
-          query(
-            collection(db, "reviews"),
-            where("listingId", "==", listingId),
-            where("direction", "==", "traveler_to_host"),
-            where("status", "==", "published"),
-            orderBy("createdAt", "desc"),
-            limit(20)
-          )
+        const snap = await getDocsFromServer(
+          query(publishedListingReviews(db, listingId), orderBy("createdAt", "desc"))
         );
+        if (!active) return;
 
         const rows = snap.docs.map((d) => {
           const data = d.data() as {
@@ -278,6 +316,7 @@ export default function ListingDetailPage() {
             comment?: string;
             createdAt?: unknown;
           };
+          if (!isValidRatingValue(data.rating)) throw new Error("Invalid published review rating.");
           return {
             id: d.id,
             reviewerId: data.reviewerId ?? "",
@@ -288,7 +327,7 @@ export default function ListingDetailPage() {
           };
         });
 
-        const reviewerIds = Array.from(new Set(rows.map((row) => row.reviewerId).filter(Boolean)));
+        const reviewerIds = Array.from(new Set(rows.slice(0, 20).map((row) => row.reviewerId).filter(Boolean)));
         const reviewerMap = new Map<string, string>();
 
         if (reviewerIds.length > 0) {
@@ -343,38 +382,44 @@ export default function ListingDetailPage() {
           };
         });
 
-        setReviews(nextReviews);
+        if (active) setReviews(nextReviews);
       } catch (e) {
+        if (!active) return;
         console.error("[RVNB] listing reviews query failed", e);
         setReviews([]);
         setReviewsError("We couldn't load reviews right now.");
       } finally {
-        setReviewsLoading(false);
+        if (active) setReviewsLoading(false);
       }
     }
 
     loadListingReviews();
-  }, [listingId]);
+    return () => { active = false; };
+  }, [listingId, reviewRetry]);
 
   const hasCoords = useMemo(() => {
-    return !!listing && typeof listing.lat === "number" && typeof listing.lng === "number";
+    return !!listing && hasListingCoordinates(listing);
   }, [listing]);
 
   const mapsUrl = useMemo(() => {
     if (!listing) return "";
-    if (typeof listing.lat !== "number" || typeof listing.lng !== "number") return "";
+    if (!hasListingCoordinates(listing)) return "";
     return buildGoogleMapsUrl(listing.lat, listing.lng, listing.placeId);
   }, [listing]);
 
   const listingReviewSummary = useMemo(() => summarizeRatings(reviews.map((review) => ({ rating: review.rating }))), [reviews]);
+  const reviewsPending = reviewsLoading || reviewsForId !== listingId;
+  const ratingState: ListingRatingState = reviewsPending ? { status: "loading" }
+    : reviewsError ? { status: "error", message: reviewsError }
+    : { status: "ready", summary: listingReviewSummary };
 
   if (!listingId) {
     return (
       <div className={styles.page}>
         <div className={styles.container}>
-          <Link href="/listings" className={styles.backLink}>
-            ← Back to listings
-          </Link>
+            <Link href="/listings" className={styles.backLink}>
+              ← Back to listings
+            </Link>
           <div className={styles.heroCard}>
             <h1 className={styles.h1}>Listing ID missing</h1>
             <p className={styles.sub}>
@@ -386,7 +431,7 @@ export default function ListingDetailPage() {
     );
   }
 
-  if (loading) {
+  if (loading || (listing !== null && listing.id !== listingId)) {
     return (
       <div className={styles.page}>
         <div className={styles.container}>
@@ -424,12 +469,19 @@ export default function ListingDetailPage() {
   return (
     <div className={styles.page}>
       <div className={styles.container}>
+        <div className={styles.topBar}>
+          <Link href="/" className={styles.brand} aria-label="RVNB Home">
+            <Image src="/rvnb-logo-icon.png" alt="RVNB" width={2000} height={1333}
+              sizes="(max-width: 540px) 267px, 320px" className={styles.brandIcon} />
+          </Link>
         <Link href="/listings" className={styles.backLink}>
           ← Back to listings
         </Link>
+        </div>
 
         <div className={styles.header}>
           <div className={styles.headerContent}>
+            <p className={styles.eyebrow}>RVNB stays marketplace</p>
             <h1 className={styles.h1}>{listing.title}</h1>
 
             <div className={styles.location}>
@@ -437,53 +489,55 @@ export default function ListingDetailPage() {
             </div>
 
             {listing.geocodeAddress ? (
-              <div className={styles.addressLine}>{listing.geocodeAddress}</div>
+              <div className={styles.addressLine}>{listing.geocodeAddress === "MANUAL_PIN" ? "Host-selected map location." : listing.geocodeAddress}</div>
             ) : null}
 
+            <div className={styles.ratingLocation}>
+              <a href="#listing-reviews" className={styles.summaryLink}>
+                <ListingRating state={ratingState} />
+              </a>
+              {hasCoords ? <a href="#listing-location" className={styles.summaryLink}>View location</a>
+                : <span className={styles.locationHelpText}>Location not mapped yet</span>}
+            </div>
+
             <div className={styles.headerBadges}>
-              <span className={styles.headerBadge}>RV-ready stay</span>
-              <span className={styles.headerBadge}>Host-backed</span>
+              <span className={styles.headerBadge}>{listingTypeLabel(listing.listingType)}</span>
+              <span className={styles.headerBadge}>Host listing</span>
               {hasCoords ? (
-                <span className={styles.headerBadgeAccent}>📍 Exact pin saved</span>
+                <span className={styles.headerBadgeAccent}>Map pin saved</span>
               ) : (
-                <span className={styles.headerBadge}>Location details available</span>
+                <span className={styles.headerBadge}>Map pin not provided</span>
               )}
             </div>
           </div>
 
           <div className={styles.priceBox}>
-            <div className={styles.priceValue}>${listing.displayPriceValue}</div>
-            <div className={styles.priceLabel}>per {listing.displayPriceLabel}</div>
+            <div className={styles.priceValue}>{listing.displayPriceValue === null ? "Rate not provided" : `$${listing.displayPriceValue}`}</div>
+            <div className={styles.priceLabel}>{listing.displayPriceLabel ? `per ${listing.displayPriceLabel}` : "Billing period not provided"}</div>
           </div>
         </div>
 
-        <div className={styles.photoShowcase}>
+        <ListingPhotoGallery key={listing.id} photos={listing.photos} fallback={<div className={styles.photoShowcase}>
           <div className={styles.photoHero}>
             <div className={styles.photoOverlayContent}>
               <div className={styles.photoEyebrow}>RVNB Listing Preview</div>
-              <div className={styles.photoHeadline}>A cleaner, richer listing experience starts here.</div>
+              <div className={styles.photoHeadline}>Host photos have not been added yet.</div>
               <div className={styles.photoCaption}>
-                Photos can be added later without changing the page structure.
+                Review the listing details, amenities, and saved location below. This is an RVNB placeholder, not a property photo.
               </div>
               <div className={styles.photoBadge}>
                 <CameraIcon />
-                Photos coming soon
+                Photos not available
               </div>
             </div>
           </div>
-
-          <div className={styles.photoThumbGrid}>
-            <div className={styles.photoThumb}>Arrival view</div>
-            <div className={styles.photoThumb}>Hookup area</div>
-            <div className={styles.photoThumb}>Parking setup</div>
-            <div className={styles.photoThumb}>Surroundings</div>
-          </div>
-        </div>
+        </div>} />
 
         <div className={styles.layout}>
           <div className={styles.leftCol}>
+            {isAccommodation(listing.listingType) ? <AccommodationDetails data={listing.raw} /> : <>
             <div className={styles.card}>
-              <div className={styles.cardTitle}>Quick highlights</div>
+              <h2 className={styles.cardTitle}>Quick highlights</h2>
 
               <div className={styles.highlightsGrid}>
                 <div className={styles.highlightTile}>
@@ -494,7 +548,7 @@ export default function ListingDetailPage() {
                 <div className={styles.highlightTile}>
                   <div className={styles.highlightLabel}>Rig size</div>
                   <div className={styles.highlightValue}>
-                    {listing.maxLengthFt > 0 ? `${listing.maxLengthFt} ft max` : "Flexible"}
+                    {listing.maxLengthFt > 0 ? `${listing.maxLengthFt} ft max` : "Not specified"}
                   </div>
                 </div>
 
@@ -507,13 +561,13 @@ export default function ListingDetailPage() {
 
                 <div className={styles.highlightTile}>
                   <div className={styles.highlightLabel}>Location</div>
-                  <div className={styles.highlightValue}>{hasCoords ? "Exact pin saved" : "General details"}</div>
+                  <div className={styles.highlightValue}>{hasCoords ? "Map pin saved" : "General details"}</div>
                 </div>
               </div>
             </div>
 
             <div className={styles.card}>
-              <div className={styles.cardTitle}>Spot details</div>
+              <h2 className={styles.cardTitle}>Spot details</h2>
 
               <div className={styles.pills}>
                 <span className={styles.pill}>Hookups: {listing.hookups}</span>
@@ -555,42 +609,47 @@ export default function ListingDetailPage() {
               </div>
 
               <div className={styles.note}>
-                Tip: When photos are added later, this page won’t change — only the photo area fills in.
+                Ask the host for approach, parking, and hookup details if you need extra arrival context.
               </div>
             </div>
+            </>}
 
             <div className={styles.card}>
-              <div className={styles.cardTitle}>About this spot</div>
+              <h2 className={styles.cardTitle}>About this spot</h2>
               <p className={styles.paragraph}>{aboutText}</p>
+              {listing.nearbyAttractions && <>
+                <h3 className={styles.subheading}>Nearby attractions</h3>
+                <p className={styles.paragraph}>{listing.nearbyAttractions}</p>
+              </>}
             </div>
 
-            <div className={styles.card}>
-              <ReviewSummary
-                title="Ratings & reviews"
-                average={listingReviewSummary.average}
-                count={listingReviewSummary.count}
-                loading={reviewsLoading}
-                error={reviewsError || undefined}
-                emptyText="No verified-stay reviews yet."
-              />
+            <section id="listing-reviews" tabIndex={-1} aria-label="Ratings and reviews" className={`${styles.card} ${styles.anchorSection}`}>
+              <div role={!reviewsPending && reviewsError ? "alert" : undefined}>
+                <ReviewSummary
+                  title="Ratings & reviews"
+                  average={listingReviewSummary.average}
+                  count={listingReviewSummary.count}
+                  loading={reviewsPending}
+                  error={reviewsError || undefined}
+                  emptyText="No reviews yet."
+                />
+                {!reviewsPending && reviewsError && <div>
+                  <button type="button" className={styles.mapAction} onClick={() => setReviewRetry(value => value + 1)}>Retry reviews</button>
+                </div>}
+              </div>
 
-              {reviewsLoading ? (
-                <div className={styles.note} style={{ marginTop: 12 }}>Loading listing reviews…</div>
-              ) : reviewsError ? (
-                <div className={styles.note} style={{ marginTop: 12 }}>{reviewsError}</div>
-              ) : reviews.length === 0 ? (
-                <div className={styles.note} style={{ marginTop: 12 }}>No verified-stay reviews yet.</div>
-              ) : (
+              {!reviewsPending && !reviewsError && reviews.length > 0 && (
                 <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-                  {reviews.map((review) => (
+                  {reviews.length > 20 && <p className={styles.locationHelpText}>Showing the latest 20 of {reviews.length} reviews. The rating includes all published traveler reviews for this listing.</p>}
+                  {reviews.slice(0, 20).map((review) => (
                     <ReviewCard key={review.id} review={review} />
                   ))}
                 </div>
               )}
-            </div>
+            </section>
 
             <div className={styles.card}>
-              <div className={styles.cardTitle}>Why travelers like this spot</div>
+              <h2 className={styles.cardTitle}>Listing highlights</h2>
 
               <div className={styles.travelList}>
                 {travelHighlights.map((item) => (
@@ -602,19 +661,19 @@ export default function ListingDetailPage() {
               </div>
             </div>
 
-            <div className={styles.card}>
-              <div className={styles.cardTitle}>Location</div>
+            <section id="listing-location" tabIndex={-1} aria-label="Location" className={`${styles.card} ${styles.anchorSection}`}>
+              <h2 className={styles.cardTitle}>Location</h2>
 
               <div className={styles.locationStatusRow}>
                 <span className={styles.locationStatusLabel}>Location details</span>
                 <span className={hasCoords ? styles.locationBadgeExact : styles.locationBadgeSoft}>
-                  {hasCoords ? "Exact pin available" : "General location only"}
+                  {hasCoords ? "Host-selected location" : "Location not mapped yet"}
                 </span>
               </div>
 
               {listing.geocodeAddress ? (
                 <p className={styles.paragraph} style={{ marginTop: 10 }}>
-                  <b>Saved address:</b> {listing.geocodeAddress}
+                  {listing.geocodeAddress === "MANUAL_PIN" ? "Host-selected map location." : <><b>Saved address:</b> {listing.geocodeAddress}</>}
                 </p>
               ) : (
                 <p className={styles.paragraph} style={{ marginTop: 10 }}>
@@ -662,24 +721,27 @@ export default function ListingDetailPage() {
                   No exact pin saved for this listing yet. Hosts can add a manual pin when creating the listing.
                 </div>
               )}
-            </div>
+            </section>
 
             <div className={styles.card}>
-              <div className={styles.cardTitle}>What to expect</div>
+              <h2 className={styles.cardTitle}>What to expect</h2>
               <p className={styles.paragraph}>
-                RVNB spots are designed to be simple, host-backed places to park and reset. This listing page will
-                expand later with rules, check-in instructions, and verified details.
+                Sending a date inquiry does not reserve this space or confirm a stay. The host must approve
+                the inquiry before the stay is confirmed. Include any arrival questions in the optional note.
               </p>
             </div>
           </div>
 
           <div className={styles.rightCol}>
-            <BookingPanel
+            {listing.displayPriceValue !== null && listing.displayPriceLabel ? <BookingPanel
+              key={listing.id}
               listingId={listing.id}
               hostId={listing.hostId}
               nightlyPrice={listing.displayPriceValue}
               priceLabel={listing.displayPriceLabel}
-            />
+              listingType={listing.listingType}
+              accommodation={record(listing.raw.accommodation)}
+            /> : <section className={styles.bookingCard}><h2 className={styles.bookingTitle}>Rate information incomplete</h2><p className={styles.bookingSub}>The host must provide a valid rate and billing period before date inquiries are available.</p></section>}
           </div>
         </div>
       </div>

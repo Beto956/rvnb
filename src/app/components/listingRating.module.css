@@ -1,0 +1,5 @@
+.rating { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; line-height: 1.6; color: #edf5ff; font-weight: 500; }
+.quiet { color: #c5d2e3; font-size: 13px; line-height: 1.6; font-weight: 400; }
+.stars { position: relative; display: inline-block; white-space: nowrap; line-height: 1; letter-spacing: 1px; font-size: 15px; }
+.starBase { color: #647e96; }
+.starFill { position: absolute; inset: 0 auto 0 0; overflow: hidden; color: #e8c58e; }

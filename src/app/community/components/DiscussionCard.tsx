@@ -1,8 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
 import {
   categoryLabel,
   formatCommunityDate,
@@ -36,58 +34,45 @@ type DiscussionCardProps = {
 };
 
 export default function DiscussionCard({ post, currentUserId }: DiscussionCardProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const router = useRouter();
   const isOwner = !!currentUserId && currentUserId === post.authorId;
   const authorName = safeAuthorName(post.authorDisplayName);
-
-  function goToAuthorProfile(e: React.SyntheticEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    router.push(`/members/${post.authorId}`);
-  }
+  const dateLabel = formatCommunityDate(post.createdAt);
 
   return (
     <li className={styles.item}>
       <div className={styles.card}>
-        <Link href={`/community/posts/${post.id}`} className={styles.cardLink}>
-          <div className={styles.header}>
-            <span
-              className={styles.avatar}
-              role="link"
-              tabIndex={0}
-              aria-label={`View ${authorName}'s profile`}
-              onClick={goToAuthorProfile}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") goToAuthorProfile(e);
-              }}
+        <div className={styles.header}>
+            <Link
+        className={styles.avatar}
+        href={`/members/${encodeURIComponent(post.authorId)}`}
+        aria-label={`View ${authorName}'s profile`}
             >
-              {initialsFromName(post.authorDisplayName)}
-            </span>
+        {initialsFromName(post.authorDisplayName)}
+            </Link>
             <div className={styles.headerText}>
-              <span
-                className={styles.author}
-                role="link"
-                tabIndex={0}
-                aria-label={`View ${authorName}'s profile`}
-                onClick={goToAuthorProfile}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") goToAuthorProfile(e);
-                }}
-              >
-                {authorName}
+        <Link
+          className={styles.author}
+          href={`/members/${encodeURIComponent(post.authorId)}`}
+          aria-label={`View ${authorName}'s profile`}
+        >
+          {authorName}
+        </Link>
+        <span className={styles.subline}>
+          <span className={styles.category}>{categoryLabel(post.category)}</span>
+          {dateLabel && (
+            <>
+              <span aria-hidden="true"> · </span>
+              <span>
+                {dateLabel}
+                {wasEdited(post.createdAt, post.updatedAt) ? " · Edited" : ""}
               </span>
-              <span className={styles.subline}>
-                <span className={styles.category}>{categoryLabel(post.category)}</span>
-                <span aria-hidden="true"> · </span>
-                <span>
-                  {formatCommunityDate(post.createdAt)}
-                  {wasEdited(post.createdAt, post.updatedAt) ? " · Edited" : ""}
-                </span>
-              </span>
+            </>
+          )}
+        </span>
             </div>
           </div>
 
+        <Link href={`/community/posts/${encodeURIComponent(post.id)}`} className={styles.cardLink}>
           <h3 className={styles.title}>{post.title}</h3>
           <p className={styles.excerpt}>{excerptOf(post.body)}</p>
 
@@ -98,56 +83,49 @@ export default function DiscussionCard({ post, currentUserId }: DiscussionCardPr
         </Link>
 
         <div className={styles.actions}>
-          <div
+          <details
             className={styles.menuWrap}
-            onBlur={(e) => {
-              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-                setMenuOpen(false);
+            onKeyDown={event => {
+              if (event.key === "Escape") {
+                event.currentTarget.open = false;
+                event.currentTarget.querySelector("summary")?.focus();
               }
             }}
           >
-            <button
-              type="button"
+            <summary
               className={styles.menuButton}
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
               aria-label={`More actions for ${post.title}`}
-              onClick={() => setMenuOpen((v) => !v)}
             >
               ⋯
-            </button>
-            {menuOpen && (
-              <ul className={styles.menu} role="menu">
-                <li role="none">
-                  <Link role="menuitem" href={`/community/posts/${post.id}`} className={styles.menuItem}>
-                    Open discussion
+            </summary>
+            <ul className={styles.menu}>
+              <li>
+                <Link href={`/community/posts/${encodeURIComponent(post.id)}`} className={styles.menuItem}>
+                  Open discussion
+                </Link>
+              </li>
+              {isOwner && (
+                <li>
+                  <Link
+                    href={`/community/posts/${encodeURIComponent(post.id)}?edit=1`}
+                    className={styles.menuItem}
+                  >
+                    Edit
                   </Link>
                 </li>
-                {isOwner && (
-                  <li role="none">
-                    <Link
-                      role="menuitem"
-                      href={`/community/posts/${post.id}?edit=1`}
-                      className={styles.menuItem}
-                    >
-                      Edit
-                    </Link>
-                  </li>
-                )}
-                {!isOwner && currentUserId && (
-                  <li role="none">
-                    <Link
-                      role="menuitem"
-                      href={`/community/posts/${post.id}?report=1`}
-                      className={styles.menuItem}
-                    >
-                      Report
-                    </Link>
-                  </li>
-                )}
-              </ul>
-            )}
-          </div>
+              )}
+              {!isOwner && currentUserId && (
+                <li>
+                  <Link
+                    href={`/community/posts/${encodeURIComponent(post.id)}?report=1`}
+                    className={styles.menuItem}
+                  >
+                    Report
+                  </Link>
+                </li>
+              )}
+            </ul>
+          </details>
         </div>
       </div>
     </li>

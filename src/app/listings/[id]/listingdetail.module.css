@@ -1,8 +1,18 @@
 .page {
   position: relative;
   min-height: 100vh;
-  color: white;
-  background: url("/listing-bg.png") center / cover no-repeat fixed;
+  color: #f5f7fb;
+  font-family: "Aptos", "Trebuchet MS", sans-serif;
+  background: #07101d url("/rvnb-listings-bg.png") center / cover no-repeat fixed;
+}
+
+.page * {
+  box-sizing: border-box;
+}
+
+.page :is(a, button, input, textarea):focus-visible {
+  outline: 3px solid #8ad1ff;
+  outline-offset: 4px;
 }
 
 .page::after {
@@ -31,16 +41,75 @@
 .container {
   position: relative;
   z-index: 1;
-  max-width: 980px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 40px 16px 80px;
+  padding: 28px 20px 80px;
+}
+
+.ratingLocation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 20px;
+  margin-top: 8px;
+}
+
+.summaryLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: #8dccff;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.summaryLink:hover { text-decoration: underline; }
+.anchorSection { scroll-margin-top: 24px; }
+.anchorSection:focus { outline: 3px solid #8ad1ff; outline-offset: 4px; }
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.brand {
+  display: block;
+  position: relative;
+  width: 180px;
+  height: 60px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.brandIcon {
+  position: absolute;
+  max-width: none;
+  width: 320px;
+  height: auto;
+  left: -70px;
+  top: -73px;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: #e8c58e;
 }
 
 .backLink {
-  display: inline-block;
-  color: rgba(255,255,255,0.78);
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: #c5d2e3;
   text-decoration: none;
-  margin-bottom: 16px;
+  margin-bottom: 0;
   transition: opacity 160ms ease, transform 160ms ease;
 }
 
@@ -53,7 +122,11 @@
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 16px;
+  gap: 24px;
+  padding: 28px;
+  border: 1px solid #354b64;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(22, 45, 68, .96), rgba(9, 27, 44, .94));
 }
 
 .headerContent {
@@ -63,23 +136,28 @@
 
 .h1 {
   margin: 0;
-  font-size: 38px;
-  letter-spacing: 0.2px;
-  line-height: 1.1;
+  font-size: clamp(30px, 3.5vw, 44px);
+  font-weight: 700;
+  letter-spacing: -0.7px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
   text-shadow: 0 10px 30px rgba(0,0,0,0.55);
 }
 
 .location {
   margin-top: 6px;
-  opacity: 0.82;
+  color: #d5e1ef;
+  font-size: 16px;
+  line-height: 1.6;
   text-shadow: 0 10px 30px rgba(0,0,0,0.55);
 }
 
 .addressLine {
   margin-top: 6px;
-  opacity: 0.82;
-  font-size: 13px;
-  line-height: 1.35;
+  color: #c5d2e3;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 .headerBadges {
@@ -97,7 +175,7 @@
   padding: 6px 12px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 850;
+  font-weight: 500;
   backdrop-filter: blur(10px);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
 }
@@ -116,10 +194,11 @@
 
 .priceBox {
   text-align: right;
-  padding: 10px 12px;
+  padding: 16px 20px;
+  flex-shrink: 0;
   border-radius: 14px;
-  background: rgba(8, 12, 18, 0.45);
-  border: 1px solid rgba(255,255,255,0.14);
+  background: #0d2135;
+  border: 1px solid #3b526a;
   backdrop-filter: blur(12px);
   box-shadow:
     0 16px 40px rgba(0,0,0,0.55),
@@ -127,20 +206,19 @@
 }
 
 .priceValue {
-  font-size: 22px;
-  font-weight: 950;
+  font-size: 28px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .priceLabel {
-  font-size: 12px;
-  opacity: 0.75;
+  font-size: 14px;
+  color: #c5d2e3;
 }
 
 .photoShowcase {
   margin-top: 18px;
-  display: grid;
-  grid-template-columns: 1.45fr 0.75fr;
-  gap: 12px;
+  display: block;
 }
 
 @media (max-width: 900px) {
@@ -151,14 +229,13 @@
 
 .photoHero {
   position: relative;
-  min-height: 290px;
-  border-radius: 22px;
+  min-height: 260px;
+  border-radius: 14px;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,0.12);
   background:
-    radial-gradient(700px 320px at 30% 10%, rgba(255,255,255,0.12), transparent 60%),
-    linear-gradient(140deg, rgba(255,255,255,0.10), rgba(255,255,255,0.02)),
-    linear-gradient(120deg, rgba(25, 35, 55, 0.68), rgba(9, 16, 28, 0.78));
+    radial-gradient(700px 320px at 30% 10%, rgba(125,190,244,0.10), transparent 60%),
+    linear-gradient(120deg, #102b42, #091b2d);
   backdrop-filter: blur(12px);
   box-shadow:
     0 20px 52px rgba(0,0,0,0.55),
@@ -177,7 +254,6 @@
     transparent
   );
   opacity: 0.7;
-  animation: shimmer 3.6s ease-in-out infinite;
   pointer-events: none;
 }
 
@@ -187,24 +263,24 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  height: 100%;
-  padding: 20px;
+  min-height: 260px;
+  padding: 28px;
 }
 
 .photoEyebrow {
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  opacity: 0.78;
+  color: #e8c58e;
 }
 
 .photoHeadline {
   margin-top: 10px;
   max-width: 540px;
-  font-size: 28px;
-  font-weight: 950;
-  line-height: 1.08;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.3;
   text-shadow: 0 12px 28px rgba(0,0,0,0.42);
 }
 
@@ -213,7 +289,7 @@
   max-width: 520px;
   font-size: 14px;
   line-height: 1.5;
-  color: rgba(255,255,255,0.82);
+  color: #c5d2e3;
 }
 
 .photoThumbGrid {
@@ -266,7 +342,7 @@
   border-radius: 999px;
   background: rgba(0,0,0,0.40);
   border: 1px solid rgba(255,255,255,0.14);
-  font-weight: 850;
+  font-weight: 500;
   font-size: 12px;
   opacity: 0.95;
   backdrop-filter: blur(10px);
@@ -274,10 +350,11 @@
 }
 
 .layout {
-  margin-top: 16px;
+  margin-top: 24px;
   display: grid;
-  grid-template-columns: 1.35fr 0.65fr;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 400px);
+  gap: 24px;
+  align-items: start;
 }
 
 .leftCol,
@@ -292,10 +369,10 @@
 }
 
 .card {
-  border-radius: 20px;
-  padding: 18px;
-  background: rgba(10, 14, 22, 0.58);
-  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px;
+  padding: 24px;
+  background: linear-gradient(145deg, rgba(19,38,59,.97), rgba(12,30,48,.97));
+  border: 1px solid #354b64;
   box-shadow:
     0 22px 60px rgba(0,0,0,0.58),
     inset 0 1px 0 rgba(255,255,255,0.10);
@@ -304,11 +381,10 @@
 }
 
 .card + .card {
-  margin-top: 14px;
+  margin-top: 20px;
 }
 
 .card:hover {
-  transform: translateY(-2px);
   border-color: rgba(255,255,255,0.18);
   box-shadow:
     0 26px 70px rgba(0,0,0,0.62),
@@ -316,9 +392,9 @@
 }
 
 .cardTitle {
-  font-weight: 950;
-  font-size: 14px;
-  margin-bottom: 12px;
+  margin: 0 0 16px;
+  font-weight: 600;
+  font-size: 20px;
   opacity: 0.98;
 }
 
@@ -335,22 +411,22 @@
 }
 
 .highlightTile {
-  border-radius: 16px;
+  border-radius: 10px;
   padding: 14px;
-  background: rgba(0,0,0,0.20);
-  border: 1px solid rgba(255,255,255,0.10);
+  background: #0d2135;
+  border: 1px solid #354b64;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
 .highlightLabel {
-  font-size: 12px;
-  opacity: 0.7;
+  font-size: 13px;
+  color: #c5d2e3;
 }
 
 .highlightValue {
   margin-top: 8px;
   font-size: 15px;
-  font-weight: 900;
+  font-weight: 600;
   line-height: 1.25;
 }
 
@@ -383,15 +459,14 @@
   justify-content: space-between;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 14px;
-  background: rgba(0,0,0,0.22);
-  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 8px;
+  background: #0d2135;
+  border: 1px solid #354b64;
   transition: border-color 140ms ease, transform 140ms ease;
 }
 
 .featureRow:hover {
   border-color: rgba(255,255,255,0.16);
-  transform: translateY(-1px);
 }
 
 .featureLeft {
@@ -415,13 +490,15 @@
 }
 
 .featureKey {
-  opacity: 0.76;
-  font-size: 13px;
+  color: #c5d2e3;
+  font-size: 14px;
 }
 
 .featureVal {
-  font-weight: 850;
-  font-size: 13px;
+  font-weight: 500;
+  font-size: 14px;
+  min-width: 0;
+  overflow-wrap: anywhere;
   text-align: right;
 }
 
@@ -438,6 +515,8 @@
   border-radius: 14px;
   background: rgba(0,0,0,0.18);
   border: 1px solid rgba(255,255,255,0.10);
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .travelCheck {
@@ -450,7 +529,7 @@
   background: rgba(80, 170, 255, 0.16);
   border: 1px solid rgba(120, 190, 255, 0.20);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
   flex-shrink: 0;
 }
 
@@ -499,13 +578,15 @@
 }
 
 .mapAction {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid rgba(255,255,255,0.15);
-  background: rgba(255,255,255,0.10);
-  color: white;
-  font-weight: 900;
+  background: #153552;
+  color: #d8eaff;
+  font-weight: 500;
   text-decoration: none;
   transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
 }
@@ -517,34 +598,42 @@
 }
 
 .locationHelpText {
-  opacity: 0.75;
-  font-size: 12px;
-  line-height: 1.4;
+  color: #c5d2e3;
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .note {
   margin-top: 12px;
-  font-size: 12px;
-  opacity: 0.72;
+  font-size: 13px;
+  color: #c5d2e3;
+  line-height: 1.6;
 }
 
 .paragraph {
   margin: 0;
   line-height: 1.6;
-  opacity: 0.88;
+  color: #d5e1ef;
+  font-size: 15px;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.subheading {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 20px 0 10px;
 }
 
 .bookingCard {
-  border-radius: 20px;
-  padding: 18px;
-  background: rgba(10, 14, 22, 0.58);
-  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 14px;
+  padding: 24px;
+  background: linear-gradient(155deg, #162d44, #102338 65%, #0b1c2e);
+  border: 1px solid #3b526a;
   box-shadow:
     0 22px 60px rgba(0,0,0,0.58),
     inset 0 1px 0 rgba(255,255,255,0.10);
   backdrop-filter: blur(14px);
-  position: sticky;
-  top: 18px;
 }
 
 .bookingTop {
@@ -552,14 +641,42 @@
 }
 
 .bookingTitle {
-  font-size: 16px;
-  font-weight: 950;
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0;
 }
 
 .bookingSub {
   margin-top: 6px;
-  font-size: 12px;
-  opacity: 0.75;
+  font-size: 13px;
+  color: #c5d2e3;
+  line-height: 1.6;
+}
+
+.bookingRate {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.bookingBreakdown {
+  margin-top: 8px;
+  color: #c5d2e3;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.bookingFields {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+  min-width: 0;
+}
+
+.bookingTypes {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 20px 0 0;
 }
 
 .dateRow {
@@ -590,23 +707,43 @@
 }
 
 .label {
-  font-size: 12px;
-  opacity: 0.78;
+  font-size: 14px;
+  font-weight: 500;
+  color: #cedbeb;
 }
 
 .input {
-  height: 42px;
-  border-radius: 12px;
+  width: 100%;
+  min-width: 0;
+  height: 46px;
+  border-radius: 8px;
   padding: 0 12px;
-  background: rgba(0,0,0,0.30);
-  border: 1px solid rgba(255,255,255,0.12);
+  background: #0d2135;
+  border: 1px solid #3b5269;
   color: white;
-  outline: none;
+  color-scheme: dark;
+  font: inherit;
+  font-size: 15px;
   transition: border-color 140ms ease, transform 140ms ease;
 }
 
 .input:focus {
-  border-color: rgba(255,255,255,0.22);
+  border-color: #7ebbf4;
+}
+
+.textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 110px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #3b5269;
+  background: #0d2135;
+  color: #f5f7fb;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  resize: vertical;
 }
 
 .sectionTitle {
@@ -624,12 +761,16 @@
 }
 
 .segmentBtn {
-  height: 42px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(0,0,0,0.22);
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #3b5269;
+  background: #0d2135;
   color: rgba(255,255,255,0.90);
-  font-weight: 850;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
   cursor: pointer;
   transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
 }
@@ -640,8 +781,8 @@
 }
 
 .segmentActive {
-  border-color: rgba(255,255,255,0.24);
-  background: rgba(255,255,255,0.10);
+  border-color: #5295ff;
+  background: #153c67;
   color: white;
 }
 
@@ -672,19 +813,20 @@
   border-radius: 14px;
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.12);
-  font-size: 12px;
-  opacity: 0.92;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .primaryAction {
   margin-top: 12px;
   width: 100%;
   height: 46px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.16);
-  background: rgba(255,255,255,0.13);
+  border-radius: 8px;
+  border: 1px solid #5295ff;
+  background: #246bd5;
   color: white;
-  font-weight: 950;
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
   box-shadow: 0 14px 36px rgba(0,0,0,0.45);
   transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
@@ -693,7 +835,7 @@
 .primaryAction:hover {
   transform: translateY(-1px);
   border-color: rgba(255,255,255,0.22);
-  background: rgba(255,255,255,0.16);
+  background: #2877e7;
 }
 
 .primaryAction:disabled {
@@ -717,6 +859,42 @@
   margin: 10px 0 0;
   opacity: 0.82;
   line-height: 1.55;
+}
+
+@media (max-width: 540px) {
+  .container {
+    padding: 20px 14px 64px;
+  }
+
+  .header,
+  .card,
+  .bookingCard,
+  .photoOverlayContent {
+    padding: 20px 18px;
+  }
+
+  .layout {
+    gap: 20px;
+  }
+
+  .brand {
+    width: 150px;
+    height: 50px;
+  }
+
+  .brandIcon {
+    width: 267px;
+    left: -58px;
+    top: -61px;
+  }
+
+  .featureRow {
+    flex-wrap: wrap;
+  }
+
+  .photoHeadline {
+    font-size: 22px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -24,8 +24,10 @@ import ReviewCard, { type ReviewCardItem } from "../../components/ReviewCard";
 import ReviewSummary from "../../components/ReviewSummary";
 import styles from "./memberProfile.module.css";
 import { isValidUserIdParam, type MemberProfileDoc } from "../memberProfileTypes";
+import ListingPhoto from "../../components/ListingPhoto";
+import { listingPhotos, type PhotoFields } from "@/lib/listing-photos";
 
-type ListingDoc = {
+type ListingDoc = PhotoFields & {
   id: string;
   title?: string;
   city?: string;
@@ -495,7 +497,9 @@ export default function MemberProfilePage() {
                 <div className={styles.listingsGrid}>
                   {listings.map((l) => (
                     <article key={l.id} className={styles.listingCard}>
-                      <div className={styles.listingMedia}>🚐 Photos coming soon</div>
+                      <div className={styles.listingMedia} style={{ position: "relative", overflow: "hidden" }}>
+                        <ListingPhoto photos={listingPhotos(l)} fill fallback={<>🚐 Photos not added</>} />
+                      </div>
                       <div className={styles.listingBody}>
                         <div className={styles.listingTitle}>{l.title || "Untitled Listing"}</div>
                         <div className={styles.listingMeta}>

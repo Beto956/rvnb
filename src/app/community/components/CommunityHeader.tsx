@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import AuthNav from "@/app/components/authnav";
 import styles from "./CommunityHeader.module.css";
 
@@ -14,8 +15,7 @@ export default function CommunityHeader() {
     <header className={styles.header}>
       <div className={styles.inner}>
         <Link href="/" className={styles.brand} aria-label="RVNB Home">
-          <span className={styles.brandMark} aria-hidden="true">▲</span>
-          <span>RVNB</span>
+          <Image src="/rvnb-logo-icon.png" alt="RVNB" width={2000} height={1333} sizes="320px" priority />
         </Link>
 
         <nav className={styles.nav} aria-label="Primary">

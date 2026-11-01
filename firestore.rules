@@ -5,6 +5,63 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Closed until an approved privacy notice and operational review enable intake.
+    function hostGrowthIntakeEnabled() {
+      return false;
+    }
+
+    function safeGrowthRegistration(data, registrationId) {
+      return data.keys().hasAll([
+          'schemaVersion', 'pilotId', 'ownerId', 'listingId', 'city', 'stateRegion',
+          'category', 'description', 'estimatedCostCents', 'requestedSupportCents',
+          'propertyPermission', 'contactEmail', 'contactConsent', 'status', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'schemaVersion', 'pilotId', 'ownerId', 'listingId', 'city', 'stateRegion',
+          'category', 'description', 'estimatedCostCents', 'requestedSupportCents',
+          'propertyPermission', 'contactEmail', 'contactConsent', 'status', 'createdAt'
+        ])
+        && data.schemaVersion is int && data.schemaVersion == 1 && data.pilotId == 'pilot-01'
+        && data.ownerId == request.auth.uid
+        && data.city is string && data.stateRegion is string
+        && ((data.listingId == null
+            && registrationId == request.auth.uid + '__proposed'
+            && data.city.size() >= 1 && data.city.size() <= 80
+            && !data.city.matches('^\\s*$')
+            && data.stateRegion.size() >= 1 && data.stateRegion.size() <= 80
+            && !data.stateRegion.matches('^\\s*$'))
+          || (data.listingId is string && data.listingId.size() >= 1
+            && data.listingId.size() <= 150
+            && registrationId == request.auth.uid + '__listing__' + data.listingId
+            && ownsListing(data.listingId)
+            && data.city == '' && data.stateRegion == ''))
+        && data.category in ['Wi-Fi coverage', 'Entrance signage', 'Listing photography', 'Site preparation']
+        && data.description is string && data.description.size() >= 20 && data.description.size() <= 1000
+        && !data.description.matches('^\\s*$')
+        && data.estimatedCostCents is int && data.estimatedCostCents >= 1 && data.estimatedCostCents <= 10000000
+        && data.requestedSupportCents is int && data.requestedSupportCents >= 1 && data.requestedSupportCents <= 50000
+        && data.requestedSupportCents <= data.estimatedCostCents
+        && data.propertyPermission == true && data.contactConsent == true
+        && data.contactEmail is string && data.contactEmail.size() <= 254
+        && data.contactEmail.matches('^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$')
+        && data.status == 'registered'
+        && data.createdAt is timestamp && data.createdAt == request.time;
+    }
+
+    match /hostGrowthRegistrations/{registrationId} {
+      allow create: if signedIn() && hostGrowthIntakeEnabled()
+        && safeGrowthRegistration(request.resource.data, registrationId);
+      allow get: if signedIn()
+        && (resource == null
+          ? registrationId == request.auth.uid + '__proposed'
+            || (registrationId.split('__listing__').size() == 2
+              && registrationId.split('__listing__')[0] == request.auth.uid
+              && registrationId.split('__listing__')[1].size() > 0)
+          : resource.data.ownerId == request.auth.uid);
+      allow list: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
     function userDoc(userId) {
       return get(/databases/$(database)/documents/users/$(userId));
     }
@@ -129,7 +186,8 @@ service cloud.firestore {
           'createdAt', 'updatedAt', 'finalizedAt', 'requestType',
           'locationText', 'city', 'state', 'startDate', 'endDate',
           'flexibleDates', 'employerName', 'teamName', 'teamLocation',
-          'workersCount', 'rigsCount', 'spotsNeeded', 'stayDurationType',
+          'representativeRole', 'workersCount', 'rigsCount', 'spotsNeeded',
+          'separateSpotsNeeded', 'singleCoordinator', 'stayDurationType',
           'primaryRv', 'moreThanOneRv', 'additionalRvs', 'hookupsNeeded',
           'budgetMax', 'budgetPeriod', 'rvDetails', 'note'
         ]);
@@ -144,8 +202,9 @@ service cloud.firestore {
           'requestId', 'requesterId', 'publicVersion', 'status', 'isFinalized',
           'createdAt', 'updatedAt', 'finalizedAt', 'requestType', 'locationText',
           'city', 'state', 'startDate', 'endDate', 'flexibleDates', 'employerName',
-          'teamName', 'teamLocation', 'workersCount', 'rigsCount', 'spotsNeeded',
-          'stayDurationType', 'primaryRv', 'moreThanOneRv', 'additionalRvs',
+          'teamName', 'teamLocation', 'representativeRole', 'workersCount', 'rigsCount',
+          'spotsNeeded', 'separateSpotsNeeded', 'singleCoordinator', 'stayDurationType',
+          'primaryRv', 'moreThanOneRv', 'additionalRvs',
           'hookupsNeeded', 'budgetMax', 'budgetPeriod', 'rvDetails', 'note'
         ]);
     }
@@ -543,13 +602,95 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    function accommodationType(value) {
+      return value in ['host_rv', 'mobile_home', 'cabin'];
+    }
+
+    function safeStayAmenities(data) {
+      return data is map && data.keys().hasOnly([
+          'wifi', 'heating', 'airConditioning', 'fullKitchen', 'kitchenette', 'refrigerator',
+          'microwave', 'cooktop', 'oven', 'bathroom', 'shower', 'hotWater', 'linens', 'towels',
+          'laundry', 'parking', 'outdoorSeating', 'picnicTable', 'grill', 'firePit', 'porchDeck',
+          'petsAllowed', 'stepFreeEntrance', 'connectedPower', 'potableWater', 'sewerConnection',
+          'holdingTank', 'smokeAlarm', 'coAlarm', 'fireExtinguisher'
+        ])
+        && data.values().hasOnly(['unknown', 'available', 'private', 'shared', 'unavailable', 'not_applicable']);
+    }
+
+    function bedCount(value) { return value is int && value >= 0 && value <= 30; }
+    function optionalTime(value) { return value is string && (value == '' || value.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')); }
+    function safeAccommodation(a, type) {
+      return a is map
+        && a.keys().hasOnly(['maxGuests', 'bedrooms', 'sleepingAreas', 'beds', 'bathrooms',
+          'checkInFrom', 'checkInTo', 'checkOutBy', 'houseRules', 'rvType', 'rvLengthFt', 'utilityNotes', 'accessNotes'])
+        && a.maxGuests is int && a.maxGuests >= 1 && a.maxGuests <= 30
+        && a.bedrooms is int && a.bedrooms >= 0 && a.bedrooms <= 20
+        && a.sleepingAreas is int && a.sleepingAreas >= 1 && a.sleepingAreas <= 20
+        && a.bathrooms is number && a.bathrooms >= 0 && a.bathrooms <= 20 && (a.bathrooms * 2) % 1 == 0
+        && a.beds is map && a.beds.keys().hasOnly(['single', 'double', 'queen', 'king', 'bunk', 'sofa'])
+        && bedCount(a.beds.single) && bedCount(a.beds.double) && bedCount(a.beds.queen)
+        && bedCount(a.beds.king) && bedCount(a.beds.bunk) && bedCount(a.beds.sofa)
+        && a.beds.single + a.beds.double + a.beds.queen + a.beds.king + a.beds.bunk + a.beds.sofa > 0
+        && optionalTime(a.checkInFrom) && optionalTime(a.checkInTo) && optionalTime(a.checkOutBy)
+        && (a.checkInFrom == '' || a.checkInTo == '' || a.checkInFrom <= a.checkInTo)
+        && a.houseRules is string && a.houseRules.size() <= 2000
+        && a.utilityNotes is string && a.utilityNotes.size() <= 1000
+        && a.accessNotes is string && a.accessNotes.size() <= 500
+        && a.rvType is string && a.rvType.size() <= 80
+        && (a.rvLengthFt == null || (a.rvLengthFt is number && a.rvLengthFt > 0 && a.rvLengthFt <= 100))
+        && (type != 'host_rv' || (a.rvType.size() > 0 && a.rvLengthFt is number));
+    }
+
+    function safeTypedListing(data) {
+      return !data.keys().hasAny(['listingType'])
+        || (data.listingType in ['rv_space', 'land_space', 'host_rv', 'mobile_home', 'cabin']
+          && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+          && data.city is string && data.city.size() >= 1 && data.city.size() <= 120
+          && data.state is string && data.state.size() == 2
+          && data.description is string && data.description.size() <= 800
+          && data.price is number && data.price >= 0 && data.price <= 1000000
+          && data.pricingType in ['Night', 'Weekly', 'Monthly']
+          && (!accommodationType(data.listingType)
+            || (data.description.size() > 0 && safeAccommodation(data.accommodation, data.listingType)
+              && safeStayAmenities(data.stayAmenities))));
+    }
+
+    function safeOfferingInquiry(data) {
+      let listing = get(/databases/$(database)/documents/listings/$(data.listingId)).data;
+      let type = listing.get('listingType', 'legacy');
+      return (type == 'legacy'
+          && (!data.keys().hasAny(['listingType']))
+          && (!data.keys().hasAny(['bookingType']) || data.bookingType in ['RV', 'LAND']))
+        || (type in ['rv_space', 'land_space', 'host_rv', 'mobile_home', 'cabin']
+          && data.listingType == type
+          && data.bookingType == (type == 'rv_space' ? 'RV' : type == 'land_space' ? 'LAND' : 'RV_PROVIDED')
+          && (!accommodationType(type)
+            || (listing.accommodation.maxGuests is int && listing.accommodation.maxGuests >= 1 && listing.accommodation.maxGuests <= 30
+              && data.guestCount is int && data.guestCount >= 1 && data.guestCount <= listing.accommodation.maxGuests))
+          && data.keys().hasOnly(['listingId', 'guestId', 'hostId', 'checkIn', 'checkOut', 'bookingType',
+            'listingType', 'guestCount', 'nights', 'estimatedTotal', 'estimateStatus', 'note', 'status', 'createdAt'])
+          && data.checkIn is string && data.checkIn.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && data.checkOut is string && data.checkOut.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && data.checkOut > data.checkIn
+          && data.nights is int && data.nights > 0 && data.nights <= 3660
+          && data.note is string && data.note.size() <= 500 && data.createdAt == request.time
+          && data.estimateStatus in ['nightly_estimate', 'host_confirmation_required']
+          && (listing.pricingType == 'Night'
+            ? data.estimatedTotal is number && data.estimatedTotal >= 0 && data.estimatedTotal <= 3660000000
+              && data.estimateStatus == 'nightly_estimate'
+            : data.estimatedTotal == null && data.estimateStatus == 'host_confirmation_required'));
+    }
+
     match /listings/{listingId} {
       allow read: if true;
       allow create: if signedIn()
-        && request.resource.data.hostId == request.auth.uid;
+        && request.resource.data.hostId == request.auth.uid
+        && safeTypedListing(request.resource.data);
       allow update, delete: if signedIn()
         && resource.data.hostId == request.auth.uid
-        && request.resource.data.hostId == resource.data.hostId;
+        && request.resource.data.hostId == resource.data.hostId
+        && (!resource.data.keys().hasAny(['listingType']) || request.resource.data.keys().hasAny(['listingType']))
+        && safeTypedListing(request.resource.data);
     }
 
     match /bookings/{bookingId} {
@@ -559,7 +700,8 @@ service cloud.firestore {
         && request.resource.data.guestId == request.auth.uid
         && request.resource.data.guestId != request.resource.data.hostId
         && bookingStatus(request.resource.data)
-        && request.resource.data.status == 'pending';
+        && request.resource.data.status == 'pending'
+        && safeOfferingInquiry(request.resource.data);
 
       allow read: if signedIn()
         && (resource.data.guestId == request.auth.uid
@@ -638,6 +780,7 @@ service cloud.firestore {
         && request.resource.data.status == 'draft'
         && request.resource.data.isFinalized == false;
       allow get: if signedIn() && resource.data.requesterId == request.auth.uid;
+      allow list: if signedIn() && resource.data.requesterId == request.auth.uid;
       allow update: if signedIn()
         && resource.data.requesterId == request.auth.uid
         && request.resource.data.requesterId == resource.data.requesterId
@@ -766,7 +909,7 @@ service cloud.firestore {
         && request.resource.data.requesterId == request.auth.uid
         && safeTransportRequest(request.resource.data);
       allow get: if signedIn() && resource.data.requesterId == request.auth.uid;
-      allow list: if false;
+      allow list: if signedIn() && resource.data.requesterId == request.auth.uid;
       allow update, delete: if false;
     }
 
@@ -784,7 +927,7 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid
         && safeTransportProvider(request.resource.data);
       allow get: if signedIn() && resource.data.userId == request.auth.uid;
-      allow list: if false;
+      allow list: if signedIn() && resource.data.userId == request.auth.uid;
       allow update, delete: if false;
     }
 

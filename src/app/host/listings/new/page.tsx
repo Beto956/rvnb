@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { setDoc, doc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 
@@ -30,6 +30,7 @@ export default function NewListingPage() {
 
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string>("");
+  const created = useRef<{ uid: string; id: string; saved: boolean } | null>(null);
 
   async function handleCreate(values: ListingFormValues) {
     setStatus("");
@@ -63,9 +64,14 @@ export default function NewListingPage() {
       const location = buildLocationFields(values, geo);
       if (location) Object.assign(basePayload, location);
 
-      await addDoc(collection(db, "listings"), basePayload);
-
-      router.push("/host");
+      if (!created.current || created.current.uid !== userUid) {
+        created.current = { uid: userUid, id: doc(collection(db, "listings")).id, saved: false };
+      }
+      const target = created.current;
+      if (target.saved) delete basePayload.createdAt;
+      await setDoc(doc(db, "listings", target.id), basePayload, { merge: true });
+      target.saved = true;
+      return target.id;
     } catch (e) {
       console.error(e);
       setStatus("❌ Could not create listing.");
@@ -91,12 +97,15 @@ export default function NewListingPage() {
         </div>
 
         <HostListingForm
+          key={userUid}
           initialValues={DEFAULT_LISTING_FORM_VALUES}
           saving={saving}
           status={status}
           submitLabel="Create Listing"
           savingLabel="Creating..."
           onSubmit={handleCreate}
+          photoOwnerId={userUid}
+          onComplete={() => router.push("/host")}
         />
       </main>
     </HostGuard>

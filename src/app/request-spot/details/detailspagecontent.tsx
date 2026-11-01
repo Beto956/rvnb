@@ -33,9 +33,12 @@ type SpotRequestDoc = {
   employerName?: string;
   teamName?: string;
   teamLocation?: string;
+  representativeRole?: string;
   workersCount?: number;
   rigsCount?: number;
   spotsNeeded?: number;
+  separateSpotsNeeded?: boolean;
+  singleCoordinator?: boolean;
   stayDurationType?: string;
   moreThanOneRv?: boolean;
   additionalRvs?: unknown;
@@ -135,11 +138,16 @@ function formatStayWindow(data: SpotRequestDoc | null) {
   return `${formatDate(data?.startDate)} — ${formatDate(data?.endDate)}`;
 }
 
+function formatBoolean(value: boolean | undefined) {
+  if (typeof value !== "boolean") return "Not provided";
+  return value ? "Yes" : "No";
+}
+
 type DetailsPageContentProps = {
   requestId: string;
 };
 
-export default function DetailsPageContent({ requestId }: DetailsPageContentProps) {
+function OwnedDetailsPageContent({ requestId }: DetailsPageContentProps) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
 
@@ -162,43 +170,45 @@ export default function DetailsPageContent({ requestId }: DetailsPageContentProp
     "success" | "error" | "neutral"
   >("neutral");
 
-  const summaryItems = useMemo(
-    () => [
-      {
-        label: "Request Type",
-        value: requestData?.requestType || "Not provided",
-      },
-      {
-        label: "Destination",
-        value: formatLocation(requestData),
-      },
-      {
-        label: "Stay Window",
-        value: formatStayWindow(requestData),
-      },
-      {
-        label: "Rig Type",
-        value: formatRigType(requestData),
-      },
-      {
-        label: "Rig Length",
-        value: formatRigLength(requestData),
-      },
-      {
-        label: "Hookups",
-        value: formatHookups(requestData),
-      },
-      {
-        label: "Budget",
-        value: formatBudget(requestData),
-      },
-      {
-        label: "Team Name",
-        value: requestData?.teamName || "Not provided",
-      },
-    ],
-    [requestData]
-  );
+  const summaryItems = useMemo(() => {
+    const base = [
+      { label: "Request Type", value: requestData?.requestType || "Not provided" },
+      { label: "Destination", value: formatLocation(requestData) },
+      { label: "Stay Window", value: formatStayWindow(requestData) },
+      { label: "Rig Type", value: formatRigType(requestData) },
+      { label: "Rig Length", value: formatRigLength(requestData) },
+      { label: "Hookups", value: formatHookups(requestData) },
+      { label: "Budget", value: formatBudget(requestData) },
+    ];
+
+    if (requestData?.requestType === "Work Stay") {
+      return [
+        ...base,
+        { label: "Work Location", value: requestData.teamLocation || "Not provided" },
+        { label: "Coworker / Crew Label", value: requestData.teamName || "Not provided" },
+        { label: "Workers", value: typeof requestData.workersCount === "number" ? String(requestData.workersCount) : "Not provided" },
+        { label: "RVs", value: typeof requestData.rigsCount === "number" ? String(requestData.rigsCount) : "Not provided" },
+        { label: "Separate Spots", value: formatBoolean(requestData.separateSpotsNeeded) },
+        { label: "Spots Needed", value: typeof requestData.spotsNeeded === "number" ? String(requestData.spotsNeeded) : "Not provided" },
+      ];
+    }
+
+    if (requestData?.requestType === "Employer / Team Housing") {
+      return [
+        ...base,
+        { label: "Company", value: requestData.employerName || "Not provided" },
+        { label: "Representative Role", value: requestData.representativeRole || "Not provided" },
+        { label: "Crew / Project", value: requestData.teamName || "Not provided" },
+        { label: "Jobsite Area", value: requestData.teamLocation || "Not provided" },
+        { label: "Crew Count", value: typeof requestData.workersCount === "number" ? String(requestData.workersCount) : "Not provided" },
+        { label: "RV Count", value: typeof requestData.rigsCount === "number" ? String(requestData.rigsCount) : "Not provided" },
+        { label: "One Coordinator", value: formatBoolean(requestData.singleCoordinator) },
+        { label: "Separate Spots", value: formatBoolean(requestData.separateSpotsNeeded) },
+      ];
+    }
+
+    return base;
+  }, [requestData]);
 
   useEffect(() => {
     let isMounted = true;
@@ -418,9 +428,12 @@ export default function DetailsPageContent({ requestId }: DetailsPageContentProp
             employerName: current.employerName,
             teamName: current.teamName,
             teamLocation: current.teamLocation,
+            representativeRole: current.representativeRole,
             workersCount: current.workersCount,
             rigsCount: current.rigsCount,
             spotsNeeded: current.spotsNeeded,
+            separateSpotsNeeded: current.separateSpotsNeeded,
+            singleCoordinator: current.singleCoordinator,
             stayDurationType: current.stayDurationType,
             primaryRv: current.primaryRv,
             moreThanOneRv: current.moreThanOneRv,
@@ -580,8 +593,7 @@ export default function DetailsPageContent({ requestId }: DetailsPageContentProp
               </h2>
               <p className={styles.heroPanelText}>
                 Step 1 captured the request. Step 2 improves the way it can be
-                matched, followed up on, and eventually surfaced inside a fuller
-                RVNB request workspace.
+                matched and reviewed in your private My Requests workspace.
               </p>
 
               <div className={styles.heroPanelList}>
@@ -590,15 +602,22 @@ export default function DetailsPageContent({ requestId }: DetailsPageContentProp
                   Cleaner workflow handoff
                 </div>
                 <div className={styles.heroPanelListItem}>
-                  Future request tracking
+                  Private request tracking
                 </div>
               </div>
             </aside>
           </div>
         </section>
 
+        {!loading && !loadError && requestData?.isFinalized && <section className={styles.messageSuccess}>
+          <p>Your request is open for host responses. Responses are not confirmed bookings.</p>
+          <Link href={`/account/requests?requestId=${encodeURIComponent(requestId)}`}>View my request →</Link>
+          {" · "}<Link href="/account/requests">My Requests</Link>
+        </section>}
+
         {submitMsg ? (
           <section
+            role={submitMsgType === "error" ? "alert" : "status"}
             className={
               submitMsgType === "success"
                 ? styles.messageSuccess
@@ -991,4 +1010,9 @@ export default function DetailsPageContent({ requestId }: DetailsPageContentProp
       </div>
     </main>
   );
+}
+
+export default function DetailsPageContent({ requestId }: DetailsPageContentProps) {
+  const { user } = useAuth();
+  return <OwnedDetailsPageContent key={`${user?.uid || "anonymous"}:${requestId}`} requestId={requestId} />;
 }

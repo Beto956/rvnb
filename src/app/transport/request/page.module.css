@@ -1,4 +1,5 @@
 .page { min-height: 100vh; color: #f8fafc; background: radial-gradient(circle at 10% 0%, rgba(59,130,246,.2), transparent 34rem), linear-gradient(180deg,#030711,#07101d 50%,#030711); }
+.formFields { border: 0; padding: 0; margin: 0; min-width: 0; }
 .shell { width: min(1040px, calc(100% - 36px)); margin: 0 auto; padding: 48px 0 90px; }
 .backLink { color: #bfdbfe; font-size: .88rem; font-weight: 800; text-decoration: none; }
 .backLink:hover { color: #fff; }
@@ -24,7 +25,8 @@
 .field textarea { resize: vertical; }
 .fieldset { display: grid; gap: 18px; margin: 26px 0 0; padding: 20px; border: 1px solid rgba(148,163,184,.14); border-radius: 14px; }
 .fieldset legend { padding: 0 8px; color: #bfdbfe; font-size: .82rem; font-weight: 850; }
-.choiceField { display: grid; gap: 10px; color: rgba(226,232,240,.82); font-size: .84rem; font-weight: 760; }
+.choiceField { display: grid; gap: 10px; padding: 0; margin: 0; min-width: 0; border: 0; color: rgba(226,232,240,.82); font-size: .84rem; font-weight: 760; }
+.choiceField legend { padding: 0; margin-bottom: 10px; }
 .choiceRow { display: flex; flex-wrap: wrap; gap: 9px; }
 .choiceRow label { display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid rgba(148,163,184,.18); border-radius: 9px; color: rgba(226,232,240,.7); font-size: .78rem; font-weight: 650; }
 .choiceRow input, .confirmations input { accent-color: #60a5fa; }
@@ -42,7 +44,7 @@
 .formActions { display: flex; align-items: center; gap: 12px; margin-top: 30px; padding-top: 22px; border-top: 1px solid rgba(148,163,184,.14); }
 .actionSpacer { flex: 1; }
 .primaryButton, .secondaryButton { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; padding: 11px 16px; border: 1px solid transparent; border-radius: 10px; font: inherit; font-weight: 850; text-decoration: none; cursor: pointer; }
-.primaryButton { color: #06101d; background: #dbeafe; border-color: #eff6ff; }
+.primaryButton { color: #fff; background: #2166c4; border-color: #6da9ff; }
 .secondaryButton { color: #dbeafe; background: rgba(37,99,235,.2); border-color: rgba(147,180,255,.34); }
 .primaryButton:hover, .secondaryButton:hover, .backLink:hover { filter: brightness(1.08); }
 .primaryButton:disabled { cursor: wait; opacity: .65; }

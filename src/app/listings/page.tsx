@@ -1,7 +1,12 @@
 import Link from "next/link";
+import Image from "next/image";
+import { listingPhotos } from "@/lib/listing-photos";
 import styles from "./listings.module.css";
 
-import ListingsMapPanel from "../components/ListingsMapPanel";
+import ListingsResults from "../components/ListingsResults";
+import { hasListingCoordinates } from "@/lib/listing-location";
+import { accommodationRate, isAccommodation, listingType, record, type ListingType } from "@/lib/listing-types";
+import AuthNav from "../components/authnav";
 
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
@@ -10,6 +15,8 @@ type Hookups = "Full" | "Partial" | "None";
 type PricingType = "Night" | "Weekly" | "Monthly";
 
 type ListingDoc = {
+  listingType?: unknown;
+  accommodation?: unknown;
   title?: string;
   city?: string;
   state?: string;
@@ -27,9 +34,15 @@ type ListingDoc = {
   // NEW
   price?: number;
   pricingType?: PricingType;
+
+  imageUrl?: string;
+  photoURL?: string;
+  photos?: string[];
 };
 
 type ListingUI = {
+  listingType: ListingType | null;
+  accommodation: Record<string, unknown>;
   id: string;
   title: string;
   city: string;
@@ -42,8 +55,10 @@ type ListingUI = {
   lat?: number;
   lng?: number;
 
-  displayPriceValue: number;
+  displayPriceValue: number | null;
   displayPriceLabel: string;
+  photos: string[];
+  hasCoords: boolean;
 };
 
 function normalizePricingLabel(pricingType: PricingType): string {
@@ -63,8 +78,11 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
 
   const lat = typeof data.lat === "number" ? data.lat : undefined;
   const lng = typeof data.lng === "number" ? data.lng : undefined;
+  const hasCoords = hasListingCoordinates({ lat, lng });
 
-  const hasNewPrice = typeof data.price === "number";
+  const rate = accommodationRate(data);
+  const accommodationMode = isAccommodation(data.listingType);
+  const hasNewPrice = typeof data.price === "number" && (!accommodationMode || (Number.isFinite(data.price) && data.price >= 0));
   const hasNewPricingType =
     data.pricingType === "Night" ||
     data.pricingType === "Weekly" ||
@@ -72,6 +90,7 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
 
   if (hasNewPrice && hasNewPricingType) {
     return {
+      listingType: listingType(data.listingType), accommodation: record(data.accommodation),
       id,
       title: title || "(Untitled Listing)",
       city: city || "(City not set)",
@@ -82,6 +101,8 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
       lng,
       displayPriceValue: data.price as number,
       displayPriceLabel: normalizePricingLabel(data.pricingType as PricingType),
+      photos: listingPhotos(data),
+      hasCoords,
     };
   }
 
@@ -89,6 +110,7 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
     typeof data.pricePerNight === "number" ? data.pricePerNight : 0;
 
   return {
+    listingType: listingType(data.listingType), accommodation: record(data.accommodation),
     id,
     title: title || "(Untitled Listing)",
     city: city || "(City not set)",
@@ -97,8 +119,10 @@ function buildListingUI(id: string, data: ListingDoc): ListingUI {
     maxLengthFt,
     lat,
     lng,
-    displayPriceValue: oldPrice,
-    displayPriceLabel: "night",
+    displayPriceValue: accommodationMode ? rate.price : oldPrice,
+    displayPriceLabel: accommodationMode ? rate.label : "night",
+    photos: listingPhotos(data),
+    hasCoords,
   };
 }
 
@@ -174,23 +198,40 @@ export default async function ListingsPage({
   }
 
   if (selectedHookups !== "Any") {
-    listings = listings.filter((l) => l.hookups === selectedHookups);
+    listings = listings.filter((l) => !isAccommodation(l.listingType) && l.hookups === selectedHookups);
   }
 
   if (selectedMaxPrice !== null) {
-    listings = listings.filter((l) => l.displayPriceValue <= selectedMaxPrice);
+    listings = listings.filter((l) => l.displayPriceValue !== null && l.displayPriceValue <= selectedMaxPrice);
   }
 
   if (selectedSort === "price_asc") {
-    listings.sort((a, b) => a.displayPriceValue - b.displayPriceValue);
+    listings.sort((a, b) => (a.displayPriceValue ?? Infinity) - (b.displayPriceValue ?? Infinity));
   } else if (selectedSort === "price_desc") {
-    listings.sort((a, b) => b.displayPriceValue - a.displayPriceValue);
+    listings.sort((a, b) => (b.displayPriceValue ?? -Infinity) - (a.displayPriceValue ?? -Infinity));
   } else if (selectedSort === "title_asc") {
     listings.sort((a, b) => a.title.localeCompare(b.title));
   }
 
+  const mappedCount = listings.filter((listing) => listing.hasCoords).length;
+  const activeFilterCount = [selectedState, selectedHookups !== "Any", selectedMaxPrice !== null].filter(Boolean).length;
+
   return (
     <div className={styles.page}>
+      <header className={styles.headerBar}>
+        <div className={styles.headerInner}>
+          <Link href="/" className={styles.brand} aria-label="RVNB Home">
+            <Image src="/rvnb-logo-icon.png" alt="RVNB" className={styles.brandIcon} width={320} height={213} />
+          </Link>
+
+          <nav className={styles.nav} aria-label="Listings navigation">
+            <Link href="/search" className={styles.navLink}>Search</Link>
+            <Link href="/request-spot" className={styles.navLink}>Request a Spot</Link>
+            <AuthNav navLinkClassName={styles.navLink} navCtaClassName={styles.navCta} navLogoutClassName={styles.navLink} />
+          </nav>
+        </div>
+      </header>
+
       <div className={styles.container}>
         <div className={styles.breadcrumb}>
           <Link href="/" className={styles.breadcrumbLink}>
@@ -201,25 +242,47 @@ export default async function ListingsPage({
         </div>
 
         <div className={styles.heroCard}>
-          <h1 className={styles.h1}>RVNB Listings</h1>
-          <p className={styles.sub}>
-            Discover RV spots across the country — clean, host-backed, and built
-            for real RV life.
-          </p>
+          <div className={styles.heroCopy}>
+            <p className={styles.eyebrow}>RVNB stays marketplace</p>
+            <h1 className={styles.h1}>Find a road-ready place to park, settle, and stay.</h1>
+            <p className={styles.sub}>
+              Browse RV-ready listings with practical details up front: location, hookups,
+              rig length, price, and map coverage when hosts have saved coordinates.
+            </p>
+          </div>
 
-          <div className={styles.countLine}>
-            Showing <strong>{listings.length}</strong> spot
-            {listings.length === 1 ? "" : "s"}
+          <div className={styles.heroStats} aria-label="Listings results summary">
+            <div className={styles.statBlock}>
+              <span className={styles.statValue}>{listings.length}</span>
+              <span className={styles.statLabel}>matching spot{listings.length === 1 ? "" : "s"}</span>
+            </div>
+            <div className={styles.statBlock}>
+              <span className={styles.statValue}>{mappedCount}</span>
+              <span className={styles.statLabel}>mapped</span>
+            </div>
+            <div className={styles.statBlock}>
+              <span className={styles.statValue}>{activeFilterCount}</span>
+              <span className={styles.statLabel}>active filter{activeFilterCount === 1 ? "" : "s"}</span>
+            </div>
           </div>
         </div>
 
-        <div className={styles.sectionDivider} />
-
         <form className={styles.filtersCard} method="get" action="/listings">
+          <div className={styles.filtersTop}>
+            <div>
+              <div className={styles.filtersTitle}>Refine stays</div>
+              <div className={styles.filtersHint}>Filter by state, budget, hookups, then sort the visible cards.</div>
+            </div>
+            <Link href="/listings" className={activeFilterCount > 0 ? styles.clearAll : styles.clearAllDisabled} aria-disabled={activeFilterCount === 0}>
+              Clear filters
+            </Link>
+          </div>
+
           <div className={styles.filtersGrid}>
             <div className={styles.filtersField}>
-              <label className={styles.filtersLabel}>State</label>
+              <label className={styles.filtersLabel} htmlFor="listing-state-filter">State</label>
               <input
+                id="listing-state-filter"
                 name="state"
                 className={styles.filtersControl}
                 defaultValue={selectedState}
@@ -227,8 +290,9 @@ export default async function ListingsPage({
             </div>
 
             <div className={styles.filtersField}>
-              <label className={styles.filtersLabel}>Max Price</label>
+              <label className={styles.filtersLabel} htmlFor="listing-max-price-filter">Max Price</label>
               <input
+                id="listing-max-price-filter"
                 name="maxPrice"
                 className={styles.filtersControl}
                 defaultValue={selectedMaxPrice ?? ""}
@@ -236,8 +300,9 @@ export default async function ListingsPage({
             </div>
 
             <div className={styles.filtersField}>
-              <label className={styles.filtersLabel}>Hookups</label>
+              <label className={styles.filtersLabel} htmlFor="listing-hookups-filter">Hookups</label>
               <select
+                id="listing-hookups-filter"
                 name="hookups"
                 className={styles.filtersControl}
                 defaultValue={
@@ -252,8 +317,9 @@ export default async function ListingsPage({
             </div>
 
             <div className={styles.filtersField}>
-              <label className={styles.filtersLabel}>Sort</label>
+              <label className={styles.filtersLabel} htmlFor="listing-sort-filter">Sort</label>
               <select
+                id="listing-sort-filter"
                 name="sort"
                 className={styles.filtersControl}
                 defaultValue={selectedSort}
@@ -273,49 +339,17 @@ export default async function ListingsPage({
           </div>
         </form>
 
-        <div className={styles.resultsLayout}>
-          <div className={styles.mapCol}>
-            <ListingsMapPanel listings={listings} />
+        <div className={styles.resultsBar}>
+          <div className={styles.resultsLeft}>
+            <span className={styles.resultsCount}>{listings.length} stay{listings.length === 1 ? "" : "s"} shown</span>
+            <span className={styles.resultsDot}>•</span>
+            <span className={styles.resultsMeta}>{mappedCount} on the map</span>
           </div>
-
-          <div className={styles.cardsCol}>
-            <div className={styles.grid}>
-              {listings.map((l) => (
-                <Link
-                  key={l.id}
-                  href={`/listings/${l.id}`}
-                  className={styles.card}
-                >
-                  <div className={styles.cardTop}>
-                    <div className={styles.cardTitle}>{l.title}</div>
-                    <div className={styles.price}>
-                      <span className={styles.priceValue}>
-                        ${l.displayPriceValue}
-                      </span>
-                      <span className={styles.per}>
-                        / {l.displayPriceLabel}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className={styles.cardMeta}>
-                    <span className={styles.pill}>
-                      {l.city}, {l.state}
-                    </span>
-                    <span className={styles.pill}>{l.hookups} hookups</span>
-                    <span className={styles.pill}>
-                      Max {l.maxLengthFt} ft
-                    </span>
-                  </div>
-
-                  <div className={styles.cardCta}>
-                    View spot →
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
+          <Link href="/unique-stays" className={styles.resultsRequestLink}>Explore Unique Stays</Link>
+          <Link href="/request-spot" className={styles.resultsRequestLink}>Need something specific?</Link>
         </div>
+
+        <ListingsResults listings={listings} />
       </div>
     </div>
   );

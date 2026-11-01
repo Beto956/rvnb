@@ -19,6 +19,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
 import { approveBooking, declineBooking } from "@/lib/booking-approval";
 import { normalizeBookingStatus } from "@/lib/booking-status";
+import { listingType, listingTypeLabel, type ListingType } from "@/lib/listing-types";
 import {
   MAX_RANGE_DAYS,
   clampRangeEnd,
@@ -49,6 +50,8 @@ type BookingStatus = "pending" | "approved" | "declined" | "cancelled" | "comple
 type StayType = "rv" | "land";
 
 type Booking = {
+  listingType?: ListingType | null;
+  guestCount?: number | null;
   id: string;
   listingId: string;
   checkIn: string; // YYYY-MM-DD
@@ -176,7 +179,8 @@ function signalLabel(s: DaySignal) {
   }
 }
 
-function stayIcon(stayType?: StayType) {
+function stayIcon(stayType?: StayType, offering?: ListingType | null) {
+  if (offering === "cabin" || offering === "mobile_home") return "🏡";
   return (stayType ?? "rv") === "rv" ? "🚐" : "🏕️";
 }
 
@@ -343,6 +347,8 @@ function HostCalendarContent({
         return {
           id: d.id,
           ...(data as Omit<Booking, "id">),
+          listingType: listingType(data.listingType),
+          guestCount: typeof data.guestCount === "number" && Number.isInteger(data.guestCount) && data.guestCount >= 1 && data.guestCount <= 30 ? data.guestCount : null,
           status: normalizeBookingStatus(typeof data.status === "string" ? data.status : undefined),
           stayType: (data.stayType as StayType) ?? undefined,
         };
@@ -1158,13 +1164,14 @@ function HostCalendarContent({
                         {b.checkIn} → {b.checkOut}
                       </div>
                       <div className={styles.bookingBadge} style={bookingBadgeStyle(b.status)}>
-                        {stayIcon(b.stayType)} {b.status.toUpperCase()}
+                        {stayIcon(b.stayType, b.listingType)} {b.status.toUpperCase()}
                       </div>
                     </div>
 
                     <div style={{ marginTop: 8, opacity: 0.8, fontSize: 13 }}>
                       {b.name ? `Guest: ${b.name}` : b.email ? `Guest: ${b.email}` : `Booking ID: ${b.id}`}
                     </div>
+                    {b.listingType && <div style={{ marginTop: 8, fontSize: 13 }}>{listingTypeLabel(b.listingType)}{b.guestCount ? ` · ${b.guestCount} guests` : ""}</div>}
 
                     <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
                       {b.status === "pending" ? (
@@ -1405,9 +1412,9 @@ function ListingCalendar({
                     )}
 
                     {shown.map((b) => (
-                      <div key={b.id} className={`${styles.dayChip} ${dayChipClass(b.status)}`}>
+                      <div key={b.id} className={`${styles.dayChip} ${dayChipClass(b.status)}`} title={b.listingType ? listingTypeLabel(b.listingType) : undefined}>
                         <span>
-                          {stayIcon(b.stayType)} {b.status.toUpperCase()}
+                          {stayIcon(b.stayType, b.listingType)} {b.status.toUpperCase()}
                         </span>
                       </div>
                     ))}
@@ -1472,4 +1479,3 @@ export default function HostCalendarPage() {
     </HostGuard>
   );
 }
-

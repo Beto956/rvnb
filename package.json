@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:rules": "firebase emulators:exec --only firestore --project demo-rvnb-rules-test \"node --test firestore.rules.test.js\""
+    "test:rules": "firebase emulators:exec --only firestore --project demo-rvnb-rules-test \"node --test firestore.rules.test.js\"",
+    "emulators:demo": "firebase emulators:start --only auth,firestore,storage --project demo-rvnb-local"
   },
   "dependencies": {
     "@react-google-maps/api": "^2.20.8",

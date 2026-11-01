@@ -27,15 +27,18 @@ import HostPrioritiesPanel, { HostPriority } from "../components/HostPrioritiesP
 import HostOpportunityCard from "../components/HostOpportunityCard";
 import HostOccupancyStats from "../components/HostOccupancyStats";
 import HostRevenueSummary from "../components/HostRevenueSummary";
+import HostGrowthIntro from "../components/HostGrowthIntro";
 
 import styles from "../components/hostDashboard.module.css";
 
 import type { HostAnalyticsBooking, HostAnalyticsListing } from "../components/hostDashboardUtils";
+import { listingPhotos, type PhotoFields } from "@/lib/listing-photos";
+import { listingType, type ListingType } from "@/lib/listing-types";
 
 type Hookups = "Full" | "Partial" | "None";
 type PricingType = "Night" | "Weekly" | "Monthly";
 
-type ListingDoc = {
+type ListingDoc = PhotoFields & {
   title?: string;
   city?: string;
   state?: string;
@@ -50,6 +53,7 @@ type ListingDoc = {
 };
 
 type ListingRow = {
+  photos: string[];
   id: string;
   title: string;
   city: string;
@@ -64,12 +68,14 @@ type ListingRow = {
 type BookingType = "RV" | "LAND" | "RV_PROVIDED";
 
 type BookingDoc = {
+  listingType?: unknown;
+  guestCount?: unknown;
   listingId?: string;
   checkIn?: string;
   checkOut?: string;
   bookingType?: BookingType;
   nights?: number;
-  estimatedTotal?: number;
+  estimatedTotal?: number | null;
   note?: string;
   status?: string;
   name?: string;
@@ -77,6 +83,8 @@ type BookingDoc = {
 };
 
 type BookingRow = {
+  listingType: ListingType | null;
+  guestCount: number | null;
   id: string;
   listingId: string;
   listingTitle: string;
@@ -84,13 +92,14 @@ type BookingRow = {
   checkIn: string;
   checkOut: string;
   nights: number;
-  estimatedTotal: number;
+  estimatedTotal: number | null;
   note: string;
   status: "pending" | "approved" | "declined" | "cancelled" | "other";
 };
 
 function toListingRow(id: string, d: ListingDoc): ListingRow {
   return {
+    photos: listingPhotos(d),
     id,
     title: (d.title ?? "(Untitled Listing)").toString(),
     city: (d.city ?? "(City not set)").toString(),
@@ -186,11 +195,13 @@ export default function HostPage() {
         id: doc.id,
         listingId,
         listingTitle: listingTitleById.get(listingId) ?? "(Unknown listing)",
+        listingType: listingType(b.listingType),
+        guestCount: typeof b.guestCount === "number" && Number.isInteger(b.guestCount) && b.guestCount >= 1 && b.guestCount <= 30 ? b.guestCount : null,
         guestLabel: (b.name ?? "").toString().trim() || "Guest request",
         checkIn: (b.checkIn ?? "").toString(),
         checkOut: (b.checkOut ?? "").toString(),
         nights: typeof b.nights === "number" ? b.nights : 0,
-        estimatedTotal: typeof b.estimatedTotal === "number" ? b.estimatedTotal : 0,
+        estimatedTotal: typeof b.estimatedTotal === "number" && Number.isFinite(b.estimatedTotal) ? b.estimatedTotal : null,
         note: (b.note ?? "").toString(),
         status,
       };
@@ -382,6 +393,7 @@ export default function HostPage() {
         price: l.price,
         pricingType: l.pricingType,
         hasCoords: l.hasCoords,
+        photos: l.photos,
         upcomingBookingCount,
         pendingBookingCount,
       };
@@ -390,6 +402,8 @@ export default function HostPage() {
 
   const bookingCards = useMemo<HostBookingRequestData[]>(() => {
     return bookings.map((b) => ({
+      listingType: b.listingType,
+      guestCount: b.guestCount,
       id: b.id,
       listingTitle: b.listingTitle,
       guestLabel: b.guestLabel,
@@ -497,6 +511,7 @@ export default function HostPage() {
             </div>
 
             <div className={styles.sideCol}>
+              <HostGrowthIntro />
               <HostPrioritiesPanel priorities={priorities} />
               <HostOpportunityCard />
               <HostOccupancyStats listings={analyticsListings} bookings={analyticsBookings} />

@@ -27,7 +27,7 @@ export default function HostRevenueSummary({ listings, bookings }: Props) {
       <div style={{ marginTop: 8 }}>
         <div className={styles.cardValue}>{formatMoney(lifetimeRevenue)}</div>
         <div className={styles.muted} style={{ marginTop: 6 }}>
-          Total non-cancelled booking revenue across all your listings.
+          Non-cancelled client estimates, not collected revenue. Totals awaiting host confirmation are excluded.
         </div>
       </div>
 

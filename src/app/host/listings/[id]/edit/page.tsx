@@ -1,11 +1,14 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import type { PhotoFields } from "@/lib/listing-photos";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { deleteField, doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/lib/auth-context";
+import { listingFieldEdits, listingType, readAccommodation } from "@/lib/listing-types";
+import { normalizeStayAmenities } from "@/lib/stay-amenities";
 
 import HostGuard from "../../../../components/HostGuard";
 import HostListingForm, {
@@ -34,6 +37,7 @@ type LoadState =
   | {
       kind: "ready";
       values: ListingFormValues;
+      photos: PhotoFields;
       hadAutoCoords: boolean;
       /** Listing had any stored lat/lng (auto-geocoded or manual pin) when loaded. */
       hadCoords: boolean;
@@ -120,6 +124,9 @@ function listingToFormValues(data: ListingDoc): ListingFormValues {
   const isManualPin = data.geocodeAddress === "MANUAL_PIN" && lat !== null && lng !== null;
 
   return {
+    listingType: listingType(data.listingType) ?? "",
+    accommodation: readAccommodation(data.accommodation),
+    stayAmenities: normalizeStayAmenities(data),
     title: readString(data.title),
     city: readString(data.city),
     stateCode: readString(data.state).trim().toUpperCase(),
@@ -179,6 +186,7 @@ function EditListingContent() {
   const [loadState, setLoadState] = useState<LoadState>({ kind: "loading" });
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string>("");
+  const canRedirect = useRef(true);
 
   // When the signed-in user (or listing id) changes, drop the previous user's listing data
   // immediately and show the loading state until the effect below re-fetches the listing and
@@ -228,6 +236,7 @@ function EditListingContent() {
         };
         setLoadState({
           kind: "ready",
+          photos: data,
           values,
           hadAutoCoords,
           hadCoords,
@@ -274,11 +283,13 @@ function EditListingContent() {
       sameLocationText(s, initial.stateCode);
 
     let geocodeWarning = "";
+    canRedirect.current = true;
 
     setSaving(true);
     try {
       // Owner field (hostId) and createdAt are intentionally never written here.
-      const updates: Record<string, unknown> = buildListingFields(values);
+      // Nested field patches preserve unrecognized stored keys, not just unrelated root data.
+      const updates = listingFieldEdits(buildListingFields(initial), buildListingFields(values));
 
       // If the host never interacted with a stored amenity field, write its original string
       // back instead of the re-derived value, so legacy values (e.g. "30/50 amp") are never
@@ -286,7 +297,7 @@ function EditListingContent() {
       // saves the new value.
       const raw = loadState.rawAmenities;
       (["power", "water", "sewer", "laundry"] as const).forEach((field) => {
-        if (!raw[field] || touched[field]) return;
+        if (!(field in updates) || !raw[field] || touched[field]) return;
         // Untouched water/sewer/laundry values that recognizably map to a checkbox state
         // (e.g. "yes", " both ") keep the canonical value from buildListingFields ("Yes",
         // "Both", ...), which is the exact form search/page.tsx filters on. Power always keeps
@@ -328,10 +339,10 @@ function EditListingContent() {
       if (geocodeWarning) {
         // Stay on the page so the warning is visible.
         setStatus(geocodeWarning);
-        return;
+        canRedirect.current = false;
       }
 
-      router.push("/host");
+      return listingId;
     } catch (e) {
       console.error(e);
       setStatus("❌ Could not save listing changes.");
@@ -365,6 +376,10 @@ function EditListingContent() {
           savingLabel="Saving..."
           onSubmit={handleSave}
           legacyAmenityHints={loadState.legacyHints}
+          photoOwnerId={userUid}
+          photoListingId={listingId}
+          initialPhotos={loadState.photos}
+          onComplete={() => { if (canRedirect.current) router.push("/host"); }}
         />
       ) : (
         <section style={stateCard}>
