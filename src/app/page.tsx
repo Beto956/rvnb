@@ -6,7 +6,6 @@ import FeaturedListingsPreview from "./components/featuredlistingspreview";
 import AuthNav from "./components/authnav";
 import EcosystemNav from "./components/ecosystemnav";
 import HostGrowthIntro from "./components/HostGrowthIntro";
-import UniqueStaysIntro from "./components/UniqueStaysIntro";
 
 const journeyCards = [
   {
@@ -29,30 +28,6 @@ const journeyCards = [
     href: "/host",
     cta: "Host on RVNB",
     tone: "gold",
-  },
-] as const;
-
-const platformCards = [
-  {
-    title: "Open RV demand",
-    label: "Live",
-    href: "/requests",
-    text: "Hosts can review traveler requests, work stays, team housing needs, and location-based RV demand.",
-    meta: "Traveler requests and host opportunities",
-  },
-  {
-    title: "Transport network",
-    label: "Live intake",
-    href: "/transport",
-    text: "RV owners and transport providers can submit requests or join the early transport network.",
-    meta: "Move RVs, trailers, and equipment",
-  },
-  {
-    title: "Insurance coverage",
-    label: "Guides and intake",
-    href: "/insurance",
-    text: "Explore RV coverage considerations and submit information for future provider follow-up as the directory develops.",
-    meta: "Coverage exploration now, matching still developing",
   },
 ] as const;
 
@@ -143,31 +118,7 @@ export default function Home() {
             <Link href="/listings" className={styles.sectionAction}>View all listings</Link>
           </div>
           <FeaturedListingsPreview limitCount={3} />
-          <UniqueStaysIntro />
           <HostGrowthIntro />
-        </div>
-      </section>
-
-      <section className={styles.platformSection} aria-labelledby="platform-heading">
-        <div className={styles.container}>
-          <div className={styles.platformIntro}>
-            <p className={styles.sectionKicker}>One RVNB platform</p>
-            <h2 id="platform-heading" className={styles.sectionTitle}>More than a listing board</h2>
-            <p className={styles.sectionSub}>
-              RVNB keeps the stay workflow central while building adjacent tools around how RV travelers and hosts actually plan, move, insure, and connect.
-            </p>
-          </div>
-
-          <div className={styles.platformGrid}>
-            {platformCards.map((card) => (
-              <Link key={card.href} href={card.href} className={styles.platformCard}>
-                <span className={styles.platformLabel}>{card.label}</span>
-                <span className={styles.platformTitle}>{card.title}</span>
-                <span className={styles.platformText}>{card.text}</span>
-                <span className={styles.platformMeta}>{card.meta}</span>
-              </Link>
-            ))}
-          </div>
         </div>
       </section>
 

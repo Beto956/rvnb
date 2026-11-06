@@ -71,6 +71,15 @@ service cloud.firestore {
         && userDoc(request.auth.uid).data.role == 'host';
     }
 
+    // Owner is a server-managed Firebase custom claim (`owner: true`) on the auth
+    // token. It can only be set through the documented UID-based provisioning
+    // procedure (docs/owner-dashboard.md) — never by client code, profile writes,
+    // or signup. Map.get with a default is required: direct property access on a
+    // token without the claim errors instead of evaluating to false.
+    function isOwner() {
+      return signedIn() && request.auth.token.get('owner', false) == true;
+    }
+
     function listingExists(listingId) {
       return exists(/databases/$(database)/documents/listings/$(listingId));
     }
@@ -561,7 +570,7 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if signedIn() && request.auth.uid == userId;
+      allow read: if isOwner() || (signedIn() && request.auth.uid == userId);
       allow create: if signedIn()
         && request.auth.uid == userId
         && request.resource.data.role in ['guest', 'host'];
@@ -703,12 +712,13 @@ service cloud.firestore {
         && request.resource.data.status == 'pending'
         && safeOfferingInquiry(request.resource.data);
 
-      allow read: if signedIn()
-        && (resource.data.guestId == request.auth.uid
-          || resource.data.hostId == request.auth.uid
-          || (resource.data.listingId is string
-            && listingExists(resource.data.listingId)
-            && listingHost(resource.data.listingId) == request.auth.uid));
+      allow read: if isOwner()
+        || (signedIn()
+          && (resource.data.guestId == request.auth.uid
+            || resource.data.hostId == request.auth.uid
+            || (resource.data.listingId is string
+              && listingExists(resource.data.listingId)
+              && listingHost(resource.data.listingId) == request.auth.uid)));
 
       allow update: if signedIn()
         && resource.data.listingId is string
@@ -779,8 +789,8 @@ service cloud.firestore {
         && safePublicSpotRequest(request.resource.data)
         && request.resource.data.status == 'draft'
         && request.resource.data.isFinalized == false;
-      allow get: if signedIn() && resource.data.requesterId == request.auth.uid;
-      allow list: if signedIn() && resource.data.requesterId == request.auth.uid;
+      allow get: if isOwner() || (signedIn() && resource.data.requesterId == request.auth.uid);
+      allow list: if isOwner() || (signedIn() && resource.data.requesterId == request.auth.uid);
       allow update: if signedIn()
         && resource.data.requesterId == request.auth.uid
         && request.resource.data.requesterId == resource.data.requesterId
@@ -797,16 +807,18 @@ service cloud.firestore {
     }
 
     match /spotRequestPublic/{requestId} {
-      allow get: if signedIn()
-        && ((!exists(/databases/$(database)/documents/spotRequestPublic/$(requestId))
-          && get(/databases/$(database)/documents/spotRequests/$(requestId)).data.requesterId == request.auth.uid)
-          || (safeSpotRequestPublic(resource.data)
-            && (isHost() || resource.data.requesterId == request.auth.uid)));
-      allow list: if signedIn()
-        && isHost()
-        && resource.data.publicVersion == 2
-        && resource.data.status == 'open'
-        && resource.data.isFinalized == true;
+      allow get: if isOwner()
+        || (signedIn()
+          && ((!exists(/databases/$(database)/documents/spotRequestPublic/$(requestId))
+            && get(/databases/$(database)/documents/spotRequests/$(requestId)).data.requesterId == request.auth.uid)
+            || (safeSpotRequestPublic(resource.data)
+              && (isHost() || resource.data.requesterId == request.auth.uid))));
+      allow list: if isOwner()
+        || (signedIn()
+          && isHost()
+          && resource.data.publicVersion == 2
+          && resource.data.status == 'open'
+          && resource.data.isFinalized == true);
       allow create: if signedIn()
         && requestId == request.resource.data.requestId
         && request.resource.data.requesterId == request.auth.uid
@@ -832,11 +844,12 @@ service cloud.firestore {
         && request.resource.data.requesterId == request.auth.uid
         && safePrivateSpotRequest(request.resource.data)
         && get(/databases/$(database)/documents/spotRequests/$(requestId)).data.requesterId == request.auth.uid;
-      allow read: if signedIn()
-        && ((!exists(/databases/$(database)/documents/spotRequestPrivate/$(requestId))
-          && get(/databases/$(database)/documents/spotRequests/$(requestId)).data.requesterId == request.auth.uid)
-          || (resource.data.requesterId == request.auth.uid
-            && resource.data.requestId == requestId));
+      allow read: if isOwner()
+        || (signedIn()
+          && ((!exists(/databases/$(database)/documents/spotRequestPrivate/$(requestId))
+            && get(/databases/$(database)/documents/spotRequests/$(requestId)).data.requesterId == request.auth.uid)
+            || (resource.data.requesterId == request.auth.uid
+              && resource.data.requestId == requestId)));
       allow update: if signedIn()
         && resource.data.requesterId == request.auth.uid
         && resource.data.requestId == requestId
@@ -848,8 +861,8 @@ service cloud.firestore {
 
     // Deterministic ID `${bookingId}_${reviewerId}` blocks duplicate reviews per booking.
     match /reviews/{reviewId} {
-      allow get: if resource.data.status == 'published';
-      allow list: if resource.data.status == 'published';
+      allow get: if isOwner() || resource.data.status == 'published';
+      allow list: if isOwner() || resource.data.status == 'published';
       allow create: if signedIn()
         && exists(/databases/$(database)/documents/bookings/$(request.resource.data.bookingId))
         && reviewId == request.resource.data.bookingId + '_' + request.auth.uid
@@ -877,7 +890,8 @@ service cloud.firestore {
         && request.resource.data.reporterId == request.auth.uid
         && request.resource.data.createdAt == request.time
         && safeReviewReport(request.resource.data);
-      allow get, list: if false;
+      // Moderation queue: owner-only reads; never publicly readable.
+      allow get, list: if isOwner();
       allow update, delete: if false;
     }
 
@@ -896,11 +910,12 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/spotRequestPublic/$(request.resource.data.requestId)).data.isFinalized == true
           && docId == request.resource.data.requestId + '__' + request.auth.uid
         );
-      allow read: if signedIn()
-        && ((!exists(/databases/$(database)/documents/hostOpportunities/$(docId))
-          && isHost())
-          || (resource.data.hostId == request.auth.uid)
-          || (resource.data.requesterId == request.auth.uid));
+      allow read: if isOwner()
+        || (signedIn()
+          && ((!exists(/databases/$(database)/documents/hostOpportunities/$(docId))
+            && isHost())
+            || (resource.data.hostId == request.auth.uid)
+            || (resource.data.requesterId == request.auth.uid)));
       allow update, delete: if false;
     }
 
@@ -908,8 +923,8 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.requesterId == request.auth.uid
         && safeTransportRequest(request.resource.data);
-      allow get: if signedIn() && resource.data.requesterId == request.auth.uid;
-      allow list: if signedIn() && resource.data.requesterId == request.auth.uid;
+      allow get: if isOwner() || (signedIn() && resource.data.requesterId == request.auth.uid);
+      allow list: if isOwner() || (signedIn() && resource.data.requesterId == request.auth.uid);
       allow update, delete: if false;
     }
 
@@ -917,8 +932,8 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
         && safeTransportInterest(request.resource.data);
-      allow get: if signedIn() && resource.data.userId == request.auth.uid;
-      allow list: if false;
+      allow get: if isOwner() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow list: if isOwner();
       allow update, delete: if false;
     }
 
@@ -926,8 +941,8 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
         && safeTransportProvider(request.resource.data);
-      allow get: if signedIn() && resource.data.userId == request.auth.uid;
-      allow list: if signedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isOwner() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow list: if isOwner() || (signedIn() && resource.data.userId == request.auth.uid);
       allow update, delete: if false;
     }
 
@@ -959,9 +974,11 @@ service cloud.firestore {
     }
 
     match /communityPosts/{postId} {
-      allow get: if resource.data.status == 'active'
+      allow get: if isOwner()
+        || resource.data.status == 'active'
         || (signedIn() && resource.data.authorId == request.auth.uid);
-      allow list: if resource.data.status == 'active'
+      allow list: if isOwner()
+        || resource.data.status == 'active'
         || (signedIn() && resource.data.authorId == request.auth.uid);
       allow create: if signedIn()
         && request.resource.data.authorId == request.auth.uid
@@ -987,9 +1004,11 @@ service cloud.firestore {
       allow delete: if false;
 
       match /replies/{replyId} {
-        allow get: if resource.data.status == 'active'
+        allow get: if isOwner()
+          || resource.data.status == 'active'
           || (signedIn() && resource.data.authorId == request.auth.uid);
-        allow list: if resource.data.status == 'active'
+        allow list: if isOwner()
+          || resource.data.status == 'active'
           || (signedIn() && resource.data.authorId == request.auth.uid);
         allow create: if signedIn()
           && request.resource.data.authorId == request.auth.uid
@@ -1020,8 +1039,8 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.reporterId == request.auth.uid
         && safeCommunityReport(request.resource.data);
-      allow get: if signedIn() && resource.data.reporterId == request.auth.uid;
-      allow list: if false;
+      allow get: if isOwner() || (signedIn() && resource.data.reporterId == request.auth.uid);
+      allow list: if isOwner();
       allow update, delete: if false;
     }
   }

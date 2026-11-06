@@ -26,14 +26,15 @@
 .content { max-width: 1240px; padding: 8px 30px 30px; margin: auto; }
 .notice { padding: 8px 12px; border: 1px solid #203d58; background: #0c2339; border-radius: 8px; font-size: 12px; color: #d6e3f3; line-height: 1.5; }
 .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
-.list, .responses { min-width: 0; padding: 14px; border: 1px solid #203d58; background: linear-gradient(135deg, #071827, #041321); border-radius: 9px; }
+.list, .responses { min-width: 0; max-width: 100%; box-sizing: border-box; padding: 14px; border: 1px solid #203d58; background: linear-gradient(135deg, #071827, #041321); border-radius: 9px; overflow-wrap: anywhere; }
 .page h2, .accountPanel h2 { margin: 0 0 8px; font-size: 23px; font-weight: 700; line-height: 1.3; }
 .page h3 { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.4; }
-.toolbar { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; margin: 14px 0 10px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; margin: 14px 0 10px; min-width: 0; max-width: 100%; }
+.toolbar > * { min-width: 0; max-width: 100%; }
 .filters { display: flex; gap: 5px; }
 .filters button { border: 1px solid #30516d; border-radius: 7px; background: #071929; color: #e0e8f5; padding: 7px 13px; cursor: pointer; font-size: 12px; }
 .filters button[aria-pressed="true"] { border-color: #39aeff; background: #075eaf; }
-.search { flex: 1; min-width: 150px; max-width: 220px; }
+.search { flex: 1 1 150px; min-width: 0; max-width: 220px; }
 .search input { width: 100%; border: 1px solid #30516d; border-radius: 8px; padding: 8px 10px; color: white; background: #0e2235; font-size: 12px; }
 .search input::placeholder { color: #bdcce0; }
 .requestList { list-style: none; padding: 0; margin: 0; display: grid; gap: 11px; }
@@ -82,7 +83,7 @@
   .responses { display: none; }
   .hasSelection .list { display: none; }
   .hasSelection .responses { display: block; width: 100%; }
-  .toolbar { flex-direction: column; }
-  .search { max-width: none; }
+  .toolbar { flex-direction: column; align-items: stretch; }
+  .search { max-width: none; flex-basis: auto; }
   .cardTitle h3 { flex-basis: 100%; }
 }
