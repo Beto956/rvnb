@@ -35,13 +35,13 @@ test("homepage keeps boxed hero options without duplicate small buttons", () => 
     "./components/homequicksearchbar": () => React.createElement("form", { "aria-label": "Quick Search fixture" }),
     "./components/featuredlistingspreview": () => null,
     "./components/ecosystemnav": load("src/app/components/ecosystemnav.tsx").default,
-    "./components/UniqueStaysIntro": load("src/app/components/UniqueStaysIntro.tsx").default,
     "./components/HostGrowthIntro": load("src/app/components/HostGrowthIntro.tsx").default,
   };
   for (const signedIn of [false, true]) {
     dependencies["./components/authnav"] = load("src/app/components/authnav.tsx", {
       "next/navigation": { usePathname: () => "/", useRouter: () => ({}) },
       "@/lib/auth-context": { useAuth: () => ({ user: signedIn ? { uid: "demo-user" } : null, loading: false }) },
+      "@/lib/use-is-owner": { useIsOwner: () => ({ isOwner: false, loading: false, error: "", retry: () => {}, refreshClaim: () => {} }) },
     }).default;
     const html = render(load("src/app/page.tsx", dependencies).default);
     const hero = html.slice(html.indexOf('aria-labelledby="home-hero-title"'), html.indexOf("</section>"));
@@ -99,13 +99,14 @@ test("featured loading failure relies on its adjacent section listing link witho
   assert.match(preview, /Create the first listing/);
 });
 
-test("homepage feature and hub retain public Unique Stays links without another feature", () => {
-  const Intro = load("src/app/components/UniqueStaysIntro.tsx").default;
+test("homepage keeps a single Unique Stays entry in the hub, without the duplicate lower panel", () => {
   const Hub = load("src/app/components/ecosystemnav.tsx").default;
-  assert.match(render(Intro), /href="\/unique-stays"/);
-  assert.match(render(Intro), /Your getaway\. Already here\./);
+  // The upper hub card is the retained Unique Stays entry.
   assert.match(render(Hub), /href="\/unique-stays"/);
-  assert.equal((readFileSync("src/app/page.tsx", "utf8").match(/<UniqueStaysIntro\s*\/>/g) || []).length, 1);
+  const home = readFileSync("src/app/page.tsx", "utf8");
+  // The duplicate "Your getaway. Already here." panel below featured listings is removed.
+  assert.ok(!home.includes("UniqueStaysIntro"), "homepage must not render the duplicate UniqueStaysIntro panel");
+  assert.ok(!require("node:fs").existsSync("src/app/components/UniqueStaysIntro.tsx"), "UniqueStaysIntro component should be removed");
 });
 
 test("homepage Hub replaces its presentation with two stays and three truthful resource links", () => {
@@ -139,12 +140,22 @@ test("signed-out and signed-in Search navigation retain Unique Stays and existin
     const AuthNav = load("src/app/components/authnav.tsx", {
       "next/navigation": { usePathname: () => "/search", useRouter: () => ({}) },
       "@/lib/auth-context": { useAuth: () => ({ user: signedIn ? { uid: "demo-user" } : null, loading: false, logout: async () => {} }) },
+      "@/lib/use-is-owner": { useIsOwner: () => ({ isOwner: false, loading: false, error: "", retry: () => {}, refreshClaim: () => {} }) },
     }).default;
     const html = render(AuthNav);
     for (const href of signedIn ? ["/account", "/account/requests", "/host"] : ["/login", "/signup"]) {
       assert.ok(html.includes(`href="${href}"`), href);
     }
+    // Owner Dashboard stays hidden without a verified owner claim.
+    assert.ok(!html.includes('href="/owner"'), "owner link must be hidden without the claim");
   }
+  // Verified owner claim reveals the Owner Dashboard entry.
+  const OwnerNav = load("src/app/components/authnav.tsx", {
+    "next/navigation": { usePathname: () => "/search", useRouter: () => ({}) },
+    "@/lib/auth-context": { useAuth: () => ({ user: { uid: "demo-owner" }, loading: false, logout: async () => {} }) },
+    "@/lib/use-is-owner": { useIsOwner: () => ({ isOwner: true, loading: false, error: "", retry: () => {}, refreshClaim: () => {} }) },
+  }).default;
+  assert.ok(render(OwnerNav).includes('href="/owner"'), "owner link must appear with the claim");
 });
 
 test("dashboard accommodation entry reuses the authorized form without unsupported query parameters", () => {

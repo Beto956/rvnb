@@ -74,10 +74,11 @@ validation, malware scanning, or strict server-enforced decoded-dimension limits
 
 Public `get` is allowed only under the listing-photo prefix; object listing and
 all other paths are denied. No pre-existing repository Storage rules/config were
-found. **The deployed Storage rules were not inspected.** Before deployment,
-compare them and merge this prefix policy without removing unrelated permissions.
-No Firestore rule or index change is required by the existing listing-write
-permissions, and none is included here.
+found. **Update (2026-11): these Storage rules were deployed during the previous
+release; do not redeploy them while they remain unchanged, and do not change IAM
+based on the stale pre-deployment note this paragraph replaces.** Production
+photo uploads remain unverified end-to-end. No Firestore rule or index change is
+required by the existing listing-write permissions, and none is included here.
 
 ## Configuration and deployment (separate approval required)
 
@@ -97,11 +98,11 @@ permissions, and none is included here.
   only its existing listing-photo placeholder; profile visibility and data
   loading are untouched. Preserve all existing account/request/profile changes
   when integrating.
-- After separate approval, verify/provision the intended bucket and billing,
-  preserve deployed unrelated Storage permissions, and deploy the Storage rules
-  **before** shipping the upload UI. Cross-service Firestore access in Storage
-  rules requires Firebase's Storage service-agent permission setup; review the
-  Firebase CLI prompt in the approved deployment. No Firestore rules/index
+- The Storage rules were deployed during the previous release (including the
+  cross-service Firestore access setup performed at that time). Do not redeploy
+  them while unchanged and do not change IAM based on this document's earlier
+  pre-deployment guidance. Production photo uploads remain unverified; verify
+  them end-to-end before shipping the upload UI. No Firestore rules/index
   deployment is necessary for this feature.
 - Rebuild the client if public Firebase environment settings change. Do not
   troubleshoot failed uploads with unrestricted writes.

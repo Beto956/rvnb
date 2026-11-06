@@ -1671,3 +1671,182 @@ test("community report creation enforces reporter identity, reason enum, and imm
   await assertFails(updateDoc(doc(guestDb, "communityReports/report-1"), { status: "resolved" }));
   await assertFails(deleteDoc(doc(guestDb, "communityReports/report-1")));
 });
+
+// ---------------------------------------------------------------------------
+// Owner dashboard: server-managed custom claim `owner: true`
+// ---------------------------------------------------------------------------
+
+const ownerAccount = { uid: "owner-1", email: "owner@example.com" };
+
+function dbAsOwner() {
+  return testEnv.authenticatedContext(ownerAccount.uid, { email: ownerAccount.email, owner: true }).firestore();
+}
+
+async function seedOwnerDatasets() {
+  await seed("bookings/booking-1", pendingBooking());
+  await seed("spotRequests/request-1", draftRequest());
+  await seed("spotRequestPublic/request-1", publicRequest("request-1"));
+  await seed("spotRequestPrivate/request-1", {
+    requestId: "request-1",
+    requesterId: users.guest.uid,
+    contactName: "Guest One",
+    contactEmail: users.guest.email,
+    finalNotes: "Private note",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  await seed("hostOpportunities/request-1__host-1", {
+    requestId: "request-1",
+    hostId: users.host.uid,
+    requesterId: users.guest.uid,
+    fullName: "Host One",
+    cityLocation: "Dallas",
+    stateRegion: "TX",
+    createdAt: new Date(),
+  });
+  await seed("transportRequests/transport-1", transportRequest());
+  await seed("transportProviders/provider-1", transportProvider());
+  await seed("transportInterest/interest-1", transportInterest());
+  await seed("communityPosts/post-1", communityPost({ status: "removed" }));
+  await seed("communityPosts/post-1/replies/reply-1", communityReply({ status: "removed" }));
+  await seed("communityReports/report-1", communityReport());
+  await seed("bookings/booking-completed", completedBooking());
+  await seed("reviews/booking-completed_guest-1", travelerReview());
+  await seed("reviewReports/report-1", reviewReport());
+}
+
+test("owner can read every dashboard dataset, including private and removed records", async () => {
+  await seedOwnerDatasets();
+  const ownerDb = dbAsOwner();
+
+  // Member accounts (needed for moderation context)
+  await assertSucceeds(getDoc(doc(ownerDb, "users/guest-1")));
+  await assertSucceeds(getDocs(collection(ownerDb, "users")));
+  // Bookings / stay inquiries
+  await assertSucceeds(getDoc(doc(ownerDb, "bookings/booking-1")));
+  await assertSucceeds(getDocs(collection(ownerDb, "bookings")));
+  // Traveler requests, drafts included, plus public/private projections
+  await assertSucceeds(getDoc(doc(ownerDb, "spotRequests/request-1")));
+  await assertSucceeds(getDocs(collection(ownerDb, "spotRequests")));
+  await assertSucceeds(getDoc(doc(ownerDb, "spotRequestPublic/request-1")));
+  await assertSucceeds(getDocs(collection(ownerDb, "spotRequestPublic")));
+  await assertSucceeds(getDoc(doc(ownerDb, "spotRequestPrivate/request-1")));
+  // Host responses & applications
+  await assertSucceeds(getDoc(doc(ownerDb, "hostOpportunities/request-1__host-1")));
+  await assertSucceeds(getDocs(query(collection(ownerDb, "hostOpportunities"), where("requestId", "==", "request-1"))));
+  // Transport datasets
+  await assertSucceeds(getDoc(doc(ownerDb, "transportRequests/transport-1")));
+  await assertSucceeds(getDocs(collection(ownerDb, "transportRequests")));
+  await assertSucceeds(getDoc(doc(ownerDb, "transportProviders/provider-1")));
+  await assertSucceeds(getDocs(collection(ownerDb, "transportProviders")));
+  await assertSucceeds(getDoc(doc(ownerDb, "transportInterest/interest-1")));
+  await assertSucceeds(getDocs(collection(ownerDb, "transportInterest")));
+  // Community content, including removed items, and both report queues
+  await assertSucceeds(getDoc(doc(ownerDb, "communityPosts/post-1")));
+  await assertSucceeds(getDocs(collection(ownerDb, "communityPosts")));
+  await assertSucceeds(getDoc(doc(ownerDb, "communityPosts/post-1/replies/reply-1")));
+  await assertSucceeds(getDocs(collection(ownerDb, "communityPosts/post-1/replies")));
+  await assertSucceeds(getDoc(doc(ownerDb, "communityReports/report-1")));
+  await assertSucceeds(getDocs(collection(ownerDb, "communityReports")));
+  await assertSucceeds(getDoc(doc(ownerDb, "reviews/booking-completed_guest-1")));
+  await assertSucceeds(getDocs(collection(ownerDb, "reviews")));
+  await assertSucceeds(getDoc(doc(ownerDb, "reviewReports/report-1")));
+  await assertSucceeds(getDocs(collection(ownerDb, "reviewReports")));
+  // Server-side aggregation used by the dashboard overview
+  await assertSucceeds(getCountFromServer(collection(ownerDb, "bookings")));
+  await assertSucceeds(getCountFromServer(collection(ownerDb, "communityReports")));
+  await assertSucceeds(getCountFromServer(collection(ownerDb, "transportInterest")));
+});
+
+test("anonymous visitors, members, and hosts are denied owner-only reads", async () => {
+  await seedOwnerDatasets();
+  const anonDb = testEnv.unauthenticatedContext().firestore();
+  const guestDb = dbAsGuest();
+  const hostDb = dbAsHost();
+  const otherDb = dbAsOther();
+
+  for (const db of [anonDb, guestDb, hostDb, otherDb]) {
+    await assertFails(getDocs(collection(db, "communityReports")));
+    await assertFails(getDoc(doc(db, "reviewReports/report-1")));
+    await assertFails(getDocs(collection(db, "reviewReports")));
+    await assertFails(getDocs(collection(db, "transportInterest")));
+  }
+  // Cross-user private records stay private for non-owners
+  await assertFails(getDoc(doc(otherDb, "users/guest-1")));
+  await assertFails(getDocs(collection(otherDb, "bookings")));
+  await assertFails(getDocs(collection(otherDb, "spotRequests")));
+  await assertFails(getDoc(doc(otherDb, "spotRequestPrivate/request-1")));
+  await assertFails(getDoc(doc(otherDb, "transportRequests/transport-1")));
+  await assertFails(getDoc(doc(otherDb, "transportProviders/provider-1")));
+  // Removed community content is not public; only author/owner can read it
+  await assertFails(getDoc(doc(otherDb, "communityPosts/post-1")));
+  await assertFails(getDoc(doc(otherDb, "communityPosts/post-1/replies/reply-1")));
+  await assertSucceeds(getDoc(doc(dbAsGuest(), "communityPosts/post-1"))); // author still can
+  // Anonymous reads of private datasets fail
+  await assertFails(getDoc(doc(anonDb, "bookings/booking-1")));
+  await assertFails(getDoc(doc(anonDb, "spotRequests/request-1")));
+});
+
+test("users cannot self-promote to owner through profile writes or look-alike claims", async () => {
+  await seed("communityReports/report-1", communityReport());
+  const otherDb = dbAsOther();
+
+  // Profile updates cannot add an owner field, and role is constrained to guest/host.
+  await assertFails(updateDoc(doc(otherDb, "users/other-1"), { owner: true }));
+  await assertFails(updateDoc(doc(otherDb, "users/other-1"), { role: "owner" }));
+
+  // Profile creation does not restrict extra fields, so a user can write an
+  // "owner" field into their own document — but it is meaningless, because
+  // rules only trust the server-managed auth token claim, never document data.
+  const newUser = { uid: "new-1", email: "n@example.com" };
+  await assertSucceeds(setDoc(doc(dbAs(newUser), "users/new-1"), { email: newUser.email, role: "guest", owner: true, createdAt: new Date() }));
+  await assertFails(getDocs(collection(dbAs(newUser), "communityReports")));
+
+  // Same for a stale profile document carrying an owner field.
+  await seed("users/other-1", { email: users.other.email, role: "guest", owner: true, createdAt: new Date() });
+  await assertFails(getDocs(collection(otherDb, "communityReports")));
+
+  // Look-alike claim values do not satisfy `request.auth.token.owner == true`.
+  const stringClaimDb = testEnv.authenticatedContext("fake-owner", { owner: "true" }).firestore();
+  const numericClaimDb = testEnv.authenticatedContext("fake-owner-2", { owner: 1 }).firestore();
+  await assertFails(getDocs(collection(stringClaimDb, "communityReports")));
+  await assertFails(getDocs(collection(numericClaimDb, "communityReports")));
+});
+
+test("owner administrative writes remain denied across collections", async () => {
+  await seedOwnerDatasets();
+  const ownerDb = dbAsOwner();
+
+  // No booking approval/decline unless the owner is the listing host.
+  await assertFails(updateDoc(doc(ownerDb, "bookings/booking-1"), { status: "approved" }));
+  // No community moderation writes.
+  await assertFails(updateDoc(doc(ownerDb, "communityPosts/post-1"), { status: "removed", updatedAt: new Date() }));
+  await assertFails(deleteDoc(doc(ownerDb, "communityPosts/post-1")));
+  await assertFails(updateDoc(doc(ownerDb, "communityReports/report-1"), { status: "resolved" }));
+  await assertFails(deleteDoc(doc(ownerDb, "communityReports/report-1")));
+  // No writing reports as someone else.
+  await assertFails(setDoc(doc(ownerDb, "reviewReports/spoofed"), reviewReport({ reporterId: users.guest.uid })));
+  // No writes to transport, requests, reviews, or other members' profiles.
+  await assertFails(updateDoc(doc(ownerDb, "transportRequests/transport-1"), { status: "closed" }));
+  await assertFails(deleteDoc(doc(ownerDb, "transportRequests/transport-1")));
+  await assertFails(updateDoc(doc(ownerDb, "spotRequests/request-1"), { status: "open" }));
+  await assertFails(deleteDoc(doc(ownerDb, "reviews/booking-completed_guest-1")));
+  await assertFails(updateDoc(doc(ownerDb, "users/guest-1"), { displayName: "Hijacked" }));
+  await assertFails(deleteDoc(doc(ownerDb, "users/guest-1")));
+});
+
+test("owner claim does not change existing member and host workflows", async () => {
+  await seedOwnerDatasets();
+  const guestDb = dbAsGuest();
+  const hostDb = dbAsHost();
+
+  // Requester still lists only their own requests; hosts still see only open projections.
+  await assertSucceeds(getDocs(query(collection(guestDb, "spotRequests"), where("requesterId", "==", users.guest.uid))));
+  // The host board query constrains every field the list rule reads.
+  await assertSucceeds(getDocs(query(collection(hostDb, "spotRequestPublic"), where("publicVersion", "==", 2), where("status", "==", "open"), where("isFinalized", "==", true))));
+  await assertFails(getDocs(query(collection(hostDb, "spotRequests"), where("requesterId", "==", users.guest.uid))));
+  // Reporter still reads their own report; booking participants still read their booking.
+  await assertSucceeds(getDoc(doc(guestDb, "communityReports/report-1")));
+  await assertSucceeds(getDoc(doc(guestDb, "bookings/booking-1")));
+  await assertSucceeds(getDoc(doc(hostDb, "bookings/booking-1")));
+});

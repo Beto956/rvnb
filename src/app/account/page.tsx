@@ -25,6 +25,7 @@ import AccountReviewsToWritePanel, { HostedReviewOpportunity } from "./component
 import AccountSidebar, { AccountActivityItem } from "./components/AccountSidebar";
 import { AccountReceivedReview } from "./components/AccountReceivedReviewsCard";
 import { useAuth } from "@/lib/auth-context";
+import { useIsOwner } from "@/lib/use-is-owner";
 import { db } from "@/lib/firebase";
 import { normalizeBookingStatus } from "@/lib/booking-status";
 import { summarizeRatings, type ReviewDirection } from "@/lib/reviews";
@@ -68,6 +69,7 @@ type UserDoc = {
   displayName?: string;
   city?: string;
   state?: string;
+  role?: string;
   createdAt?: unknown;
 };
 
@@ -126,6 +128,9 @@ async function fetchListingsByIds(ids: string[]): Promise<Map<string, ListingDoc
 
 export default function AccountPage() {
   const { user, loading } = useAuth();
+  // Verified server-managed owner claim only; stays hidden during verification
+  // and for non-owners. No platform data is surfaced inside My Account.
+  const { isOwner } = useIsOwner();
 
   const [profileLoading, setProfileLoading] = useState(true);
   const [userDoc, setUserDoc] = useState<UserDoc | null>(null);
@@ -152,8 +157,10 @@ export default function AccountPage() {
   const [reviewsError, setReviewsError] = useState("");
 
   useEffect(() => {
+    const uid = user?.uid;
+    let active = true;
     async function loadProfile() {
-      if (!user?.uid) {
+      if (!uid) {
         setUserDoc(null);
         setProfileLoading(false);
         return;
@@ -161,22 +168,25 @@ export default function AccountPage() {
 
       setProfileLoading(true);
       try {
-        const snap = await getDoc(doc(db, "users", user.uid));
-        setUserDoc(snap.exists() ? (snap.data() as UserDoc) : null);
+        const snap = await getDoc(doc(db, "users", uid));
+        if (active) setUserDoc(snap.exists() ? (snap.data() as UserDoc) : null);
       } catch (e) {
         console.error("[RVNB] account profile load failed", e);
-        setUserDoc(null);
+        if (active) setUserDoc(null);
       } finally {
-        setProfileLoading(false);
+        if (active) setProfileLoading(false);
       }
     }
 
     loadProfile();
+    return () => { active = false; };
   }, [user?.uid]);
 
   useEffect(() => {
+    const uid = user?.uid;
+    let active = true;
     async function loadPublicProfile() {
-      if (!user?.uid) {
+      if (!uid) {
         setPublicProfileExists(false);
         setPublicProfileVisibility(null);
         setPublicProfileLoading(false);
@@ -185,7 +195,8 @@ export default function AccountPage() {
 
       setPublicProfileLoading(true);
       try {
-        const snap = await getDoc(doc(db, "memberProfiles", user.uid));
+        const snap = await getDoc(doc(db, "memberProfiles", uid));
+        if (!active) return;
         if (snap.exists()) {
           const data = snap.data() as { visibility?: MemberProfileVisibility };
           setPublicProfileExists(true);
@@ -196,19 +207,24 @@ export default function AccountPage() {
         }
       } catch (e) {
         console.error("[RVNB] public profile status load failed", e);
-        setPublicProfileExists(false);
-        setPublicProfileVisibility(null);
+        if (active) {
+          setPublicProfileExists(false);
+          setPublicProfileVisibility(null);
+        }
       } finally {
-        setPublicProfileLoading(false);
+        if (active) setPublicProfileLoading(false);
       }
     }
 
     loadPublicProfile();
+    return () => { active = false; };
   }, [user?.uid]);
 
   useEffect(() => {
+    const uid = user?.uid;
+    let active = true;
     async function loadListings() {
-      if (!user?.uid) {
+      if (!uid) {
         setMyListings([]);
         setListingsLoading(false);
         return;
@@ -217,24 +233,29 @@ export default function AccountPage() {
       setListingsLoading(true);
       setListingsError("");
       try {
-        const snap = await getDocs(query(collection(db, "listings"), where("hostId", "==", user.uid)));
-        setMyListings(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<ListingDoc, "id">) })));
+        const snap = await getDocs(query(collection(db, "listings"), where("hostId", "==", uid)));
+        if (active) setMyListings(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<ListingDoc, "id">) })));
       } catch (e) {
         const code = (e as { code?: string })?.code ?? "unknown";
         console.error(`[RVNB] account listings query failed (code: ${code})`, e);
-        setListingsError("We couldn't load your listings right now. Please try refreshing.");
-        setMyListings([]);
+        if (active) {
+          setListingsError("We couldn't load your listings right now. Please try refreshing.");
+          setMyListings([]);
+        }
       } finally {
-        setListingsLoading(false);
+        if (active) setListingsLoading(false);
       }
     }
 
     loadListings();
+    return () => { active = false; };
   }, [user?.uid]);
 
   useEffect(() => {
+    const uid = user?.uid;
+    let active = true;
     async function loadTrips() {
-      if (!user?.uid) {
+      if (!uid) {
         setMyTripsRaw([]);
         setHostedBookingsRaw([]);
         setTripListingsById(new Map());
@@ -247,13 +268,14 @@ export default function AccountPage() {
 
       try {
         const [tripsSnap, hostedSnap] = await Promise.all([
-          getDocs(query(collection(db, "bookings"), where("guestId", "==", user.uid))),
-          getDocs(query(collection(db, "bookings"), where("hostId", "==", user.uid))),
+          getDocs(query(collection(db, "bookings"), where("guestId", "==", uid))),
+          getDocs(query(collection(db, "bookings"), where("hostId", "==", uid))),
         ]);
 
         const trips = tripsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<BookingDoc, "id">) }));
         const hosted = hostedSnap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<BookingDoc, "id">) }));
 
+        if (!active) return;
         setMyTripsRaw(trips);
         setHostedBookingsRaw(hosted);
 
@@ -265,24 +287,29 @@ export default function AccountPage() {
           .filter((id): id is string => !!id);
 
         const lookup = await fetchListingsByIds(idsNeedingLookup);
-        setTripListingsById(lookup);
+        if (active) setTripListingsById(lookup);
       } catch (e) {
         const code = (e as { code?: string })?.code ?? "unknown";
         console.error(`[RVNB] account bookings query failed (code: ${code})`, e);
-        setTripsError("We couldn't load your trips right now. Please try refreshing.");
-        setMyTripsRaw([]);
-        setHostedBookingsRaw([]);
+        if (active) {
+          setTripsError("We couldn't load your trips right now. Please try refreshing.");
+          setMyTripsRaw([]);
+          setHostedBookingsRaw([]);
+        }
       } finally {
-        setTripsLoading(false);
+        if (active) setTripsLoading(false);
       }
     }
 
     loadTrips();
+    return () => { active = false; };
   }, [user?.uid]);
 
   useEffect(() => {
+    const uid = user?.uid;
+    let active = true;
     async function loadReviews() {
-      if (!user?.uid) {
+      if (!uid) {
         setReviewsWrittenIds(new Set());
         setReceivedReviewsRaw([]);
         setReviewsLoading(false);
@@ -297,14 +324,14 @@ export default function AccountPage() {
           getDocs(
             query(
               collection(db, "reviews"),
-              where("reviewerId", "==", user.uid),
+              where("reviewerId", "==", uid),
               where("status", "==", "published")
             )
           ),
           getDocs(
             query(
               collection(db, "reviews"),
-              where("revieweeId", "==", user.uid),
+              where("revieweeId", "==", uid),
               where("status", "==", "published"),
               orderBy("createdAt", "desc"),
               limit(20)
@@ -312,6 +339,7 @@ export default function AccountPage() {
           ),
         ]);
 
+        if (!active) return;
         setReviewsWrittenIds(
           new Set(writtenSnap.docs.map((d) => (d.data() as { bookingId?: string }).bookingId).filter(Boolean) as string[])
         );
@@ -350,6 +378,7 @@ export default function AccountPage() {
           }
         }));
 
+        if (!active) return;
         setReceivedReviewsRaw(receivedReviews.map((review) => ({
           ...review,
           reviewerName: reviewerNames.get(review.reviewerId) ?? "RVNB member",
@@ -357,15 +386,18 @@ export default function AccountPage() {
       } catch (e) {
         const code = (e as { code?: string })?.code ?? "unknown";
         console.error(`[RVNB] account reviews query failed (code: ${code})`, e);
-        setReviewsError("We couldn't load your reviews right now.");
-        setReviewsWrittenIds(new Set());
-        setReceivedReviewsRaw([]);
+        if (active) {
+          setReviewsError("We couldn't load your reviews right now.");
+          setReviewsWrittenIds(new Set());
+          setReceivedReviewsRaw([]);
+        }
       } finally {
-        setReviewsLoading(false);
+        if (active) setReviewsLoading(false);
       }
     }
 
     loadReviews();
+    return () => { active = false; };
   }, [user?.uid]);
 
   const displayName = useMemo(() => {
@@ -388,7 +420,9 @@ export default function AccountPage() {
   }, [userDoc?.city, userDoc?.state]);
 
   const memberSince = useMemo(() => formatMemberSince(userDoc?.createdAt), [userDoc?.createdAt]);
-  const isHost = myListings.length > 0;
+  // Host status comes from the authoritative account role, not listing count —
+  // a host with zero listings still gets host navigation.
+  const isHost = userDoc?.role === "host";
 
   // Legacy-safe conversion: one malformed record is skipped, never crashes the page and
   // never gets silently attributed to the wrong user (the Firestore query already scoped
@@ -573,15 +607,21 @@ export default function AccountPage() {
 
       <section className={styles.contentSection}>
         <div className={styles.container}>
+          {isOwner && (
+            <Link href="/owner" className={styles.ownerShortcut}>
+              <span className={styles.ownerShortcutIcon} aria-hidden="true">🛠️</span>
+              <span>
+                <strong>Owner Dashboard</strong>
+                <span className={styles.ownerShortcutSub}>Platform-wide oversight (read-only)</span>
+              </span>
+              <span className={styles.ownerShortcutArrow} aria-hidden="true">→</span>
+            </Link>
+          )}
           <AccountStatsRow
             loading={listingsLoading || tripsLoading}
             listingsCount={myListings.length}
             tripsTakenCount={tripsTakenCount}
             bookingsHostedCount={bookingsHostedCount}
-            reviewsLoading={reviewsLoading}
-            reviewsError={reviewsError}
-            reviewsAverage={reviewsSummary.average}
-            reviewsCount={reviewsSummary.count}
           />
 
           <div className={styles.layoutGrid}>

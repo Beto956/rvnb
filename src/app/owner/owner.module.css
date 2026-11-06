@@ -1,0 +1,376 @@
+.page {
+  --rvnb-muted: #9aa7c2;
+  --rvnb-muted-soft: #7e8bab;
+  --rvnb-blue: #3b82f6;
+  --rvnb-blue-soft: rgba(59, 130, 246, 0.16);
+  --rvnb-warm: #f59e0b;
+  min-height: 100vh;
+  background:
+    radial-gradient(1100px 620px at 15% -10%, rgba(60, 120, 255, 0.16), transparent),
+    radial-gradient(900px 620px at 85% 0%, rgba(80, 170, 255, 0.08), transparent),
+    #060b14;
+  color: #f5f7fb;
+  padding: 28px 16px 64px;
+}
+
+.shell {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rvnb-warm);
+  margin: 0 0 6px;
+}
+
+.title {
+  font-size: clamp(26px, 4vw, 34px);
+  margin: 0 0 8px;
+}
+
+.subtitle {
+  color: var(--rvnb-muted);
+  margin: 0;
+  max-width: 640px;
+  line-height: 1.5;
+}
+
+.headerLinks {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.pillLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--rvnb-blue-soft);
+  border: 1px solid rgba(96, 165, 250, 0.32);
+  color: #dbeafe;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pillLink:hover {
+  background: rgba(59, 130, 246, 0.24);
+}
+
+.pillLink:focus-visible,
+.button:focus-visible,
+.linkCard:focus-visible,
+.rowToggle:focus-visible {
+  outline: 2px solid var(--rvnb-blue);
+  outline-offset: 2px;
+}
+
+.notice {
+  margin: 18px 0 0;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  color: #fde68a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.section {
+  margin-top: 30px;
+  border-radius: 18px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.sectionTitle {
+  font-size: 19px;
+  margin: 0;
+}
+
+.countLabel {
+  font-size: 12px;
+  color: var(--rvnb-muted);
+}
+
+.sectionHint {
+  color: var(--rvnb-muted);
+  font-size: 13px;
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+
+.cardsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.countCard {
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(6, 11, 20, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.countValue {
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.countName {
+  font-size: 12px;
+  color: var(--rvnb-muted);
+  margin: 4px 0 0;
+  line-height: 1.4;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.row {
+  border-radius: 14px;
+  background: rgba(6, 11, 20, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px 14px;
+}
+
+.rowToggle {
+  width: 100%;
+  display: block;
+  text-align: left;
+  background: none;
+  border: none;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 10px;
+}
+
+.rowMain {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rowTitle {
+  font-weight: 600;
+  font-size: 14px;
+  color: #fff;
+}
+
+.rowTitle a {
+  color: #93c5fd;
+  text-decoration: none;
+}
+
+.rowTitle a:hover {
+  text-decoration: underline;
+}
+
+.rowMeta {
+  font-size: 12px;
+  color: var(--rvnb-muted);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  background: var(--rvnb-blue-soft);
+  color: #bfdbfe;
+  white-space: nowrap;
+}
+
+.badgeWarn {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.12);
+  color: #fde68a;
+}
+
+.badgeMuted {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--rvnb-muted);
+}
+
+.detail {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 13px;
+  line-height: 1.6;
+  color: #dbe2f4;
+}
+
+.detail dl {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) 1fr;
+  gap: 4px 12px;
+  margin: 0 0 10px;
+}
+
+.detail dt {
+  color: var(--rvnb-muted);
+}
+
+.detail dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.subList {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.subList li {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: 12px;
+}
+
+.state {
+  padding: 18px;
+  text-align: center;
+  color: var(--rvnb-muted);
+  font-size: 14px;
+}
+
+.errorBox {
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(255, 80, 80, 0.1);
+  border: 1px solid rgba(255, 80, 80, 0.25);
+  color: #fecaca;
+  font-size: 13px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.button {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.loadMore {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+}
+
+.linkGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.linkCard {
+  display: block;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(6, 11, 20, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #dbeafe;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.linkCard:hover {
+  border-color: rgba(96, 165, 250, 0.4);
+}
+
+.linkCard span {
+  display: block;
+  margin-top: 4px;
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--rvnb-muted);
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 20px 12px 48px;
+  }
+
+  .section {
+    padding: 14px;
+  }
+
+  .detail dl {
+    grid-template-columns: 1fr;
+  }
+
+  .detail dt {
+    margin-top: 6px;
+  }
+}

@@ -194,8 +194,9 @@ After explicit approval, release in this order (nothing deployed by this task):
    ready and that `listingType` has no disabled single-field indexing override.
 2. Deploy the reviewed Firestore rules **before** enabling new typed listing/
    inquiry clients. Keep Host Growth intake closed as currently implemented.
-3. Ensure the earlier photo-upload Storage rules are deployed if not already
-   approved/released; this task does not alter those rules.
+3. The earlier photo-upload Storage rules were deployed during the previous
+   release and are unchanged; do not redeploy them or change IAM. Production
+   photo uploads remain unverified end-to-end.
 4. Release the reviewed application. No data migration or production fixtures
    are needed. Do not deploy mock preview helpers.
 
