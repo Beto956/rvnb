@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { useIsOwner } from "@/lib/use-is-owner";
 
 type AuthNavProps = {
   navLinkClassName?: string;
@@ -18,6 +19,9 @@ export default function AuthNav({
   const router = useRouter();
   const pathname = usePathname();
   const { user, loading, logout } = useAuth();
+  // Hidden until the server-managed owner claim is verified — never shown on
+  // speculation, and disappears on logout/account switch.
+  const { isOwner } = useIsOwner();
 
   async function handleLogout() {
     try {
@@ -59,6 +63,12 @@ export default function AuthNav({
       <Link className={navLinkClassName} href="/account">
         My Account
       </Link>
+
+      {isOwner && (
+        <Link className={navLinkClassName} href="/owner" aria-current={pathname === "/owner" ? "page" : undefined}>
+          Owner Dashboard
+        </Link>
+      )}
 
       <button
         type="button"

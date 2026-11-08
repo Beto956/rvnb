@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { auth } from "@/lib/firebase";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { safeNextPath } from "@/lib/safe-next-path";
 
 export default function LoginPage() {
   return (
@@ -51,13 +52,10 @@ function LoginInner() {
 
   const [mounted, setMounted] = useState(false);
 
-  const nextPath = (() => {
-    const n = sp?.get("next");
-    if (!n) return "/listings";
-    if (!n.startsWith("/")) return "/listings";
-    if (n.startsWith("//")) return "/listings";
-    return n;
-  })();
+  // Default destination after a normal login is the member's account. A
+  // validated internal `?next=` (query/fragment preserved) still wins so
+  // interrupted workflows resume; external/unsafe values fall back to /account.
+  const nextPath = safeNextPath(sp?.get("next"), "/account");
 
   useEffect(() => {
     setMounted(true);
@@ -78,9 +76,9 @@ function LoginInner() {
       await signInWithEmailAndPassword(auth, e, password);
       setMessage("✅ Logged in! Redirecting…");
       router.push(nextPath);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      const code = String(err?.code || "");
+      const code = String((err as { code?: string })?.code || "");
       if (code.includes("auth/invalid-credential") || code.includes("auth/wrong-password")) {
         setError("❌ Incorrect email or password.");
       } else if (code.includes("auth/user-not-found")) {
@@ -109,9 +107,9 @@ function LoginInner() {
     try {
       await sendPasswordResetEmail(auth, e);
       setMessage("📩 Password reset email sent. Check your inbox (and spam).");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      const code = String(err?.code || "");
+      const code = String((err as { code?: string })?.code || "");
       if (code.includes("auth/user-not-found")) {
         setError("❌ No account found with that email.");
       } else {

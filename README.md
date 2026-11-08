@@ -139,6 +139,12 @@ in Trips. Public member profiles never include private requests or responses.
 Run `npx tsc --noEmit`, ESLint on changed source files, `npm run build`, and
 `npm run test:rules`. The rules script uses only the `demo-rvnb-rules-test`
 emulator project. Never point rules tests at a production project.
+Storage rules tests use a separate script, `npm run test:rules:storage`, which
+targets the `demo-rvnb-listing-photos` emulator project. Each suite's project
+must match the `projectId` hardcoded in its test file: the Storage rules read
+listing documents cross-service via `firestore.get()`, and the Storage emulator
+resolves those reads in its startup project's namespace — a mismatch makes the
+seeded listings invisible and every owner upload fail with `storage/unauthorized`.
 
 Deployment order (not performed automatically):
 

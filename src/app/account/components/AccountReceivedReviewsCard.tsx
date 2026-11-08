@@ -55,6 +55,9 @@ export default function AccountReceivedReviewsCard({ loading, error, average, co
       <p className={styles.sideCardSub}>
         ⭐ {average?.toFixed(1)} average · {count} review{count === 1 ? "" : "s"}
       </p>
+      <p className={styles.smallEmpty}>
+        Based on your {count} most recent received review{count === 1 ? "" : "s"}.
+      </p>
 
       <div className={styles.activityList}>
         {recent.map((r) => (
